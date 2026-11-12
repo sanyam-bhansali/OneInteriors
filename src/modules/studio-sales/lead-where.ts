@@ -15,6 +15,19 @@ import { NOT_SET, salesOwner, type Cursor, type LeadFilters, type SortKey } from
 
 const OPEN_STAGE: Prisma.StudioClientWhereInput = { stage: { kind: { in: ['OPEN', 'WON'] } } };
 
+/**
+ * The "Society" field (owner, 12 Nov 2026: the filter showed only "Not set"):
+ * a lead's society lives in its own column and, once linked, in its society
+ * record (Leads → Societies, typos merged), never in `fields`. So the filter
+ * reads the society record's name, else the society as typed.
+ */
+export const SOCIETY_FIELD_KEY = 'society';
+
+export function societyWhere(value: string): Prisma.StudioClientWhereInput {
+  if (value === NOT_SET) return { societyId: null, OR: [{ society: null }, { society: '' }] };
+  return { OR: [{ societyRecord: { name: value } }, { societyId: null, society: value }] };
+}
+
 /** The clock every rule reads, resolved once (AxLeads `clockNow`), in India days. */
 export interface Clock {
   now: Date;
@@ -155,6 +168,10 @@ export function leadWhere(f: LeadFilters, now: Date, meId: string | null = null)
   if (f.tags?.length) and.push({ tags: { hasSome: f.tags } });
   for (const [key, values] of Object.entries(f.custom ?? {})) {
     if (!values.length) continue;
+    if (key === SOCIETY_FIELD_KEY) {
+      and.push({ OR: values.map(societyWhere) });
+      continue;
+    }
     const parts = values.map(
       (value): Prisma.StudioClientWhereInput =>
         value === NOT_SET
