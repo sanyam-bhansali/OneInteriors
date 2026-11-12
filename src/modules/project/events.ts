@@ -112,6 +112,9 @@ export const PROJECT_EVENT_TYPES = [
   'design.step_moved',
   // The design process (owner, 24 Oct 2026; DESIGN-PROCESS-PLAN.md): a delay's reason checked; a project moved to the new steps.
   'design.delay_checked',
+  // Unticking a design step (owner, 12 Nov 2026): the untick (with what was ticked, for the history) and the delay it voided.
+  'design.unticked',
+  'design.delay_voided',
   'design.steps_switched',
   'design.step_reordered',
   'design.task_added',

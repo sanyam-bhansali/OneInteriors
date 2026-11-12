@@ -1809,6 +1809,7 @@ model HomeProject {
   designReviews      HomeDesignReview[]
   stepDelays         HomeStepDelay[]
   holds              HomeProjectHold[]
+  stepUnticks        HomeStepUntick[]
 
   /// Studio OS Phase 3: the site crews' work orders. Internal: never in any
   /// customer projection.
@@ -2220,6 +2221,7 @@ model HomeChecklistItem {
   doneNote       String?         @db.Text
   doneDocumentId String?
   delays         HomeStepDelay[]
+  unticks        HomeStepUntick[]
 
   /// The design process (owner and Hauspire's design team, 24 Oct 2026;
   /// docs/studio-os/DESIGN-PROCESS-PLAN.md §1): the step's effort in minutes
@@ -5762,6 +5764,33 @@ model HomeStepDelay {
   @@index([projectId, at])
   @@index([stepId])
   @@map("home_step_delays")
+}
+
+/// A design step unticked (owner, 12 Nov 2026: "add an option to untick
+/// ticked steps in design"): who unticked it and why, and what the tick was
+/// (its day, who ticked it, the team's sentence, its file and photo), so
+/// the history keeps them after the step lets go. Written once, never
+/// edited. Team only: NEVER crosses to the customer.
+model HomeStepUntick {
+  id             String            @id @default(cuid())
+  projectId      String
+  project        HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stepId         String
+  step           HomeChecklistItem @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  reason         String            @db.Text
+  tickedAt       DateTime
+  tickedById     String?
+  doneNote       String?           @db.Text
+  doneDocumentId String?
+  donePhotoId    String?
+  /// Days the late tick had moved the plan, put back by this untick.
+  undoneDays     Int               @default(0)
+  byId           String
+  at             DateTime          @default(now())
+
+  @@index([projectId, at])
+  @@index([stepId])
+  @@map("home_step_unticks")
 }
 
 /// A project on hold (owner, 12 Nov 2026: "if the client ghosts or needs

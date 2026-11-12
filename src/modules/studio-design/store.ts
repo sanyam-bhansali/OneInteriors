@@ -17,6 +17,7 @@ import 'server-only';
  *   (`design.workload`); a designer sees their own projects.
  */
 
+import { mayApproveHold } from '@/modules/studio-hold/rules';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { currentMember, memberOnProject } from '@/modules/studio/access';
@@ -110,8 +111,8 @@ export interface DesignStepView {
   /** Done before the project was brought onto One Interiors (docs/studio-os/BRING-IN-PROJECTS.md). */
   beforeJoining: boolean;
   doneFile: { id: string; title: string; url: string } | null;
-  /** Ticked before and unticked since: a re-tick asks nothing and moves nothing (owner, 12 Nov 2026). */
-  tickedBefore: boolean;
+  /** Unticked before (owner, 12 Nov 2026): what was ticked, and who unticked it and why. Team only. Oldest first. */
+  history: { tickedOn: string; tickedBy: string; note: string | null; file: string | null; untickedOn: string; untickedBy: string; reason: string }[];
   /** Its moves, oldest first. */
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
   /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
@@ -208,6 +209,8 @@ export interface DesignTab {
   /** Sign off the design (close it): owner, and the PM or designer on the project. */
   canClose: boolean;
   canEditPlan: boolean;
+  /** May untick a design step: the owner, a PM or the design head (owner, 12 Nov 2026). */
+  canUntick: boolean;
 }
 
 export type DesignTabResult = { ok: true; tab: DesignTab } | { ok: false; error: string };
@@ -270,7 +273,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               effortMin: true,
               approvalKind: true,
               tasks: { orderBy: { sortOrder: 'asc' }, select: { id: true, label: true, doneAt: true } },
-              delays: { orderBy: { at: 'asc' }, select: { fromDate: true, toDate: true, side: true, reason: true, note: true, at: true } },
+              delays: { orderBy: { at: 'asc' }, select: { id: true, fromDate: true, toDate: true, side: true, reason: true, note: true, at: true } },
             },
           },
         },
@@ -304,10 +307,29 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     ? await prisma.homeDocument.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true, title: true, storageKey: true } })
     : [];
   const designDocs = p.documents;
-  const ticks = items.length
-    ? await prisma.homeProjectEvent.findMany({ where: { projectId, type: 'design.ticked', refId: { in: items.map((i) => i.id) } }, select: { refId: true } })
-    : [];
-  const tickedOnce = new Set(ticks.map((t) => t.refId));
+  /* Unticks (owner, 12 Nov 2026): the voided delays drop out; each untick shows in its step's history. */
+  const [voided, unticks] = await Promise.all([
+    prisma.homeProjectEvent.findMany({ where: { projectId, type: 'design.delay_voided' }, select: { refId: true } }),
+    prisma.homeStepUntick.findMany({ where: { projectId }, orderBy: { at: 'asc' }, select: { stepId: true, byId: true, at: true, reason: true, tickedAt: true, tickedById: true, doneNote: true, doneDocumentId: true } }),
+  ]);
+  const voidedIds = new Set(voided.map((v) => v.refId));
+  const untickPeople = [...new Set(unticks.flatMap((u) => [u.byId, u.tickedById]).filter((x): x is string => typeof x === 'string'))];
+  const untickNames = untickPeople.length ? await prisma.user.findMany({ where: { id: { in: untickPeople } }, select: { id: true, name: true } }) : [];
+  const nameOf = (id: string | null | undefined) => (id ? untickNames.find((u) => u.id === id)?.name?.trim() || 'Someone' : 'Someone');
+  const untickDocIds = unticks.map((u) => u.doneDocumentId).filter((x): x is string => typeof x === 'string');
+  const untickDocs = untickDocIds.length ? await prisma.homeDocument.findMany({ where: { projectId, id: { in: untickDocIds } }, select: { id: true, title: true } }) : [];
+  const historyOf = (stepId: string): DesignStepView['history'] =>
+    unticks
+      .filter((u) => u.stepId === stepId)
+      .map((u) => ({
+        tickedOn: istDay(u.tickedAt),
+        tickedBy: nameOf(u.tickedById),
+        note: u.doneNote,
+        file: u.doneDocumentId ? (untickDocs.find((d) => d.id === u.doneDocumentId)?.title ?? null) : null,
+        untickedOn: istDay(u.at),
+        untickedBy: nameOf(u.byId),
+        reason: u.reason,
+      }));
   /* Project documents (DESIGN-PROCESS-PLAN.md §3): version numbers from the chain and the client's answers, names we make, finals. */
   const lastAnswer = new Map<string, 'APPROVED' | 'CHANGES'>();
   for (const r of [...p.designReviews].sort((a, b) => a.at.getTime() - b.at.getTime())) lastAnswer.set(r.documentId, r.verdict);
@@ -356,8 +378,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
       doneFile: i.doneDocumentId ? (fileUrl.get(i.doneDocumentId) ?? null) : null,
-      tickedBefore: tickedOnce.has(i.id),
-      moves: i.delays.map((d) => ({
+      history: historyOf(i.id),
+      moves: i.delays.filter((d) => !voidedIds.has(d.id)).map((d) => ({
         from: dayFromDb(d.fromDate),
         to: dayFromDb(d.toDate),
         side: d.side,
@@ -488,6 +510,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       canAssign,
       canClose: may('design.close'),
       canEditPlan: may('plan.edit'),
+      canUntick: !check.member.viewOnly && (may('plan.edit') || mayApproveHold(check.member)),
     },
   };
 }

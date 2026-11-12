@@ -93,6 +93,9 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
       project: { select: { introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true } } } } } },
     },
   });
+  // A delay voided by an untick (owner, 12 Nov 2026) is not a delay any more: an event, as the table is append-only.
+  const voided = rows.length ? await prisma.homeProjectEvent.findMany({ where: { type: 'design.delay_voided', refId: { in: rows.map((r) => r.id) } }, select: { refId: true } }) : [];
+  const voidedIds = new Set(voided.map((v) => v.refId));
   // A check is a project event (home_step_delays is append-only): the newest per delay.
   const checks = rows.length
     ? await prisma.homeProjectEvent.findMany({ where: { type: 'design.delay_checked', refId: { in: rows.map((r) => r.id) } }, select: { refId: true, actorId: true, at: true } })
@@ -101,7 +104,7 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
   const userIds = [...new Set([...rows.map((r) => r.byId), ...checks.map((c) => c.actorId)].filter((x): x is string => Boolean(x)))];
   const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [];
   const name = (id: string | null) => (id ? (users.find((u) => u.id === id)?.name?.trim() || 'Someone') : 'Someone');
-  const out: DelayRow[] = rows.map((r) => {
+  const out: DelayRow[] = rows.filter((r) => !voidedIds.has(r.id)).map((r) => {
     const from = dayFromDb(r.fromDate);
     const to = dayFromDb(r.toDate);
     return {

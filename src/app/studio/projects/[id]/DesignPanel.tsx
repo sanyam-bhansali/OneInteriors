@@ -28,6 +28,7 @@ import {
   shareDrawingAction,
   shareMoodBoardAction,
   tickDesignStepAction,
+  untickDesignStepAction,
 } from './design-actions';
 import { RequirementCard } from './RequirementCard';
 import type { StudioRequirementForm } from '@/modules/project/requirement-form';
@@ -191,7 +192,7 @@ const CATEGORY_WORD: Record<'ESSENTIAL' | 'PREMIUM' | 'LUXURY', string> = { ESSE
 const effortWords = (min: number | null): string | null => (min === null || min <= 0 ? null : min < 60 ? `${min} min` : `${Math.round((min / 60) * 10) / 10} h`);
 
 function Steps({ tab }: { tab: DesignTab }) {
-  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' | 'below' } | null>(null);
+  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' | 'below' | 'untick' } | null>(null);
   const { message, run, pending } = useRun();
   if (tab.steps.length === 0) return null;
   /* The client sees every design step, without dates (DESIGN-PROCESS-PLAN.md Decision 11), on every plan since 27 Oct 2026; no star to choose any (owner, 27 Oct 2026). */
@@ -219,6 +220,7 @@ function Steps({ tab }: { tab: DesignTab }) {
             <StepLine tab={tab} st={st} onOpen={(what) => setOpen(open?.id === st.id && open.what === what ? null : { id: st.id, what })} />
             {open?.id === st.id && open.what === 'tick' ? <TickForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
             {open?.id === st.id && open.what === 'move' ? <MoveForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
+            {open?.id === st.id && open.what === 'untick' ? <UntickForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
             {open?.id === st.id && open.what === 'edit' ? (
               <EditForm
                 tab={tab}
@@ -252,7 +254,7 @@ function Steps({ tab }: { tab: DesignTab }) {
   );
 }
 
-function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onOpen: (what: 'tick' | 'move' | 'edit') => void }) {
+function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onOpen: (what: 'tick' | 'move' | 'edit' | 'untick') => void }) {
   const meta = !st.inScope
     ? `Not in scope · ${tab.customerFirst} does not see it`
     : st.done
@@ -289,6 +291,14 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
           </span>
         ) : null}
         {st.done && st.beforeJoining ? <span className={`block ${muted}`}>Done before joining One Interiors</span> : null}
+        {/* Unticked before (owner, 12 Nov 2026): what was ticked stays, with who unticked it and why. Team only. */}
+        {st.history.map((h, k) => (
+          <span key={k} className={`block ${muted}`} data-testid="untick-history">
+            Ticked {dayWords(h.tickedOn)} by {h.tickedBy}
+            {h.note ? ` (“${h.note}”)` : ''}
+            {h.file ? ` · file: ${h.file}` : ''} · unticked {dayWords(h.untickedOn)} by {h.untickedBy}: {h.reason}
+          </span>
+        ))}
         {st.done && (st.doneNote || st.doneFile) ? (
           <span className={`block ${muted}`}>
             {st.doneNote ? `Team note: ${st.doneNote}` : ''}
@@ -310,6 +320,11 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         {tab.canWork && st.inScope && !st.done ? (
           <button type="button" className="btn pri sm" disabled={Boolean(st.lockedBy)} onClick={() => onOpen('tick')} title={st.lockedBy ? `Opens when the ${st.lockedBy} is recorded` : undefined}>
             Tick
+          </button>
+        ) : null}
+        {tab.canUntick && st.done ? (
+          <button type="button" className="btn ghost sm" onClick={() => onOpen('untick')}>
+            Untick
           </button>
         ) : null}
         {tab.canWork && st.inScope && !st.done && st.plannedOn && !st.lockedBy ? (
@@ -452,9 +467,7 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
       </label>
-      {st.lateDays > 0 && st.tickedBefore ? (
-        <p className={`m-0 ${muted}`}>Ticked before: its delay was answered then, and nothing moves again.</p>
-      ) : st.lateDays > 0 ? (
+      {st.lateDays > 0 ? (
         // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
         <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
           {/* Whose delay, nothing more (owner, 27 Oct 2026): the client's shows in their app as days waiting on them; ours never does. */}
@@ -487,6 +500,38 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" className="btn pri sm" disabled={pending}>
           Tick {st.label}
+        </button>
+        <button type="button" className="btn ghost sm" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      <Message m={message} />
+    </form>
+  );
+}
+
+/** Unticks a design step (owner, 12 Nov 2026): a reason, and what it undoes in plain words. */
+function UntickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
+  const { message, run, pending } = useRun();
+  const [reason, setReason] = useState('');
+  return (
+    <form
+      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => untickDesignStepAction(tab.projectId, st.id, reason), onDone);
+      }}
+    >
+      <label className="flex flex-col gap-1 text-[13px]">
+        Why untick it? (the team sees this)
+        <input className="fld" required minLength={3} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ticked by mistake" />
+      </label>
+      <p className={`m-0 ${muted}`}>
+        It undoes the tick: any dates it moved go back, any delay it filed is removed, and {tab.customerFirst} sees the step as not done again. Its sentence and file stay in the history.
+      </p>
+      <div className="flex gap-2">
+        <button type="submit" className="btn pri sm" disabled={pending}>
+          Untick {st.label}
         </button>
         <button type="button" className="btn ghost sm" onClick={onDone}>
           Cancel

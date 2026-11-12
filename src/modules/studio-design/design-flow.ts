@@ -31,7 +31,10 @@ import { docPathBelongsTo, projectDocExists, projectDocTicket, storeProjectDoc }
 import { checkUpload, finalsOf, handoverMissing, isDocType, isHandoverDocsStep, markFinalWarning, type DocType } from './documents';
 import { currentMember, memberOnProject } from '@/modules/studio/access';
 import { can, needsAssignment } from '@/modules/studio/roles';
-import { recordEvent, type ProjectActor } from '@/modules/project/events';
+import { dedupeKey, recordEvent, recordEventOnce, type EventPayload, type ProjectActor } from '@/modules/project/events';
+import { shiftStepsWithStage } from '@/modules/project/stage-settle';
+import type { RuleStage, StageKind } from '@/modules/project/project-rules';
+import { mayApproveHold } from '@/modules/studio-hold/rules';
 import { canSupersede } from '@/modules/project/locker-rules';
 import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
@@ -61,6 +64,10 @@ import {
   designWeights,
   isDesignKind,
   rechainDays,
+  checkUntickReason,
+  lateTickPlanUndo,
+  readTickUndo,
+  untickStepMoves,
   lateTickCheck,
   planStepMove,
   ROOM_MAX,
@@ -70,7 +77,7 @@ import {
 } from './rules';
 import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
-import { settleDesignPhase, shiftAfterLateTick, tickApprovalStep, tickedBefore } from './step-settle';
+import { projectOnHold, settleDesignPhase, shiftAfterLateTick, tickApprovalStep, type TickShift } from './step-settle';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -225,12 +232,11 @@ export async function tickDesignStep(
     if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them and mark each one final, then tick.` };
   }
   // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
-  // Ticked before and unticked since: the first tick's answer stands (owner, 12 Nov 2026).
   const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
-  const again = await tickedBefore(prisma, projectId, step.id);
   // On hold (owner, 12 Nov 2026): nothing is late; the hold moves the dates when it is taken off.
-  const held = (await prisma.homeProjectHold.count({ where: { projectId, status: 'ON' } })) > 0;
-  const late = again || held ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  // A re-tick after an untick asks again: the untick undid what the first tick did (owner, 12 Nov 2026).
+  const held = await projectOnHold(prisma, projectId);
+  const late = held ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
   if (!late.ok) return late;
   const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
   if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
@@ -242,10 +248,11 @@ export async function tickDesignStep(
   }
   const share = input.share === true || input.share === 'true' || input.share === 'on';
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
-  let shifted = 0;
+  let shift = null as TickShift | null;
   try {
     const outcome = await prisma.$transaction(async (tx) => {
       let docId: string | null = null;
+      let undo: Record<string, unknown> = {};
       if (stored && file) {
         const doc = await tx.homeDocument.create({
           data: {
@@ -273,18 +280,21 @@ export async function tickDesignStep(
       });
       if (count !== 1) throw new Refused('Already ticked.');
       if (late.delay && plannedDay) {
-        await tx.homeStepDelay.create({
+        const delay = await tx.homeStepDelay.create({
           data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(istDay(now)), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
+          select: { id: true },
         });
-        shifted = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today: istDay(now), byId: check.member.userId, actor, now });
+        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today: istDay(now), byId: check.member.userId, actor, now });
+        // What it moved, so an untick can put it back (owner, 12 Nov 2026).
+        undo = { lateDays: late.delay.days, side: late.delay.side, delayId: delay.id, shift: { ...shift } };
       }
-      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side, shifted } : {}) } });
+      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: docId !== null, ...undo } as EventPayload });
       const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
       await settleDesignPhase(tx, projectId, actor, now);
       return settled;
     });
     const movedWords = late.delay
-      ? ` ${shifted ? 'The steps after it, the' : 'The'} design's end and handover moved ${late.delay.days} day${late.delay.days === 1 ? '' : 's'} later${late.delay.side === 'CLIENT' ? ": the client's delay, not counted as ours" : ''}.`
+      ? ` ${shift?.movedSteps.length ? 'The steps after it, the' : 'The'} design's end and handover moved ${late.delay.days} day${late.delay.days === 1 ? '' : 's'} later${late.delay.side === 'CLIENT' ? ": the client's delay, not counted as ours" : ''}.`
       : '';
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
     return { ok: true, message: `Ticked: ${step.label}.${movedWords}${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
@@ -292,6 +302,84 @@ export async function tickDesignStep(
     if (e instanceof Refused) return { ok: false, error: e.message };
     throw e;
   }
+}
+
+/**
+ * Unticks a design step (owner, 12 Nov 2026: "add an option to untick ticked
+ * steps in design"): the owner, a PM or the design head, with a reason. It
+ * undoes what the tick did: the later steps it moved go back, the design's
+ * end and handover go back (filed with the same side, so the two moves
+ * cancel), the delay it filed is voided (an event: delays are append-only),
+ * and the client sees the step as not done. The tick's sentence and file stay
+ * in the history with "unticked by" (the `design.unticked` event).
+ */
+export async function untickDesignStep(projectId: string, stepId: string, rawReason: unknown, now = new Date()): Promise<DesignResult> {
+  const check = await memberOnProject(projectId);
+  if (!check.ok) return check;
+  const { member, access } = check;
+  if (member.viewOnly || !(access.may('plan.edit') || mayApproveHold(member))) return { ok: false, error: 'Only the owner, a project manager or the design head unticks a step.' };
+  const why = checkUntickReason(rawReason);
+  if (!why.ok) return why;
+  const stage = await prisma.homeProjectStage.findFirst({
+    where: { projectId, kind: 'DESIGN' },
+    select: { id: true, items: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, label: true, plannedOn: true, doneAt: true, doneById: true, doneNote: true, doneDocumentId: true, donePhotoId: true } } },
+  });
+  const step = stage?.items.find((i) => i.id === stepId);
+  if (!stage || !step) return { ok: false, error: GONE };
+  if (!step.doneAt) return { ok: false, error: 'This step is not ticked.' };
+  const tick = await prisma.homeProjectEvent.findFirst({ where: { projectId, type: 'design.ticked', refId: step.id }, orderBy: { at: 'desc' }, select: { payload: true } });
+  const undo = readTickUndo(tick?.payload);
+  const actor: ProjectActor = { type: 'STUDIO', id: member.userId };
+  const refused = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.homeChecklistItem.updateMany({
+      where: { id: step.id, doneAt: { not: null } },
+      data: { doneAt: null, doneById: null, doneSource: null, doneSiteLogId: null, donePhotoId: null, doneNote: null, doneDocumentId: null },
+    });
+    if (count !== 1) throw new Refused('Someone unticked it already. Reload the page.');
+    if (undo && undo.days > 0) {
+      const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== step.id }));
+      for (const m of untickStepMoves(steps, undo)) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
+      if (undo.planMoved) {
+        const rows = await tx.homeProjectStage.findMany({ where: { projectId }, orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true } });
+        const stages: RuleStage[] = rows.map((r) => ({ id: r.id, kind: r.kind as StageKind, name: r.name, plannedStart: istDay(r.plannedStart), plannedEnd: istDay(r.plannedEnd), actualEnd: r.actualEnd ? istDay(r.actualEnd) : null }));
+        const plan = lateTickPlanUndo(stages, undo.days, undo.side);
+        if (plan) {
+          for (const sMove of plan.stages) {
+            await tx.homeProjectStage.update({ where: { id: sMove.stageId }, data: { plannedStart: dayToDb(sMove.plannedStart), plannedEnd: dayToDb(sMove.plannedEnd) } });
+            const was = stages.find((x) => x.id === sMove.stageId)!;
+            if (was.kind !== 'DESIGN') await shiftStepsWithStage(tx, sMove.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: sMove.plannedStart, end: sMove.plannedEnd });
+          }
+          const reason = undo.side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO';
+          const note = `“${step.label}” unticked: its late tick's ${undo.days} day${undo.days === 1 ? '' : 's'} put back.`;
+          let leadId: string | null = null;
+          for (const r of plan.rows) {
+            const row = await tx.homeProjectDateChange.create({
+              data: { projectId, stageId: r.stageId, field: r.field, fromDate: dayToDb(r.from), toDate: dayToDb(r.to), reason, note, byId: member.userId, at: now },
+              select: { id: true },
+            });
+            leadId ??= row.id;
+          }
+          await recordEvent(tx, { projectId, type: 'date.moved', actor, refId: leadId, payload: { stageId: plan.rows[0]!.stageId, field: plan.rows[0]!.field, days: plan.days, rows: plan.rows.length, reason, customer: undo.side === 'CLIENT', stepId: step.id, untick: true }, at: now });
+        }
+      }
+    }
+    if (undo?.delayId) await recordEventOnce(tx, { projectId, type: 'design.delay_voided', actor, refId: undo.delayId, payload: { stepId: step.id }, at: now, dedupeKey: dedupeKey('delay-voided', undo.delayId) });
+    const kept = await tx.homeStepUntick.create({
+      data: { projectId, stepId: step.id, reason: why.reason, tickedAt: step.doneAt!, tickedById: step.doneById, doneNote: step.doneNote, doneDocumentId: step.doneDocumentId, donePhotoId: step.donePhotoId, undoneDays: undo?.days ?? 0, byId: member.userId, at: now },
+      select: { id: true },
+    });
+    await recordEvent(tx, { projectId, type: 'design.unticked', actor, refId: step.id, at: now, payload: { untickId: kept.id, undoneDays: undo?.days ?? 0 } });
+    await settleStageAfterTicks(tx, projectId, stage.id, actor, now);
+  }).then(
+    () => null,
+    (e: unknown) => {
+      if (e instanceof Refused) return e.message;
+      throw e;
+    },
+  );
+  if (refused) return { ok: false, error: refused };
+  const back = undo && undo.days > 0 ? ` The dates it moved went back ${undo.days} day${undo.days === 1 ? '' : 's'}, and its ${undo.side === 'CLIENT' ? "client's" : 'our'} delay is removed.` : '';
+  return { ok: true, message: `Unticked: ${step.label}.${back} The client sees it as not done; its sentence and file stay in the history.` };
 }
 
 /**
