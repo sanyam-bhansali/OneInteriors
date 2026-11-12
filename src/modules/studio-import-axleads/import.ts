@@ -179,7 +179,7 @@ export async function loadContext(db: PrismaClient, studioId: string, ax: AxExpo
  * Plan, and — unless `dryRun` — write. Returns the plan either way, so the
  * runner prints the same report for both.
  */
-export async function runImport(db: PrismaClient, input: { studioId: string; ax: AxExport; choices: Choices; dryRun: boolean; now?: Date; refresh?: boolean }): Promise<ImportOutcome> {
+export async function runImport(db: PrismaClient, input: { studioId: string; ax: AxExport; choices: Choices; dryRun: boolean; now?: Date; refresh?: boolean; keepOwners?: boolean }): Promise<ImportOutcome> {
   const now = input.now ?? new Date();
   const ctx = await loadContext(db, input.studioId, input.ax);
   const plan = planImport(input.ax, ctx, input.choices, { now, refresh: input.refresh === true });
@@ -455,7 +455,8 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
           if (l.fromImport) {
             const c = l.client;
             /* Given on AxLeads to someone not matched here: whoever has it here keeps it. */
-            const assignedToId = l.assigneeUnknown ? was.assignedToId : memberId(c.assignee);
+            /* `keepOwners` (owner, 12 Nov 2026): nobody's on AxLeads keeps whoever has it here. */
+            const assignedToId = l.assigneeUnknown || (input.keepOwners === true && !c.assignee) ? was.assignedToId ?? memberId(c.assignee) : memberId(c.assignee);
             const oldFields = was.fields && typeof was.fields === 'object' && !Array.isArray(was.fields) ? (was.fields as Record<string, unknown>) : {};
             await tx.studioClient.update({
               where: { id: l.clientId },
