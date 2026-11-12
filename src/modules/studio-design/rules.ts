@@ -384,17 +384,42 @@ export function lateTickShift(steps: readonly StepDay[], tickedId: string, today
 }
 
 /**
+ * A step ticked before its day (owner, 12 Nov 2026: "it should change
+ * according to the last task completed date"): every later step not ticked
+ * yet comes forward by the days it was early, keeping its gap. Never into
+ * the past: the move stops so no step lands before today. `days` is
+ * negative (or 0 when nothing moves).
+ */
+export function earlyTickShift(steps: readonly StepDay[], tickedId: string, doneDay: string, today: string): { days: number; moves: { id: string; from: string; to: string }[] } {
+  const at = steps.findIndex((s) => s.id === tickedId);
+  const ticked = steps[at];
+  if (!ticked?.plannedOn || !isDay(doneDay) || !isDay(today)) return { days: 0, moves: [] };
+  const later = steps.slice(at + 1).filter((s) => !s.done && s.plannedOn);
+  let days = daysBetween(ticked.plannedOn, doneDay);
+  if (days >= 0 || later.length === 0) return { days: 0, moves: [] };
+  // No step pulled before today.
+  for (const s of later) days = Math.max(days, daysBetween(s.plannedOn!, today));
+  if (days >= 0) return { days: 0, moves: [] };
+  return { days, moves: later.map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) })) };
+}
+
+/** Whose move: the client's delay, ours, or a step done early (filed as rescheduled, never anyone's delay). */
+export type ShiftSide = DelaySideName | 'EARLY';
+const reasonOfSide = (side: ShiftSide) => (side === 'CLIENT' ? 'CUSTOMER_CHANGE' : side === 'STUDIO' ? 'STUDIO' : 'OTHER');
+
+/**
  * The plan's dates after a late tick (owner, 12 Nov 2026: design end and
  * handover move too): the design stage's end and every later stage not
  * finished move by the same days, recorded as the client's change or our
  * delay, so the plan says whose days they are (project-rules.ts
  * `overallDelay`). Null when there is no design stage or nothing to move.
  */
-export function lateTickPlanMove(stages: readonly RuleStage[], days: number, side: DelaySideName): StageMovePlan | null {
-  if (days <= 0) return null;
+export function lateTickPlanMove(stages: readonly RuleStage[], days: number, side: ShiftSide): StageMovePlan | null {
+  // Later for a late tick; earlier (negative days) for one done early (owner, 12 Nov 2026: design end and handover too).
+  if (days === 0 || (side !== 'EARLY' && days < 0)) return null;
   const design = stages.find((s) => s.kind === 'DESIGN');
   if (!design) return null;
-  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, days), reason: side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO', shiftLater: true });
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, days), reason: reasonOfSide(side), shiftLater: true });
   return r.ok ? r.plan : null;
 }
 
@@ -413,7 +438,7 @@ export function checkUntickReason(raw: unknown): { ok: true; reason: string } | 
 /** What a late tick moved, as kept on its `design.ticked` event; null when it moved nothing (on time, on hold, or an older tick). */
 export interface TickUndo {
   days: number;
-  side: DelaySideName;
+  side: ShiftSide;
   delayId: string | null;
   movedSteps: string[];
   planMoved: boolean;
@@ -423,11 +448,11 @@ export function readTickUndo(payload: unknown): TickUndo | null {
   if (!payload || typeof payload !== 'object') return null;
   const o = payload as Record<string, unknown>;
   const shift = o.shift && typeof o.shift === 'object' ? (o.shift as Record<string, unknown>) : null;
-  const side = o.side === 'CLIENT' || o.side === 'STUDIO' ? o.side : null;
+  const side = o.side === 'CLIENT' || o.side === 'STUDIO' || o.side === 'EARLY' ? o.side : null;
   if (!side) return null;
   const days = shift && typeof shift.days === 'number' ? shift.days : 0;
   return {
-    days: Math.max(0, Math.round(days)),
+    days: Math.round(days),
     side,
     delayId: typeof o.delayId === 'string' ? o.delayId : null,
     movedSteps: shift && Array.isArray(shift.movedSteps) ? shift.movedSteps.filter((x): x is string => typeof x === 'string') : [],
@@ -441,17 +466,17 @@ export function readTickUndo(payload: unknown): TickUndo | null {
  * is (its day is history now).
  */
 export function untickStepMoves(steps: readonly StepDay[], undo: Pick<TickUndo, 'days' | 'movedSteps'>): { id: string; from: string; to: string }[] {
-  if (undo.days <= 0) return [];
+  if (undo.days === 0) return [];
   const moved = new Set(undo.movedSteps);
   return steps.filter((s) => moved.has(s.id) && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, -undo.days) }));
 }
 
 /** The design's end and every later stage back by the late tick's days, filed with the same side so the two moves cancel out. */
-export function lateTickPlanUndo(stages: readonly RuleStage[], days: number, side: DelaySideName): StageMovePlan | null {
-  if (days <= 0) return null;
+export function lateTickPlanUndo(stages: readonly RuleStage[], days: number, side: ShiftSide): StageMovePlan | null {
+  if (days === 0) return null;
   const design = stages.find((s) => s.kind === 'DESIGN');
   if (!design) return null;
-  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, -days), reason: side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO', shiftLater: true });
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, -days), reason: reasonOfSide(side), shiftLater: true });
   return r.ok ? r.plan : null;
 }
 

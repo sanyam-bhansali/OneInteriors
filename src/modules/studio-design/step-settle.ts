@@ -16,7 +16,7 @@ import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { settleStageAfterTicks, shiftStepsWithStage } from '@/modules/project/stage-settle';
 import type { RuleStage, StageKind } from '@/modules/project/project-rules';
 import { dayFromDb, dayToDb, istDay } from '@/modules/project/working-days';
-import { designPhaseAfterTicks, lateTickCheck, lateTickPlanMove, lateTickShift, type DelaySideName } from './rules';
+import { designPhaseAfterTicks, earlyTickShift, lateTickCheck, lateTickPlanMove, lateTickShift, type ShiftSide } from './rules';
 import type { ApprovalKind } from './template';
 
 /**
@@ -61,7 +61,8 @@ export interface TickShift {
  */
 export async function shiftAfterLateTick(
   tx: Prisma.TransactionClient,
-  input: { projectId: string; stepId: string; label: string; side: DelaySideName; today: string; byId: string; actor: ProjectActor; now: Date },
+  /** `doneDay`: the day it was done, when not today (scripts/relink-design-dates.ts). */
+  input: { projectId: string; stepId: string; label: string; side: ShiftSide; today: string; byId: string; actor: ProjectActor; now: Date; doneDay?: string },
 ): Promise<TickShift> {
   const stage = await tx.homeProjectStage.findFirst({
     where: { projectId: input.projectId, kind: 'DESIGN' },
@@ -69,8 +70,9 @@ export async function shiftAfterLateTick(
   });
   if (!stage) return { days: 0, movedSteps: [], planMoved: false };
   const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== input.stepId }));
-  const shift = lateTickShift(steps, input.stepId, input.today);
-  if (shift.days <= 0) return { days: 0, movedSteps: [], planMoved: false };
+  // Late: later by the days late. Early (owner, 12 Nov 2026): earlier by the days early, never into the past.
+  const shift = input.side === 'EARLY' ? earlyTickShift(steps, input.stepId, input.doneDay ?? input.today, input.today) : lateTickShift(steps, input.stepId, input.today);
+  if (shift.days === 0) return { days: 0, movedSteps: [], planMoved: false };
   for (const m of shift.moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
 
   const rows = await tx.homeProjectStage.findMany({
@@ -87,8 +89,9 @@ export async function shiftAfterLateTick(
       // The design stage's own steps moved above, by the late days; a later stage's steps move with it.
       if (was.kind !== 'DESIGN') await shiftStepsWithStage(tx, s.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: s.plannedStart, end: s.plannedEnd });
     }
-    const reason = input.side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO';
-    const note = `“${input.label}” ticked ${shift.days} day${shift.days === 1 ? '' : 's'} late: ${input.side === 'CLIENT' ? "the client's delay" : 'our delay'}.`;
+    const reason = input.side === 'CLIENT' ? 'CUSTOMER_CHANGE' : input.side === 'STUDIO' ? 'STUDIO' : 'OTHER';
+    const n = Math.abs(shift.days);
+    const note = input.side === 'EARLY' ? `“${input.label}” done ${n} day${n === 1 ? '' : 's'} early: the plan comes forward.` : `“${input.label}” ticked ${n} day${n === 1 ? '' : 's'} late: ${input.side === 'CLIENT' ? "the client's delay" : 'our delay'}.`;
     let leadId: string | null = null;
     for (const r of plan.rows) {
       const row = await tx.homeProjectDateChange.create({
@@ -150,6 +153,10 @@ export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: 
     });
     const shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'CLIENT', today: istDay(now), byId: userId, actor, now });
     undo = { lateDays: late.delay.days, side: 'CLIENT', delayId: delay.id, shift };
+  } else if (!held && planned && planned > istDay(now)) {
+    // Approved before its day: the later steps and the plan come forward (owner, 12 Nov 2026).
+    const shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'EARLY', today: istDay(now), byId: userId, actor, now });
+    if (shift.days !== 0) undo = { side: 'EARLY', shift };
   }
   await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: false, approval: kind, ...undo } as EventPayload });
   await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
