@@ -122,18 +122,31 @@ const s = (
  * meeting gave no effort for the two site visits and the electrical
  * drawings; those three are ours (2 h, 3 h, 2 h).
  */
+/** The steps that need their document to tick (owner, 12 Nov 2026: "all the steps where document is necessary like quotation 2d layout"). */
+export const DOCUMENT_STEPS: readonly string[] = [
+  '2D layout',
+  'Final 2D',
+  'Final 3D & renders',
+  'Final design quotation',
+  'Electrical drawings & quotation',
+  'Working drawings',
+  'Working drawings final',
+  'Post-validation changes',
+  'Final documentation for handover',
+];
+
 export const HAUSPIRE_DESIGN: readonly DesignTemplateStep[] = [
   s('Project allocation + mood board', 'DESIGNER', 0, 30, { tasks: ['Send the requirement form with the mood board'] }),
   s('Site visit', 'DESIGNER', 1, 2 * H),
   s('2D layout', 'DESIGNER', 1, 2 * H, { doc: true }),
   s('2D approval', 'CLIENT', 0, 0, { approval: 'LAYOUT_2D' }),
-  s('Final 2D', 'DESIGNER', 0, 1 * H),
+  s('Final 2D', 'DESIGNER', 0, 1 * H, { doc: true }),
   s('First draft (3D)', 'DESIGNER', 4, 16 * H, { gate: 'design advance' }),
   s('Design changes', 'DESIGNER', 1, 4 * H),
   s('Material selection', 'DESIGNER', 2, 4 * H),
   s('Final 3D & renders', 'DESIGNER', 3, 4 * H, { doc: true }),
   s('Final 3D approval', 'CLIENT', 0, 0, { approval: 'RENDER_3D' }),
-  s('Final design quotation', 'DESIGNER', 3, 30),
+  s('Final design quotation', 'DESIGNER', 3, 30, { doc: true }),
   s('Final quotation meeting', 'DESIGNER', 1, 3 * H),
   s('Post-quotation changes', 'DESIGNER', 1, 4 * H),
   s('Final design approval', 'CLIENT', 0, 0, { approval: 'DESIGN_FINAL' }),
@@ -143,7 +156,7 @@ export const HAUSPIRE_DESIGN: readonly DesignTemplateStep[] = [
   s('Working drawings approval', 'CLIENT', 0, 0, { approval: 'WORKING' }),
   s('Working drawings final', 'DESIGNER', 2, 2 * H, { doc: true }),
   s('Site validation', 'PM', 3, 4 * H, { pre: true }),
-  s('Post-validation changes', 'DESIGNER', 1, 2 * H, { pre: true }),
+  s('Post-validation changes', 'DESIGNER', 1, 2 * H, { pre: true, doc: true }),
   s('Post-validation approval', 'CLIENT', 0, 0, { pre: true, approval: 'VALIDATION' }),
   s('Final documentation for handover', 'DESIGNER', 3, 4 * H, { pre: true, doc: true }),
   s('Agreement signed', 'CLIENT', 0, 0, { pre: true }),
