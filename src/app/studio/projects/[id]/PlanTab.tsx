@@ -135,8 +135,14 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap gap-2">
 
-          <Chip tone={c?.status === 'late' ? 'bad' : 'good'}>{stageLine}</Chip>
-          <Chip tone={o.studioDays > 0 ? 'bad' : 'good'}>{overallLine}</Chip>
+          {plan.onHold ? (
+            <Chip tone="warn">On hold · nothing counts as late</Chip>
+          ) : (
+            <>
+              <Chip tone={c?.status === 'late' ? 'bad' : 'good'}>{stageLine}</Chip>
+              <Chip tone={o.studioDays > 0 ? 'bad' : 'good'}>{overallLine}</Chip>
+            </>
+          )}
         </div>
         {o.plannedHandover && o.forecastHandover ? (
           <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">

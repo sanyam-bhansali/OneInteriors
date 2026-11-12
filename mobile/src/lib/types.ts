@@ -168,6 +168,8 @@ export interface Project {
   siteMissedDays?: string[];
   /** Studio OS Phase 2: the design phase (studio-design/customer-view.ts). Older servers omit it; null with no design stage. */
   design?: Design | null;
+  /** On hold (12 Nov 2026): since when and why. Null when running; older servers omit it. */
+  hold?: { since: string; days: number; reason: 'CLIENT_NOT_RESPONDING' | 'CLIENT_NEEDS_TIME' | 'POSSESSION_LATE' | 'OTHER'; words: string } | null;
   /** The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what unlocks it. Older servers omit it. */
   lifecycle?: Lifecycle;
   /** Change orders (15 Oct 2026; project/change-order-rules.ts): extra work sent to you, newest first. Older servers omit it. */

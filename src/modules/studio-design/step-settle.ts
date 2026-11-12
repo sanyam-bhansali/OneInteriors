@@ -128,7 +128,7 @@ export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: 
     select: { id: true, stageId: true, label: true, plannedOn: true, responsible: true },
   });
   if (!step) return false;
-  const again = await tickedBefore(tx, projectId, step.id);
+  const again = (await tickedBefore(tx, projectId, step.id)) || (await tx.homeProjectHold.count({ where: { projectId, status: 'ON' } })) > 0;
   const { count } = await tx.homeChecklistItem.updateMany({
     where: { id: step.id, doneAt: null },
     data: { doneAt: now, doneById: userId, doneSource: 'TICK', doneNote: 'Approved by the client in the app.' },

@@ -228,7 +228,9 @@ export async function tickDesignStep(
   // Ticked before and unticked since: the first tick's answer stands (owner, 12 Nov 2026).
   const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
   const again = await tickedBefore(prisma, projectId, step.id);
-  const late = again ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  // On hold (owner, 12 Nov 2026): nothing is late; the hold moves the dates when it is taken off.
+  const held = (await prisma.homeProjectHold.count({ where: { projectId, status: 'ON' } })) > 0;
+  const late = again || held ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
   if (!late.ok) return late;
   const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
   if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };

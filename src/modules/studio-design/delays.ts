@@ -128,7 +128,8 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
 /** Open design steps whose day has passed, on projects still in design (a designer: their own). */
 async function lateRightNow(studioId: string, designerId: string | null, today: string): Promise<LateNowRow[]> {
   const projects = await prisma.homeProject.findMany({
-    where: { cancelledAt: null, introduction: { studioId }, stages: { some: { kind: 'DESIGN', actualEnd: null } }, ...(designerId ? { designerId } : {}) },
+    /* On hold (owner, 12 Nov 2026): not late. */
+    where: { cancelledAt: null, introduction: { studioId }, stages: { some: { kind: 'DESIGN', actualEnd: null } }, holds: { none: { status: 'ON' } }, ...(designerId ? { designerId } : {}) },
     take: 300,
     select: {
       id: true,

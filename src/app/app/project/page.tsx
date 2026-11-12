@@ -140,6 +140,12 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
                 ? `Goes up as ${project.studio} finishes each design step${design?.designer ? ` with ${design.designer}` : ''}.`
                 : `Goes up as ${project.studio} ticks off each step, with a photo you can see in Site.`}
             </p>
+            {/* On hold (owner, 12 Nov 2026): since when and why, in plain words; never the team's note. */}
+            {project.hold ? (
+              <p className="oa-note" role="status" style={{ margin: 0, padding: '10px 12px', borderRadius: 10, background: 'var(--line)', color: 'var(--ink)' }} data-testid="hold-note">
+                <b>On hold since {holdDay(project.hold.since)}</b> · {project.hold.words}. The plan picks up from here when it restarts.
+              </p>
+            ) : null}
             {/* Days the design waited on them (owner, 27 Oct 2026); never the studio's own delays. */}
             {inDesign && design && design.clientDelayDays > 0 ? (
               <span className="oa-meta">
@@ -500,6 +506,9 @@ function Changes({ changes, contractPaise }: { changes: MyProject['changes']; co
     </section>
   );
 }
+
+/** "12 Nov" for a day. */
+const holdDay = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 export default function AppProject() {
   const mine = useMyProject();

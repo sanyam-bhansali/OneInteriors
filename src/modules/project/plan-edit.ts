@@ -464,6 +464,8 @@ export interface StudioPlan {
   projectId: string;
   today: string;
   stages: PlanStageView[];
+  /** On hold (owner, 12 Nov 2026): nothing counts as late. */
+  onHold: boolean;
   /** Whole percent of the project done. */
   progressPct: number;
   /** The in-scope weights as set, added up: the editor shows it against 100%. */
@@ -513,6 +515,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
         select: { stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, note: true, at: true },
       },
       decisions: { orderBy: { dueOn: 'asc' }, select: { id: true, title: true, dueOn: true, chosenIndex: true } },
+      holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
     },
   });
   if (!p) return { ok: false, error: 'That project is not one of yours.' };
@@ -545,6 +548,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
     plan: {
       projectId,
       today,
+      onHold: (p.holds?.length ?? 0) > 0,
       progressPct: progress.pct,
       weightTotalPct: bpToPct(weightTotalBp),
       stages: statuses.map((s, i) => {

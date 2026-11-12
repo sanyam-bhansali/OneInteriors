@@ -111,6 +111,14 @@ export default function Project() {
               ))}
             </View>
             <Text style={styles.note}>{inDesign ? t('project.designSoFar.body', { studio: p.studio }) : t('project.segs.body')}</Text>
+            {p.hold ? (
+              <View accessible accessibilityRole="text" style={{ marginTop: 8, gap: 2 }}>
+                <Text style={[styles.note, { fontWeight: '600' }]}>{t('project.hold.title', { date: shortDate(p.hold.since) })}</Text>
+                <Text style={styles.note}>
+                  {t(`project.hold.${p.hold.reason}`)} {t('project.hold.body')}
+                </Text>
+              </View>
+            ) : null}
           </View>
         );
       }

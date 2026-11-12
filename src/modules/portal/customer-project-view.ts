@@ -93,6 +93,7 @@ import {
 } from './money-locker-view';
 import type { CustomerChoice } from '@/modules/project/decision-rules';
 import { CUSTOMER_DESIGN_SELECT, toCustomerDesign, type CustomerDesign } from '@/modules/studio-design/customer-view';
+import { toCustomerHold, type CustomerHold } from '@/modules/studio-hold/rules';
 import { effectivePhase, isPhase } from '@/modules/project/lifecycle-rules';
 import { windowFromLedger } from '@/modules/project/snag-window';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
@@ -191,6 +192,8 @@ export interface CustomerProject {
   siteMissedDays: string[];
   /* Studio OS Phase 2 — design (studio-design/customer-view.ts): % done, the starred milestones, the next one and the payment that opens the next step, mood board, visits, measurements, drawings to approve, what changed at closing. Null with no DESIGN stage. */
   design: CustomerDesign | null;
+  /* On hold (owner, 12 Nov 2026; studio-hold/rules.ts): since when and why, in plain words. Null when running. */
+  hold?: CustomerHold | null;
   /* The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what the customer must do to unlock it. */
   lifecycle: CustomerLifecycle;
   /* Change orders (15 Oct 2026; project/change-order-rules.ts): extra work sent to the customer, newest first. Never a draft, a cancelled one, who made it or a rate. */
@@ -319,6 +322,8 @@ export const CUSTOMER_PROJECT_SELECT = {
   },
   /* Studio OS Phase 2: the design card's columns (studio-design/customer-view.ts names them). */
   ...CUSTOMER_DESIGN_SELECT,
+  /* On hold (owner, 12 Nov 2026): status, reason key and days only. Never `note`, `askedById` or who decided. */
+  holds: { where: { status: { in: ['ON', 'ENDED'] } }, select: { status: true, reason: true, startedOn: true, endedOn: true } },
   /* Change orders: only those sent to the customer. Never `createdById`, `decidedById`, `releasedById`, `quoteId`, a line's rate or product id beyond saying it has a size. */
   changeOrders: {
     where: { status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'DECLINED', 'PAID', 'RELEASED'] } },
@@ -411,12 +416,15 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     warranty: s.warranty === true,
   }));
   const payments = customerPayments(ledgerOf, p.paidPhases, owner, new Set(p.documents.map((d) => d.id)));
-  const design = toCustomerDesign(
+  const designOnly = toCustomerDesign(
     (p.stages ?? []).find((s) => s.kind === 'DESIGN') ?? null,
     p,
     p.documents ?? [],
     ledgerOf ? ledgerOf.stages.map((s) => ({ index: s.index, label: s.label, state: s.state })) : null,
   );
+  /* Days on hold are days waited on the client (owner, 12 Nov 2026): added to "Waited on you so far". */
+  const holds = toCustomerHold((p.holds ?? []).map((h) => ({ status: h.status, reason: h.reason, startedOn: h.startedOn ? dayFromDb(h.startedOn) : null, endedOn: h.endedOn ? dayFromDb(h.endedOn) : null })), istDay(now));
+  const design = designOnly ? { ...designOnly, clientDelayDays: designOnly.clientDelayDays + holds.totalDays } : null;
   const warrantyEndsOn = p.warrantyEndsOn ? dayFromDb(p.warrantyEndsOn) : null;
   const decisions = p.decisions.map((d) => ({ title: d.title, state: decisionState(d, now) }));
   /* Change orders: each one's payments with their ledger status (a correction or a dispute counts as the ledger says). */
@@ -485,6 +493,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
   });
   return {
     id: p.id,
+    hold: holds.now,
     role: owner ? 'owner' : 'family',
     plan: planName(p.plan),
     studio: p.introduction.studio.tradeName,

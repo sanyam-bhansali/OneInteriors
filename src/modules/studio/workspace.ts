@@ -72,6 +72,9 @@ export interface ProjectsOverview {
 }
 
 /** The Projects page: every customer project this member may read, and what needs them today. Null when not a studio member. */
+/** A project on hold shows as on hold, never late (owner, 12 Nov 2026). */
+const withHold = (onHold: boolean, row: WorkspaceRow): WorkspaceRow => (onHold ? { ...row, onHold: true, lateDays: 0, customerLateDays: 0 } : row);
+
 export async function studioProjects(now = new Date()): Promise<ProjectsOverview | null> {
   const member = await currentMember();
   if (!member) return null;
@@ -96,12 +99,14 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
       siteLogs: { orderBy: { postedAt: 'desc' }, take: 1, select: { postedAt: true } },
       snags: { where: { status: 'OPEN' }, select: { title: true, room: true, status: true, fixBy: true } },
       decisions: { where: { chosenIndex: null }, orderBy: { dueOn: 'asc' }, select: { title: true, dueOn: true, chosenIndex: true } },
+      /* On hold (owner, 12 Nov 2026): not late while it is on. */
+      holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
     },
   });
   const rows = sortRows(
     projects.map((p) => {
       const b = p.introduction.brief;
-      return workspaceRow(
+      return withHold((p.holds?.length ?? 0) > 0, workspaceRow(
         {
           id: p.id,
           home: homeLabel(b),
@@ -122,7 +127,7 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
           calendar: p.introduction.studio,
         },
         now,
-      );
+      ));
     }),
   );
   return {
