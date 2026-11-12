@@ -93,8 +93,14 @@ async function main() {
           select: { id: true, number: true, clientName: true },
         })
       : [];
-    const quotes = linked.filter((q) => q.clientName.trim() !== name);
-    if (withQuotes) console.log(`Quotations: ${quotes.length ? quotes.map((q) => `${q.number} ("${q.clientName}")`).join(', ') : linked.length ? 'all already under the new name' : 'none found for this client'}`);
+    /* Only the name is swapped, so "Mr. Ganesh Pawar" becomes "Mr. Rahul Pawar"; one already carrying the new name is left alone. */
+    const lower = (v: string) => v.toLowerCase();
+    const renamedQuote = (v: string) => {
+      const at = lower(v).indexOf(lower(old.trim()));
+      return at >= 0 ? `${v.slice(0, at)}${name}${v.slice(at + old.trim().length)}`.replace(/\s+/g, ' ').trim() : name;
+    };
+    const quotes = linked.filter((q) => !lower(q.clientName).includes(lower(name))).map((q) => ({ ...q, to: renamedQuote(q.clientName) }));
+    if (withQuotes) console.log(`Quotations: ${quotes.length ? quotes.map((q) => `${q.number} "${q.clientName}" → "${q.to}"`).join(', ') : linked.length ? 'all already under the new name' : 'none found for this client'}${linked.length > quotes.length && quotes.length ? ` (${linked.length - quotes.length} already right)` : ''}`);
     console.log(`Project: ${intro?.homeProject ? `client name ${briefChange ? `"${brief!.contactName}" → "${name}"` : 'already right'}; account ${userChange ? 'renamed' : 'kept'}; ${invites.length} invite(s) renamed` : 'none booked on this lead'}`);
     if (dryRun) {
       console.log('Dry run: nothing was written. Run again without --dry-run to rename.');
@@ -106,7 +112,7 @@ async function main() {
       if (briefChange) await tx.brief.update({ where: { id: brief!.id }, data: { contactName: name } });
       if (userChange) await tx.user.update({ where: { id: brief!.user!.id }, data: { name } });
       for (const i of invites) await tx.homeProjectInvite.update({ where: { id: i.id }, data: { name } });
-      if (quotes.length) await tx.studioQuote.updateMany({ where: { id: { in: quotes.map((q) => q.id) } }, data: { clientName: name } });
+      for (const q of quotes) await tx.studioQuote.update({ where: { id: q.id }, data: { clientName: q.to } });
       await tx.studioClientEvent.create({ data: { studioId, clientId: lead.id, kind: 'EDITED', actor: 'SYSTEM', byName: 'scripts/rename-client.ts', summary: `Name changed from "${old}" to "${name}"`, meta: { from: old, to: name } } });
       await tx.auditLog.create({ data: { actorId: null, action: 'studio.client.renamed', entityType: 'StudioClient', entityId: lead.id, after: { from: old, to: name, project: intro?.homeProject?.id ?? null, quotes: quotes.map((q) => q.number) } } });
     });
