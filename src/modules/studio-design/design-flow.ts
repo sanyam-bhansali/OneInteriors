@@ -191,6 +191,8 @@ export async function tickDesignStep(
   input: { note?: unknown; share?: unknown; reason?: unknown; reasonNote?: unknown },
   file: File | null,
   now = new Date(),
+  /* A drawing uploaded straight to storage (up to 50 MB; owner, 12 Nov 2026: a working drawing over 4 MB broke the tick): its path, checked here. */
+  uploaded: { path: string; name: string; bytes: number; type: string } | null = null,
 ): Promise<DesignResult> {
   const check = await memberOnProject(projectId, 'design.work');
   if (!check.ok) return check;
@@ -205,7 +207,7 @@ export async function tickDesignStep(
   const step = p?.stages[0]?.items[0];
   if (!p || !step) return { ok: false, error: GONE };
   const note = typeof input.note === 'string' ? input.note.replace(/\r\n/g, '\n').trim() : '';
-  const hasFile = Boolean(file && file.size > 0);
+  const hasFile = Boolean(file && file.size > 0) || uploaded !== null;
   // The step waits on its own payment, or on an earlier step's (DESIGN-PROCESS-PLAN.md Decision 5).
   const gateStages = gateStagesOf(p);
   const all = await prisma.homeChecklistItem.findMany({ where: { stageId: step.stageId }, orderBy: { sortOrder: 'asc' }, select: { id: true, gatePayment: true, doneAt: true, inScope: true } });
@@ -241,10 +243,17 @@ export async function tickDesignStep(
   const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
   if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
   let stored: { path: string } | null = null;
-  if (hasFile) {
-    const s = await storeProjectDoc(projectId, file!);
+  let meta: { name: string; type: string; bytes: number } | null = null;
+  if (uploaded) {
+    if (!docPathBelongsTo(uploaded.path, projectId)) return { ok: false, error: 'That upload is not for this project. Try again.' };
+    if (!(await projectDocExists(uploaded.path))) return { ok: false, error: 'The file did not finish uploading. Try again.' };
+    stored = { path: uploaded.path };
+    meta = { name: uploaded.name, type: uploaded.type, bytes: uploaded.bytes };
+  } else if (file && file.size > 0) {
+    const s = await storeProjectDoc(projectId, file);
     if (!s.ok) return s;
     stored = s;
+    meta = { name: file.name, type: file.type, bytes: file.size };
   }
   const share = input.share === true || input.share === 'true' || input.share === 'on';
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
@@ -253,16 +262,16 @@ export async function tickDesignStep(
     const outcome = await prisma.$transaction(async (tx) => {
       let docId: string | null = null;
       let undo: Record<string, unknown> = {};
-      if (stored && file) {
+      if (stored && meta) {
         const doc = await tx.homeDocument.create({
           data: {
             projectId,
             kind: 'DRAWINGS',
             title: step.label.slice(0, TITLE_MAX),
             storageKey: stored.path,
-            originalName: file.name.slice(0, 200),
-            contentType: file.type,
-            bytes: file.size,
+            originalName: meta.name.slice(0, 200),
+            contentType: meta.type,
+            bytes: meta.bytes,
             uploadedById: check.member.userId,
             byStudio: true,
             sharedAt: share ? now : null,

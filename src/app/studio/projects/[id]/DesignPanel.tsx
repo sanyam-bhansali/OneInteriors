@@ -449,6 +449,7 @@ function AddBelowForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView;
 
 function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
   const { pending, message, run } = useRun();
+  const [busy, setBusy] = useState<string | null>(null);
   return (
     <form
       className="mt-2 flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
@@ -457,9 +458,37 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
         const data = new FormData(e.currentTarget);
         data.set('projectId', tab.projectId);
         data.set('stepId', st.id);
-        run(() => tickDesignStepAction(data), onDone);
+        const file = data.get('file');
+        run(async () => {
+          /* The file goes straight to storage (up to 50 MB), never through the page: a working drawing over 4 MB broke the tick (owner, 12 Nov 2026). */
+          if (file instanceof File && file.size > 0) {
+            if (file.size > 50 * 1024 * 1024) return { ok: false, error: 'Files can be up to 50 MB. Split a larger set into parts.' };
+            try {
+              setBusy('Getting a place for the file…');
+              const t = await fetch('/api/studio/docs/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: tab.projectId, name: file.name, bytes: file.size }) });
+              const ticket = (await t.json()) as { ok: boolean; path?: string; url?: string | null; error?: string };
+              if (!ticket.ok || !ticket.path) return { ok: false, error: ticket.error || 'We could not get a place to store that file.' };
+              if (ticket.url) {
+                setBusy(`Uploading ${Math.round(file.size / 1024 / 102.4) / 10} MB…`);
+                const put = await fetch(ticket.url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
+                if (!put.ok) return { ok: false, error: 'The upload did not finish. Try again.' };
+              }
+              data.delete('file');
+              data.set('uploadedPath', ticket.path);
+              data.set('uploadedName', file.name);
+              data.set('uploadedBytes', String(file.size));
+              data.set('uploadedType', file.type || 'application/octet-stream');
+            } catch {
+              return { ok: false, error: 'The upload did not finish. Check the connection and try again.' };
+            } finally {
+              setBusy(null);
+            }
+          }
+          return tickDesignStepAction(data);
+        }, onDone);
       }}
     >
+      {busy ? <p className="m-0 text-[12.5px] text-[var(--muted)]" role="status">{busy}</p> : null}
       <label className="flex flex-col gap-1 text-[13px]">
         {st.needsDocument ? 'The file (required): PDF or image' : 'A file, if there is one'}
         <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required={st.needsDocument} className="text-[13px]" />
