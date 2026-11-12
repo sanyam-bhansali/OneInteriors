@@ -57,6 +57,11 @@ export async function tickDesignStepAction(form: FormData): Promise<DesignResult
       id(form.get('stepId')),
       { note: text(form.get('note'), 600), share: form.get('share'), reason: text(form.get('reason'), 40) || null, reasonNote: text(form.get('reasonNote'), 600) },
       fileOf(form.get('file')),
+      new Date(),
+      // Uploaded straight to storage by the browser (any size up to 50 MB).
+      form.get('uploadedPath')
+        ? { path: text(form.get('uploadedPath'), 200), name: text(form.get('uploadedName'), 200), bytes: Number(form.get('uploadedBytes')) || 0, type: text(form.get('uploadedType'), 100) }
+        : null,
     ),
   );
 }
