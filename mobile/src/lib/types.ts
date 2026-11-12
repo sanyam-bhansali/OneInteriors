@@ -198,6 +198,9 @@ export interface Extra {
   declineReason: string | null;
   photoUrl: string | null;
   canAnswer: boolean;
+  /** Additional scope (12 Nov 2026): extra days and the day its payment is due. Older servers omit them. */
+  daysRequired?: number | null;
+  dueOn?: string | null;
 }
 
 /** A quotation to sign, or signed. Read and signed on the website's /app/signoff/:id, opened inside the app. */

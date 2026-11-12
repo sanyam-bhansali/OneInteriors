@@ -342,6 +342,8 @@ export const CUSTOMER_PROJECT_SELECT = {
       sentAt: true,
       decidedAt: true,
       declineReason: true,
+      daysRequired: true,
+      dueOn: true,
       photoDocumentId: true,
       lines: { orderBy: { sortOrder: 'asc' }, select: { product: true, room: true, details: true, unit: true, widthMm: true, heightMm: true, qtyMilli: true, productId: true, amountPaise: true } },
     },
@@ -447,6 +449,8 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
           sentAt: c.sentAt ? istDay(c.sentAt) : null,
           decidedAt: c.decidedAt ? istDay(c.decidedAt) : null,
           declineReason: c.declineReason,
+          daysRequired: c.daysRequired,
+          dueOn: c.dueOn ? dayFromDb(c.dueOn) : null,
           lines: c.lines.map((l) => ({ ...l, amountPaise: fromDb(l.amountPaise) })),
           payments: (p.payments ?? [])
             .filter((r) => r.changeOrderId === c.id)

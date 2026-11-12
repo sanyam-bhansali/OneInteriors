@@ -285,11 +285,15 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
           {st.needsDocument ? ' · needs its file' : ''}
           {st.lockedBy ? ` · opens when the ${st.lockedBy} is recorded` : ''}
         </span>
-        {st.moves.length ? (
-          <span className={`block ${muted}`}>
-            Moved {st.moves.length === 1 ? 'once' : `${st.moves.length} times`}: last {dayWords(st.moves.at(-1)!.from)} → {dayWords(st.moves.at(-1)!.to)} ({st.moves.at(-1)!.side === 'CLIENT' ? 'client side' : 'studio side'}: {st.moves.at(-1)!.reason.toLowerCase()})
+        {/* Every move or late tick on the step, with whose delay, why and the team's note (owner, 12 Nov 2026: "it should show on that step"). Team only. */}
+        {st.moves.map((m, k) => (
+          <span key={`mv-${k}`} className={`block ${muted}`} data-testid="step-delay">
+            {st.done && k === st.moves.length - 1 && st.doneOn === m.to ? 'Ticked late' : 'Moved'} {dayWords(m.from)} → {dayWords(m.to)} ·{' '}
+            <span className={m.side === 'CLIENT' ? 'text-[var(--warn)]' : 'text-[var(--bad)]'}>{m.side === 'CLIENT' ? "client's delay" : 'our delay'}</span>
+            {m.reason && !/^(client delay|our delay)$/i.test(m.reason) ? ` · ${m.reason.toLowerCase()}` : ''}
+            {m.note ? ` · note: “${m.note}”` : ''}
           </span>
-        ) : null}
+        ))}
         {st.done && st.beforeJoining ? <span className={`block ${muted}`}>Done before joining One Interiors</span> : null}
         {/* Unticked before (owner, 12 Nov 2026): what was ticked stays, with who unticked it and why. Team only. */}
         {st.history.map((h, k) => (

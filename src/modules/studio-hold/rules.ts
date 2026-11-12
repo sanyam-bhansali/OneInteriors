@@ -20,6 +20,8 @@ export const HOLD_REASONS = {
   CLIENT_NEEDS_TIME: 'Client needs time',
   POSSESSION_LATE: 'Possession is late',
   OTHER: 'Other (client side)',
+  /* Automatic (owner, 12 Nov 2026): from the client's approval of additional scope until its payment is recorded. Never asked by hand. */
+  ADDITIONAL_SCOPE: 'Additional scope payment pending',
 } as const;
 export type HoldReason = keyof typeof HOLD_REASONS;
 export const isHoldReason = (v: unknown): v is HoldReason => typeof v === 'string' && v in HOLD_REASONS;
@@ -30,6 +32,7 @@ export const CUSTOMER_HOLD_WORDS: Record<HoldReason, string> = {
   CLIENT_NEEDS_TIME: 'paused while you take the time you need',
   POSSESSION_LATE: 'waiting for possession of your flat',
   OTHER: 'paused on your side',
+  ADDITIONAL_SCOPE: 'waiting for the additional scope payment',
 };
 
 export type HoldStatus = 'ASKED' | 'ON' | 'ENDED' | 'DECLINED' | 'WITHDRAWN';
@@ -65,7 +68,7 @@ export function mayEndHold(m: { role: string; designHead?: boolean | null; userI
 export function checkHoldAsk(input: { reason: unknown; note: unknown }, holds: readonly Pick<HoldRow, 'status'>[]): { ok: true; reason: HoldReason; note: string | null } | { ok: false; error: string } {
   const open = openHold(holds);
   if (open) return { ok: false, error: open.status === 'ON' ? 'This project is on hold already.' : 'A hold is waiting for approval already.' };
-  if (!isHoldReason(input.reason)) return { ok: false, error: 'Pick why the project should go on hold.' };
+  if (!isHoldReason(input.reason) || input.reason === 'ADDITIONAL_SCOPE') return { ok: false, error: 'Pick why the project should go on hold.' };
   const note = typeof input.note === 'string' ? input.note.replace(/\r\n/g, '\n').trim() : '';
   if (note.length > HOLD_NOTE_MAX) return { ok: false, error: `Keep the note under ${HOLD_NOTE_MAX} characters.` };
   return { ok: true, reason: input.reason, note: note || null };

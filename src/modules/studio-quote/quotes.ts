@@ -111,6 +111,8 @@ export interface QuoteRow {
   phases: PaymentPhase[] | null;
   /** The Sales Final this Design Final was made from. */
   basedOnId: string | null;
+  /** Additional scope (owner, 12 Nov 2026): the project it adds to; sent from that project, never marked as a design final. */
+  scopeForProjectId: string | null;
   /** Essential, Premium or Luxe (DESIGN-PROCESS-PLAN.md §4.3); null when not set. */
   category: 'ESSENTIAL' | 'PREMIUM' | 'LUXURY' | null;
   /** The client's floor plan rooms, when their brief came with a read plan. */
@@ -282,6 +284,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
       quoteDate: row.quoteDate ?? row.createdAt,
       phases: quotePhases(row.phases, row.studio.paymentPhases),
       basedOnId: row.basedOnId,
+      scopeForProjectId: row.scopeForProjectId,
       category: row.category,
       clientId: row.clientId,
       planRooms,
@@ -439,12 +442,13 @@ async function designerQuoteScope(): Promise<{ studioId: string; where: Prisma.S
   if (!member || member.role !== 'DESIGNER' || member.status !== 'ACTIVE' || member.viewOnly) return null;
   const projects = await prisma.homeProject.findMany({
     where: { introduction: { studioId: member.studioId }, cancelledAt: null, signedQuoteId: { not: null }, ...(member.designHead ? {} : { designerId: member.id }) },
-    select: { signedQuoteId: true, designFinalQuoteId: true },
+    select: { id: true, signedQuoteId: true, designFinalQuoteId: true },
     take: 500,
   });
   const signed = projects.map((p) => p.signedQuoteId!).filter(Boolean);
   const finals = projects.map((p) => p.designFinalQuoteId).filter((x): x is string => Boolean(x));
-  const designFinals: Prisma.StudioQuoteWhereInput = { stage: 'DESIGN', OR: [{ basedOnId: { in: signed } }, { id: { in: finals } }] };
+  /* And each project's additional scope (owner, 12 Nov 2026): a new quotation for what is added after the design final. */
+  const designFinals: Prisma.StudioQuoteWhereInput = { stage: 'DESIGN', OR: [{ basedOnId: { in: signed } }, { id: { in: finals } }, { scopeForProjectId: { in: projects.map((p) => p.id) } }] };
   return {
     studioId: member.studioId,
     where: { studioId: member.studioId, OR: [{ id: { in: signed } }, designFinals] },

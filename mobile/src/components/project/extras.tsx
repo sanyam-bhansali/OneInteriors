@@ -91,11 +91,16 @@ function ExtraItem({ e, onChanged, t }: { e: Extra; onChanged: () => void; t: T 
     <View style={styles.item}>
       <View style={styles.head}>
         <Text style={[styles.big, { flex: 1 }]}>
-          {t('life.extra.number', { n: e.number })}: {e.title}
+          {e.dueOn ? e.title : `${t('life.extra.number', { n: e.number })}: ${e.title}`}
         </Text>
         <Text style={styles.big}>{inr(e.totalPaise)}</Text>
       </View>
       <Meta>{state}</Meta>
+      {e.dueOn ? (
+        <Text style={styles.text}>
+          {t('life.scope.days', { n: e.daysRequired ?? 0 })}. {t('life.scope.due', { date: shortDate(e.dueOn) })}.
+        </Text>
+      ) : null}
       {e.reason ? (
         <Text style={styles.text}>
           <Text style={styles.note}>{t('life.extra.why')}: </Text>

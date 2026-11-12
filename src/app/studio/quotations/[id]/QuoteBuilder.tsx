@@ -623,6 +623,13 @@ export function QuoteBuilder({
           {quote.number} · editing {STAGE_LABELS[quote.stage]}
         </p>
         <div className="hgrid2">
+          {quote.scopeForProjectId ? (
+            /* Additional scope (owner, 12 Nov 2026): one save; it is sent from the project. */
+            <button type="button" className="btn sec" disabled={locked || saving} onClick={() => saveAs('DESIGN')} style={{ gridColumn: '1 / -1' }}>
+              Save additional scope
+            </button>
+          ) : (
+          <>
           <button
             type="button"
             className="btn sec"
@@ -645,6 +652,8 @@ export function QuoteBuilder({
           >
             {quote.stage === 'DESIGN' ? 'Save design draft' : 'Revise for design'}
           </button>
+          </>
+          )}
         </div>
         <p className={`hsaved ${saving ? 'muted' : dirty ? 'warn-t' : 'good-t'}`} role="status">
           {saving ? 'Saving…' : dirty ? 'Unsaved changes — figures on screen are live; the stored copy is not.' : 'Saved. Everything on screen is stored.'}

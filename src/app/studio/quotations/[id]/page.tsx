@@ -131,6 +131,15 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             ) : null}
           </div>
         </div>
+        {quote.scopeForProjectId ? (
+          /* Additional scope (owner, 12 Nov 2026): built here, sent from the project with the days it needs. */
+          <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8 }}>
+            <span className="sm muted">Additional scope: add only the new items, then send it from the project with the days it needs.</span>
+            <Link href={`/studio/projects/${quote.scopeForProjectId}`} className="btn pri">
+              Back to the project
+            </Link>
+          </div>
+        ) : (
         <StatusBar
           quoteId={quote.id}
           status={quote.status}
@@ -140,6 +149,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
           clientFirstName={quote.clientName.split(/\s+/)[0] ?? ''}
         />
+        )}
       </div>
 
       {project.projectId ? (
