@@ -70,7 +70,7 @@ import {
 } from './rules';
 import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
-import { settleDesignPhase, tickApprovalStep } from './step-settle';
+import { settleDesignPhase, shiftAfterLateTick, tickApprovalStep, tickedBefore } from './step-settle';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -225,8 +225,10 @@ export async function tickDesignStep(
     if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them and mark each one final, then tick.` };
   }
   // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
+  // Ticked before and unticked since: the first tick's answer stands (owner, 12 Nov 2026).
   const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
-  const late = lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  const again = await tickedBefore(prisma, projectId, step.id);
+  const late = again ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
   if (!late.ok) return late;
   const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
   if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
@@ -238,6 +240,7 @@ export async function tickDesignStep(
   }
   const share = input.share === true || input.share === 'true' || input.share === 'on';
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  let shifted = 0;
   try {
     const outcome = await prisma.$transaction(async (tx) => {
       let docId: string | null = null;
@@ -271,14 +274,18 @@ export async function tickDesignStep(
         await tx.homeStepDelay.create({
           data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(istDay(now)), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
         });
+        shifted = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today: istDay(now), byId: check.member.userId, actor, now });
       }
-      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side } : {}) } });
+      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side, shifted } : {}) } });
       const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
       await settleDesignPhase(tx, projectId, actor, now);
       return settled;
     });
+    const movedWords = late.delay
+      ? ` ${shifted ? 'The steps after it, the' : 'The'} design's end and handover moved ${late.delay.days} day${late.delay.days === 1 ? '' : 's'} later${late.delay.side === 'CLIENT' ? ": the client's delay, not counted as ours" : ''}.`
+      : '';
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
-    return { ok: true, message: `Ticked: ${step.label}.${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
+    return { ok: true, message: `Ticked: ${step.label}.${movedWords}${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
   } catch (e) {
     if (e instanceof Refused) return { ok: false, error: e.message };
     throw e;

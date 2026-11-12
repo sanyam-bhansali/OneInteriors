@@ -29,6 +29,9 @@ export const designWords = {
   'design.send': { en: 'Send to your designer', hi: 'डिज़ाइनर को भेजें', mr: 'डिझायनरला पाठवा' },
   'design.cancel': { en: 'Cancel', hi: 'रद्द करें', mr: 'रद्द करा' },
   'design.steps': { en: '{done} of {total} design milestones done', hi: '{total} में से {done} डिज़ाइन पड़ाव पूरे', mr: '{total} पैकी {done} डिझाइन टप्पे पूर्ण' },
+  /* Days the design waited on the client (owner, 27 Oct and 12 Nov 2026): never the studio's own delays, never a date. */
+  'design.waitedOne': { en: 'Waited on you so far: 1 day', hi: 'अब तक आपका इंतज़ार: 1 दिन', mr: 'आतापर्यंत तुमची वाट: 1 दिवस' },
+  'design.waited': { en: 'Waited on you so far: {n} days', hi: 'अब तक आपका इंतज़ार: {n} दिन', mr: 'आतापर्यंत तुमची वाट: {n} दिवस' },
   'design.yourTurn': { en: 'Waiting on you', hi: 'आपकी बारी', mr: 'तुमची वेळ' },
   'design.rooms': { en: 'Your rooms, as measured', hi: 'आपके कमरे, नाप के साथ', mr: 'तुमच्या खोल्या, मोजमापासह' },
   'design.high': { en: '{h} high', hi: '{h} ऊँचा', mr: '{h} उंच' },

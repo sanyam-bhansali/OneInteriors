@@ -110,6 +110,8 @@ export interface DesignStepView {
   /** Done before the project was brought onto One Interiors (docs/studio-os/BRING-IN-PROJECTS.md). */
   beforeJoining: boolean;
   doneFile: { id: string; title: string; url: string } | null;
+  /** Ticked before and unticked since: a re-tick asks nothing and moves nothing (owner, 12 Nov 2026). */
+  tickedBefore: boolean;
   /** Its moves, oldest first. */
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
   /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
@@ -299,6 +301,10 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     ? await prisma.homeDocument.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true, title: true, storageKey: true } })
     : [];
   const designDocs = p.documents;
+  const ticks = items.length
+    ? await prisma.homeProjectEvent.findMany({ where: { projectId, type: 'design.ticked', refId: { in: items.map((i) => i.id) } }, select: { refId: true } })
+    : [];
+  const tickedOnce = new Set(ticks.map((t) => t.refId));
   /* Project documents (DESIGN-PROCESS-PLAN.md §3): version numbers from the chain and the client's answers, names we make, finals. */
   const lastAnswer = new Map<string, 'APPROVED' | 'CHANGES'>();
   for (const r of [...p.designReviews].sort((a, b) => a.at.getTime() - b.at.getTime())) lastAnswer.set(r.documentId, r.verdict);
@@ -347,6 +353,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
       doneFile: i.doneDocumentId ? (fileUrl.get(i.doneDocumentId) ?? null) : null,
+      tickedBefore: tickedOnce.has(i.id),
       moves: i.delays.map((d) => ({
         from: dayFromDb(d.fromDate),
         to: dayFromDb(d.toDate),

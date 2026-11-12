@@ -278,6 +278,8 @@ export interface Design {
   waitingFor?: string | null;
   /** The design's next step when it is yours to do. Older servers omit it. */
   yourStep?: string | null;
+  /** Days the design waited on you (your late approvals and answers); never the studio's own delays. Older servers omit it. */
+  clientDelayDays?: number;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
   /** The requirement form (1 Nov 2026): null until the designer sends it. Older servers omit it. */
   requirementForm?: 'to-fill' | 'filled' | null;

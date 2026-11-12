@@ -452,19 +452,24 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
       </label>
-      {st.lateDays > 0 ? (
+      {st.lateDays > 0 && st.tickedBefore ? (
+        <p className={`m-0 ${muted}`}>Ticked before: its delay was answered then, and nothing moves again.</p>
+      ) : st.lateDays > 0 ? (
         // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
         <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
           {/* Whose delay, nothing more (owner, 27 Oct 2026): the client's shows in their app as days waiting on them; ours never does. */}
           <fieldset className="m-0 flex flex-col gap-1 border-0 p-0 text-[13px]">
             <legend className="mb-1">{st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: whose delay?</legend>
             <label className="flex items-center gap-2">
-              <input type="radio" name="reason" value="CLIENT_DELAY" required={st.responsible !== 'CLIENT'} defaultChecked={st.responsible === 'CLIENT'} /> The client&rsquo;s ({tab.customerFirst} sees the days)
+              <input type="radio" name="reason" value="CLIENT_DELAY" required={st.responsible !== 'CLIENT'} defaultChecked={st.responsible === 'CLIENT'} /> The client&rsquo;s ({tab.customerFirst} sees the days; not counted as ours)
             </label>
             <label className="flex items-center gap-2">
               <input type="radio" name="reason" value="STUDIO_DELAY" /> Ours (only the team sees it)
             </label>
           </fieldset>
+          <p className={`m-0 ${muted}`}>
+            Every step after it, the design&rsquo;s end and handover move {st.lateDays === 1 ? '1 day' : `${st.lateDays} days`} later.
+          </p>
           <OnlyYourTeam>
             <label className="flex flex-col gap-1 text-[13px]">
               Why, for the team (optional)

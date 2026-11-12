@@ -49,8 +49,9 @@ export interface ProjectKpiInput {
 export function projectKpis(i: ProjectKpiInput): Kpi[] {
   const base = i.base ?? '/studio/projects';
   const b = i.board;
-  const late = i.rows.filter((r) => r.lateDays > 0);
-  const ours = late.filter((r) => r.lateDays > r.customerLateDays).length;
+  /* The client's days are not our delay (owner, 12 Nov 2026): "Running late" counts projects late on us only. */
+  const ours = i.rows.filter((r) => r.lateDays > r.customerLateDays).length;
+  const onClients = i.rows.filter((r) => r.lateDays > 0 && r.lateDays <= r.customerLateDays).length;
   const waiting = i.rows.filter((r) => r.waiting.length > 0);
   const overdueDecisions = i.rows.reduce((n, r) => n + r.waiting.filter((w) => w.overdue).length, 0);
   const due = i.rows.filter((r) => r.nextPayment?.toRecord);
@@ -78,7 +79,7 @@ export function projectKpis(i: ProjectKpiInput): Kpi[] {
     );
   }
   out.push(
-    { label: 'Running late', value: late.length, note: late.length ? (ours ? `${ours} on us` : 'all on the clients') : 'nothing late', tone: ours ? 'bad' : late.length ? 'warn' : 'good' },
+    { label: 'Running late', value: ours, note: ours ? 'on us' : onClients ? `nothing on us · ${plural(onClients, 'project')} waiting on clients` : 'nothing late', tone: ours ? 'bad' : 'good' },
     { label: 'Waiting on clients', value: waiting.length, note: overdueDecisions ? `${plural(overdueDecisions, 'decision')} past the date` : 'decisions open', tone: overdueDecisions ? 'warn' : undefined },
     {
       label: 'Payments due',

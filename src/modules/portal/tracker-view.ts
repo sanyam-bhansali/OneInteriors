@@ -32,6 +32,7 @@ import {
   isCustomerDelay,
   isDelayReason,
   moveSentence,
+  designMoveInstants,
   overallDelay,
   stageCompletion,
   stageStatuses,
@@ -217,6 +218,16 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
     steps.flatMap((list, i) => list.map((it) => ({ id: it.key, stageId: rules[i]!.id, weightBp: it.weightBp ?? 0, inScope: true, done: it.doneAt !== null }))),
   );
 
+  /*
+   * The client reads no design date (DESIGN-PROCESS-PLAN.md Decision 11): a
+   * move that starts on the design stage (a late design tick moving the
+   * design's end and handover, owner 12 Nov 2026, or a PM moving the design's
+   * dates) is not listed for them. Its days still count where they count
+   * (their own delays in `customerDays`), and the design card says how long
+   * the design waited on them.
+   */
+  const designMoveAt = designMoveInstants(rules, changes);
+  const shownChanges = changes.filter((c) => !designMoveAt.has(c.at.getTime()));
   const statuses = stageStatuses(rules, changes, today, cal);
   const overall = overallDelay(rules, changes, today, cal);
   const cur = currentStatus(statuses);
@@ -235,7 +246,7 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
     const items = milestones[i]!;
     const c = stageCompletion(items.map((it) => ({ done: it.doneAt !== null })));
     const sp = progress.stages.get(s.id);
-    const m = s.lastMove;
+    const m = s.lastMove && !designMoveAt.has(s.lastMove.at.getTime()) ? s.lastMove : null;
     return {
       key: KIND_KEY[s.kind],
       kind: s.kind,
@@ -284,7 +295,7 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       : null;
 
   return {
-    tracker: { progressPct: steps.some((l) => l.length) ? progress.pct : stages.every((s) => s.actualEnd) ? 100 : 0, stages, current, moves: movesOf(changes, names, handover?.id ?? null), overall: {
+    tracker: { progressPct: steps.some((l) => l.length) ? progress.pct : stages.every((s) => s.actualEnd) ? 100 : 0, stages, current, moves: movesOf(shownChanges, names, handover?.id ?? null), overall: {
 
       plannedHandover: overall.plannedHandover,
       forecastHandover: overall.forecastHandover,

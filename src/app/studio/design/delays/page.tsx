@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { delaysList } from '@/modules/studio-design/delays';
+import { delaysList, type DelayRow } from '@/modules/studio-design/delays';
 import { CheckButton } from './CheckButton';
 import '../../projects/projects.css';
 
@@ -26,15 +26,18 @@ export default async function DelaysPage() {
       </div>
     );
   }
-  const client = view.rows.filter((r) => r.side === 'CLIENT').reduce((a, r) => a + r.days, 0);
-  const studio = view.rows.filter((r) => r.side === 'STUDIO').reduce((a, r) => a + r.days, 0);
+  /* The client's delays are not ours (owner, 12 Nov 2026): our delays are the list; the client's sit apart, uncounted, still there to check. */
+  const ours = view.rows.filter((r) => r.side === 'STUDIO');
+  const theirs = view.rows.filter((r) => r.side === 'CLIENT');
+  const client = theirs.reduce((a, r) => a + r.days, 0);
+  const studio = ours.reduce((a, r) => a + r.days, 0);
   return (
     <div className="content oi-proj">
       <div className="phead">
         <div>
           <h1>Delays</h1>
           <p className="muted" style={{ margin: '6px 0 0' }}>
-            Every late design step of the last four months: whose delay and why. {client} days on the client&apos;s side, {studio} on ours.
+            Our late design steps of the last four months, and why: {studio} day{studio === 1 ? '' : 's'}. The client&apos;s delays ({client} day{client === 1 ? '' : 's'}) are listed apart and not counted as ours.
             {view.canCheck ? ` ${view.unchecked} not checked yet.` : ''}
           </p>
         </div>
@@ -67,12 +70,29 @@ export default async function DelaysPage() {
           </ul>
         </section>
       ) : null}
-      {view.rows.length === 0 ? (
+      {ours.length === 0 ? (
         <div className="empty">
-          <p className="m-0">{view.lateNow.length ? 'No delay filed yet in the last four months.' : 'No late design steps. Every step is on its day.'}</p>
+          <p className="m-0">{view.lateNow.length ? 'None of our delays filed in the last four months.' : 'No late design steps on us. Every step is on its day.'}</p>
         </div>
       ) : (
-        <div className="card overflow-x-auto p-0">
+        <DelayTable rows={ours} canCheck={view.canCheck} label="Our delays" />
+      )}
+      {theirs.length > 0 ? (
+        <section aria-label="The client's delays" className="flex flex-col gap-2">
+          <div>
+            <h2 className="m-0 text-[15px]">The client&apos;s delays · {theirs.length}</h2>
+            <p className="muted m-0 text-[13px]">Waiting on the client: not counted as our delay. The client sees the days in their app. Check each one is really the client&apos;s.</p>
+          </div>
+          <DelayTable rows={theirs} canCheck={view.canCheck} label="The client's delays" />
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function DelayTable({ rows, canCheck, label }: { rows: DelayRow[]; canCheck: boolean; label: string }) {
+  return (
+    <div className="card overflow-x-auto p-0" aria-label={label}>
           <table className="w-full min-w-[820px] border-collapse text-[13.5px]">
             <thead>
               <tr className="text-left text-[12px] muted">
@@ -85,7 +105,7 @@ export default async function DelaysPage() {
               </tr>
             </thead>
             <tbody>
-              {view.rows.map((r) => (
+              {rows.map((r) => (
                 <tr key={r.id} className="border-t border-[var(--s-rule-soft)] align-top">
                   <td className="px-3 py-2">
                     <Link href={`/studio/projects/${r.projectId}?tab=design#step-${r.stepId}`} className="font-medium">
@@ -111,14 +131,12 @@ export default async function DelaysPage() {
                     <div className="muted sm">{dayWords(r.on)}</div>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2">
-                    {r.checked ? <span className="muted sm">Checked by {r.checked.by}, {dayWords(r.checked.on)}</span> : view.canCheck ? <CheckButton id={r.id} /> : <span className="muted sm">Not checked yet</span>}
+                    {r.checked ? <span className="muted sm">Checked by {r.checked.by}, {dayWords(r.checked.on)}</span> : canCheck ? <CheckButton id={r.id} /> : <span className="muted sm">Not checked yet</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
-    </div>
   );
 }

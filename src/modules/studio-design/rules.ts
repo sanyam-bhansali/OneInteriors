@@ -12,6 +12,7 @@
 
 import { splitAcross } from '@/lib/money';
 import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
+import { planMove, type MovePlan as StageMovePlan, type RuleStage } from '@/modules/project/project-rules';
 import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, PRE_EXECUTION_GROUP, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
 
 // ── Building the steps ────────────────────────────────────────
@@ -359,6 +360,42 @@ export function planStepMove(steps: readonly StepDay[], stepId: string, to: stri
     .filter((s, k) => (k === 0 || !s.done) && s.plannedOn)
     .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
   return { ok: true, days, moves };
+}
+
+/**
+ * A step ticked after its day (owner, 12 Nov 2026: "when a task is ticked
+ * after delay the next steps should automatically calculate the new
+ * completion deadline and planned date both"): every later step not ticked
+ * yet moves later by the days it was late, so each keeps its gap to the one
+ * before it. Steps already ticked never move. `days` 0 and no moves when the
+ * tick is on time (or early), or the step has no planned day.
+ */
+export function lateTickShift(steps: readonly StepDay[], tickedId: string, today: string): { days: number; moves: { id: string; from: string; to: string }[] } {
+  const at = steps.findIndex((s) => s.id === tickedId);
+  const ticked = steps[at];
+  if (!ticked?.plannedOn || !isDay(today)) return { days: 0, moves: [] };
+  const days = daysBetween(ticked.plannedOn, today);
+  if (days <= 0) return { days: 0, moves: [] };
+  const moves = steps
+    .slice(at + 1)
+    .filter((s) => !s.done && s.plannedOn)
+    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
+  return { days, moves };
+}
+
+/**
+ * The plan's dates after a late tick (owner, 12 Nov 2026: design end and
+ * handover move too): the design stage's end and every later stage not
+ * finished move by the same days, recorded as the client's change or our
+ * delay, so the plan says whose days they are (project-rules.ts
+ * `overallDelay`). Null when there is no design stage or nothing to move.
+ */
+export function lateTickPlanMove(stages: readonly RuleStage[], days: number, side: DelaySideName): StageMovePlan | null {
+  if (days <= 0) return null;
+  const design = stages.find((s) => s.kind === 'DESIGN');
+  if (!design) return null;
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, days), reason: side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO', shiftLater: true });
+  return r.ok ? r.plan : null;
 }
 
 /** Days a step is late on `today`: past its planned day and still open. 0 when not late. */
