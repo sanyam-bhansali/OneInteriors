@@ -108,6 +108,8 @@ export const PROJECT_EVENT_TYPES = [
   'project.hold_declined',
   'project.hold_withdrawn',
   'project.hold_ended',
+  // On-site carcass (owner, 13 Nov 2026; studio/expected-closing.ts): carcass built on site, only shutters from the factory. Set or cleared.
+  'project.carcass_set',
   // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design
   'designer.assigned',
   'design.ticked',

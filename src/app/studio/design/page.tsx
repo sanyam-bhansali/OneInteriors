@@ -9,6 +9,7 @@ import { KpiRow } from '../ui/KpiRow';
 import { designKpis } from '@/modules/studio/app-kpis';
 import { byDesigner, designerChoices, pickDesigner, NO_DESIGNER } from '@/modules/studio/designer-filter';
 import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
+import { maySeeClosing } from '@/modules/studio/expected-closing';
 import '../projects/projects.css';
 
 export const metadata: Metadata = { title: 'Design', robots: { index: false, follow: false } };
@@ -58,6 +59,12 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           <Link href="/studio/design/delays" className="btn ghost">
             Delays
           </Link>
+          {/* Expected closing (owner, 13 Nov 2026): the owner, the design head and a PM. */}
+          {member && maySeeClosing(member) ? (
+            <Link href="/studio/projects/closing" className="btn ghost" data-testid="expected-closing-link">
+              Expected closing
+            </Link>
+          ) : null}
           {/* Delete and restore (the owner only, 29 Oct 2026; studio/project-delete.ts). */}
           {mayDeleteProjects(member) ? (
             <Link href="/studio/projects/deleted" className="btn ghost">

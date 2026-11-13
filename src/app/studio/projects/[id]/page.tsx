@@ -43,6 +43,8 @@ import { ExtrasPanel } from './ExtrasPanel';
 import { SignoffCard } from './SignoffCard';
 import '../projects.css';
 import { PriorityStars } from './PriorityStars';
+import { CarcassToggle } from './CarcassToggle';
+import { carcassFor } from '@/modules/studio/expected-closing-store';
 import { mayDo } from '@/modules/studio/access';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
@@ -121,6 +123,8 @@ export default async function ProjectWorkspacePage({
   const hold = await holdView(w.id, now).catch(() => null);
   /* Additional scope (owner, 12 Nov 2026): after the design final. */
   const scope = await scopeView(w.id).catch(() => null);
+  /* On-site carcass (owner, 13 Nov 2026: "which projects can we take manual?"): carcass on site, shutters from the factory. */
+  const carcass = await carcassFor(w.id).catch(() => null);
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
@@ -157,6 +161,7 @@ export default async function ProjectWorkspacePage({
           <h1>{w.home}</h1>
           <div className="flex flex-wrap gap-2">
             <PriorityStars projectId={w.id} initial={w.priority} canEdit={canStar} />
+            {carcass ? <CarcassToggle projectId={w.id} initial={carcass.on} canEdit={carcass.canFlag} /> : null}
             <span className="chip">{w.customer}</span>
             {w.ownClient ? (
               <span className="chip" title="Not introduced by One Interiors: no introduction, no commission">
