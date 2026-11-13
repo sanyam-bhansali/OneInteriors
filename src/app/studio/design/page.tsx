@@ -10,6 +10,8 @@ import { designKpis } from '@/modules/studio/app-kpis';
 import { byDesigner, designerChoices, pickDesigner, NO_DESIGNER } from '@/modules/studio/designer-filter';
 import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { maySeeClosing } from '@/modules/studio/expected-closing';
+import { newProjectsForMe } from '@/modules/studio-design/new-projects';
+import { NewProjects } from './NewProjects';
 import '../projects/projects.css';
 
 export const metadata: Metadata = { title: 'Design', robots: { index: false, follow: false } };
@@ -28,7 +30,13 @@ const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
 export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
-  const [{ tab: rawTab, deleted, designer }, fullBoard, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
+  const [{ tab: rawTab, deleted, designer }, fullBoard, w, member, fresh] = await Promise.all([
+    searchParams,
+    lifecycleBoard().catch(() => null),
+    designWorkload(),
+    currentMember(),
+    newProjectsForMe().catch(() => null),
+  ]);
   /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head narrow the board to one designer's projects. */
   const choices = fullBoard?.scope === 'studio' ? designerChoices([...fullBoard.design, ...fullBoard.preExecution, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed]) : [];
   const picked = pickDesigner(designer, choices);
@@ -89,6 +97,8 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           Project deleted. It is in Deleted projects if you need it back.
         </p>
       ) : null}
+      {/* New projects first (owner, 13 Nov 2026): converted, no designer yet; Assign designer on each. */}
+      {fresh ? <NewProjects data={fresh} /> : null}
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
       <KpiRow label="Design at a glance" items={designKpis({ board, designers: mine ? null : designers, unassigned: board ? board.design.filter((c) => c.designerId === null).length : 0, tab: rawTab ? tab : undefined })} />
       {choices.length > 1 ? (

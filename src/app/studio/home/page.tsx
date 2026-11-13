@@ -30,6 +30,8 @@ import { crewsOnMySites } from '@/modules/studio-crews/store';
 import { closuresRemainingFor, lifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { remainingLine } from '@/modules/project/lifecycle-rules';
 import { asLifeTab, LifecycleTabs } from '../design/LifecycleTabs';
+import { NewProjects } from '../design/NewProjects';
+import { newProjectsForMe } from '@/modules/studio-design/new-projects';
 import { siteWords } from '../site/words';
 import './home.css';
 import '../setup/setup.css';
@@ -64,7 +66,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
      this member may see (mySitesToday reads through projectsVisibleTo),
      crews only for roles that may read work orders (crewsOnMySites returns
      nothing to a designer), a designer's own design steps. */
-  const [studio, today, lang, sites, crews, board, closures, work, meetingsToAnswer, { tab: rawTab }] = await Promise.all([
+  const [studio, today, lang, sites, crews, board, closures, work, meetingsToAnswer, { tab: rawTab }, fresh] = await Promise.all([
     member
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
@@ -81,6 +83,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     /* Office meetings (owner, 27 Oct 2026): ones asked of them, and suggested times on theirs. */
     member ? meetingsWaiting(member) : Promise.resolve(0),
     searchParams,
+    /* New projects to assign a designer to (owner, 13 Nov 2026): null for those who do not assign. */
+    member && ['OWNER', 'PM', 'DESIGNER'].includes(member.role) ? newProjectsForMe().catch(() => null) : Promise.resolve(null),
   ]);
 
   /* "Set up your studio" (owner, 14 Oct 2026): on the owner's first visit
@@ -221,6 +225,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
           ) : null}
         </div>
 
+        {/* New projects (owner, 13 Nov 2026): "On Renuka's dashboard there should be 'New project'". For whoever assigns designers. */}
+        {fresh ? <NewProjects data={fresh} /> : null}
         {work ? <MyWork work={work} /> : null}
 
         <section aria-labelledby="h-apps" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

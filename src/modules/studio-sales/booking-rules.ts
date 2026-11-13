@@ -28,6 +28,7 @@
 import { isDay, istDay, daysBetween } from '@/modules/project/working-days';
 import { parseRupees, isPaymentMode, type PaymentModeName } from '@/modules/project/payment-ledger';
 import { formatINR } from '@/lib/money';
+import { CATEGORY_ERRORS } from '@/modules/studio-quote/category-rules';
 import type { StudioRoleName } from '@/modules/studio/roles';
 
 export interface BookingInput {
@@ -64,6 +65,8 @@ export interface BookingFacts {
   alreadyBooked: boolean;
   /** The quotation's lines changed after the sales final was marked. */
   changedSinceFinal: boolean;
+  /** No Essential, Premium or Luxe on the quotation (owner, 13 Nov 2026: mandatory; it sets the design length). */
+  noCategory?: boolean;
   /** The lead or quotation came from One Interiors (they sign in the app). */
   fromOneInteriors: boolean;
   /** The lead is in the bin. */
@@ -90,6 +93,7 @@ export function bookingRefusal(f: BookingFacts): string | null {
   if (f.alreadyBooked) return BOOKING_ERRORS.booked;
   if (!f.hasSalesFinal) return BOOKING_ERRORS.noFinal;
   if (f.changedSinceFinal) return BOOKING_ERRORS.changed;
+  if (f.noCategory) return CATEGORY_ERRORS.missing;
   if (f.amountPaise > f.bookingStagePaise) {
     return `That is more than the booking advance on the sales final (${formatINR(f.bookingStagePaise)}). Record the rest against the next stage on the project.`;
   }

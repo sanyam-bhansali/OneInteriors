@@ -8,6 +8,7 @@ import { searchAction } from '../search-actions';
 import type { FoundClient } from '@/modules/studio-practice/clients';
 import { IDLE } from '../form-state';
 import { LineIcon } from '../ui/icons';
+import { CATEGORY_WORDS, QUOTE_CATEGORIES } from '@/modules/studio-quote/category-rules';
 
 /**
  * Starting a quotation — which means building one.
@@ -60,6 +61,7 @@ export function StartQuote({
   const [state, action, pending] = useActionState(createQuoteAction, IDLE);
   const [config, setConfig] = useState<ConfigName>('3 BHK');
   const [build, setBuild] = useState(true);
+  const [category, setCategory] = useState('');
   /* Who it is for (Studio OS Phase 1): an existing lead, found by name or
      phone, or a new person (added to the leads unless unticked). */
   const [lead, setLead] = useState<FoundClient | null>(null);
@@ -209,6 +211,19 @@ export function StartQuote({
           <input name="carpetSqft" inputMode="numeric" placeholder="1150" className="fld num" />
         </label>
       </div>
+
+      {/* Mandatory (owner, 13 Nov 2026): "If it is not there, you cannot make a quotation." It sets the design length. */}
+      <fieldset className="qrow" style={{ border: 0, padding: 0, margin: 0, alignItems: 'center' }}>
+        <legend className="lbl" style={{ marginBottom: 6 }}>
+          Category — required
+        </legend>
+        {QUOTE_CATEGORIES.map((c) => (
+          <label key={c} className="qcheck">
+            <input type="radio" name="category" value={c} required checked={category === c} onChange={() => setCategory(c)} />
+            {CATEGORY_WORDS[c]}
+          </label>
+        ))}
+      </fieldset>
 
       <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
         Leave the kitchen run blank and a {config} is assumed at <span className="mono">{standardRunFor(config)}</span>mm — it is

@@ -56,12 +56,15 @@ import {
   cleanCode,
   type InviteLang,
 } from './own-project-rules';
+import { categoryRefusal } from '@/modules/studio-quote/category-rules';
 
 /** Every column `quoteTotals` reads, plus the lines the plan is built from. */
 const QUOTE_SELECT = {
   id: true,
   number: true,
   status: true,
+  category: true,
+  scopeForProjectId: true,
   introductionId: true,
   briefId: true,
   clientName: true,
@@ -251,6 +254,9 @@ export async function startOwnProject(
   const quoteId = String(input.quoteId ?? '').slice(0, 64);
   const q = await prisma.studioQuote.findFirst({ where: { id: quoteId, studioId: member.studioId }, select: QUOTE_SELECT });
   if (!q) return { ok: false, error: 'That quotation is not one of yours.' };
+  /* The category sets the design days (owner, 13 Nov 2026: mandatory on every quotation). */
+  const noCategory = categoryRefusal(q);
+  if (noCategory) return { ok: false, error: noCategory };
   const totalDays = parseTotalDays(input.totalDays, defaultDays(q));
   if (totalDays === null) return { ok: false, error: 'Handover between 7 days and two years from the start, please.' };
 
