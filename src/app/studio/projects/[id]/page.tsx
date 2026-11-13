@@ -119,8 +119,8 @@ export default async function ProjectWorkspacePage({
   const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
   /* A project on hold (owner, 12 Nov 2026): ask, approve, take off. */
   const hold = await holdView(w.id, now).catch(() => null);
-  /* Additional scope (owner, 12 Nov 2026): after the design final. */
-  const scope = await scopeView(w.id).catch(() => null);
+  /* Additional scope (owner, 12 Nov 2026; 13 Nov: a simple form, no quotation): after the design final. */
+  const scope = await scopeView(w.id, now).catch(() => null);
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
