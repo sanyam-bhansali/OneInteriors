@@ -554,7 +554,8 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
 /** What a design head may do beyond a designer: see every designer's load. */
 /* And starts projects from a sales final (owner, 27 Oct 2026: "a start a project option to Renuka"). */
 /* And records payments received, on every project (owner, 12 Nov 2026: "Renuka Designer head should have access to add payment received"). */
-const DESIGN_HEAD_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>(['design.workload', 'project.create', 'payment.record']);
+/* And assigns the designer to a new project (owner, 13 Nov 2026: "Renuka needs to then assign it to a designer"). */
+const DESIGN_HEAD_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>(['design.workload', 'project.create', 'payment.record', 'design.assign']);
 
 export function can(member: MemberRole, action: StudioAction, ctx: CanContext = {}): boolean {
   if (member.status !== 'ACTIVE') return false;

@@ -20,6 +20,7 @@ import {
 } from '@/modules/studio-sales/lead-view';
 import { Avatar, Dot, Modal, PillCold, PillDue, PillToday, StageBadge, TagChips, btnOutline, btnPrimary, useDismiss } from './ax-ui';
 import { LostReasonDialog } from './AxBoard';
+import { ConvertDialog } from './ConvertDialog';
 import { BulkBar, ClaimOne } from './LeadList';
 import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
 import { leadHrefIn, listViewContext } from '@/modules/studio-sales/lead-context';
@@ -137,6 +138,7 @@ export function AxList({
 
   const [noteFor, setNoteFor] = useState<LeadView | null>(null);
   const [lostFor, setLostFor] = useState<{ lead: LeadView; to: string } | null>(null);
+  const [convertFor, setConvertFor] = useState<{ lead: LeadView; to: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   /** Log call may be offered on this row: the member's own lead, or any lead for owner and PM. Never the pool or the sample. */
@@ -323,7 +325,10 @@ export function AxList({
                           lead={l}
                           stages={stages}
                           onMove={(to) => {
-                            if (stages.find((s) => s.id === to)?.kind === 'LOST') setLostFor({ lead: l, to });
+                            const kind = stages.find((s) => s.id === to)?.kind;
+                            if (kind === 'LOST') setLostFor({ lead: l, to });
+                            /* Converted only through Convert (owner, 13 Nov 2026). */
+                            else if (kind === 'WON' && l.stageKind !== 'WON') setConvertFor({ lead: l, to });
                             else void move(l, to, null);
                           }}
                         />
@@ -384,6 +389,22 @@ export function AxList({
       <p className="cl-foot">{loading ? 'Loading…' : `${total.toLocaleString('en-IN')} ${total === 1 ? 'lead' : 'leads'}`}</p>
 
       {noteFor ? <QuickNote lead={noteFor} onClose={() => setNoteFor(null)} onSaved={(text) => setRows((rs) => rs.map((r) => (r.id === noteFor.id ? { ...r, latestNote: text, noteCount: r.noteCount + 1 } : r)))} /> : null}
+      {convertFor ? (
+        <ConvertDialog
+          clientId={convertFor.lead.id}
+          name={convertFor.lead.name}
+          stageId={convertFor.to}
+          onClose={() => setConvertFor(null)}
+          onDone={(r) => {
+            const f = convertFor;
+            setConvertFor(null);
+            const s = stages.find((x) => x.id === f.to);
+            setRows((rs) => rs.map((x) => (x.id === f.lead.id ? { ...x, stageId: f.to, stageName: s?.name ?? x.stageName, stageColour: s?.colour ?? x.stageColour, stageKind: 'WON' } : x)));
+            setSaid(`${f.lead.name} converted · project started${r.stage ? ` · in ${r.stage}` : ''}`);
+            router.refresh();
+          }}
+        />
+      ) : null}
       {lostFor ? (
         <LostReasonDialog
           name={lostFor.lead.name}

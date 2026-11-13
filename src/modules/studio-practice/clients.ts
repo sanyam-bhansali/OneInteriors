@@ -53,6 +53,7 @@ import {
 import { reactionLine, type CallReactionId } from './call-log';
 import { allowedCallMoves } from './call-step-rules';
 import { queueConversions } from '@/modules/studio-sales/conversions';
+import { wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
 
 export interface ClientRow {
   id: string;
@@ -602,9 +603,12 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
     const before = input.stageId
       ? await prisma.studioClient.findFirst({
           where: { AND: [fence, { id: input.id, studioId, deletedAt: null }] },
-          select: { stageId: true, stage: { select: { name: true } } },
+          select: { stageId: true, bookedAt: true, stage: { select: { name: true, kind: true } } },
         })
       : null;
+    /* Converted only through Convert (owner, 13 Nov 2026; studio-sales/convert-rules.ts). */
+    const wonRefused = before ? wonMoveRefusal({ toKind: kind, fromKind: before.stage.kind, converted: before.bookedAt !== null }) : null;
+    if (wonRefused) return { ok: false, error: wonRefused };
 
     // `updateMany` scoped by studioId: an id from a form is not proof of
     // ownership, and this simply matches nothing when it is not theirs.
@@ -971,7 +975,7 @@ async function logContactAndMove(
 ): Promise<Result> {
   const lead = await prisma.studioClient.findFirst({
     where: { AND: [fence, { id, studioId, deletedAt: null }] },
-    select: { stageId: true, stage: { select: { name: true } } },
+    select: { stageId: true, bookedAt: true, stage: { select: { name: true, kind: true } } },
   });
   if (!lead) return { ok: false, error: 'That client is not yours.' };
 
@@ -979,6 +983,8 @@ async function logContactAndMove(
   const allowed = allowedCallMoves(stages, lead.stageId, outcome).find((m) => m.id === moveToStageId);
   const to = stages.find((s) => s.id === moveToStageId);
   if (!allowed || !to) return { ok: false, error: 'That move is not offered for this lead any more. Nothing was saved; refresh and log the call again.' };
+  const wonRefused = wonMoveRefusal({ toKind: to.kind, fromKind: lead.stage.kind, converted: lead.bookedAt !== null });
+  if (wonRefused) return { ok: false, error: wonRefused };
 
   const closing = to.kind === 'LOST' || to.kind === 'DONE';
   const implied = OUTCOME_FOLLOWUP[outcome];

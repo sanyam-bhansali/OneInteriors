@@ -12,6 +12,7 @@ import { initials } from '@/modules/studio-sales/lead-view';
 import { LineIcon } from '../../ui/icons';
 import { Dot, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
 import { LostReasonDialog } from '../AxBoard';
+import { ConvertDialog } from '../ConvertDialog';
 import { binAction } from '../actions';
 import { addTagsAction, deleteNoteAction, editNoteAction, followUpDoneAction, moveLeadAction, removeTagAction } from '../list-actions';
 import { addNoteAction, newQuoteForLeadAction } from '../../sales-actions';
@@ -61,7 +62,7 @@ export function LeadHeader({
   whatsapp,
   stages,
   may,
-  canBook,
+  canBook: _canBook,
   previousCalls = 0,
 }: {
   lead: HeaderLead;
@@ -71,7 +72,7 @@ export function LeadHeader({
   stages: { id: string; name: string; colour: string; kind: 'OPEN' | 'WON' | 'DONE' | 'LOST'; sortOrder?: number; isIntake?: boolean; isCallStep?: boolean }[];
   /** `call` (sales roles, owner 22 Oct 2026): may log a call on this lead; left out, logging follows `edit`. */
   may: { edit: boolean; quote: boolean; delete: boolean; call?: boolean };
-  /** A sales final waits for its booking advance (Record booking is on this page). */
+  /** A sales final waits for its booking advance (Record booking is on this page). The Converted button opens Convert instead (owner, 13 Nov 2026). */
   canBook: boolean;
   /** Calls already logged on this lead: the Picked up sheet's "attempt N". */
   previousCalls?: number;
@@ -80,7 +81,8 @@ export function LeadHeader({
   const [pending, start] = useTransition();
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
   const [lostTo, setLostTo] = useState<string | null>(null);
-  const [explain, setExplain] = useState(false);
+  /* Convert (owner, 13 Nov 2026): '' from the Converted button, a won column's id from the stage picker. */
+  const [convertTo, setConvertTo] = useState<string | null>(null);
   const [sure, setSure] = useState(false);
   /* Log call → the outcome's sheet (AxLeads, 13 Oct 2026; calling steps,
      21 Oct 2026): Picked up, a missed call's retry and suggested move, or
@@ -106,6 +108,8 @@ export function LeadHeader({
   const moveTo = (to: string) => {
     if (to === lead.stageId) return;
     if (stages.find((s) => s.id === to)?.kind === 'LOST') return setLostTo(to);
+    /* Converted only through Convert (owner, 13 Nov 2026). */
+    if (stages.find((s) => s.id === to)?.kind === 'WON' && stages.find((s) => s.id === lead.stageId)?.kind !== 'WON' && !lead.booked) return setConvertTo(to);
     act(() => moveLeadAction(lead.id, to, null), `Moved to ${stages.find((s) => s.id === to)?.name ?? 'that column'}`);
   };
 
@@ -284,7 +288,7 @@ export function LeadHeader({
             Converted
           </span>
         ) : (
-          <button type="button" onClick={() => (canBook ? goTo('booking') : setExplain((x) => !x))} className="btn sm" style={{ background: 'var(--good-bg)', color: 'var(--good)' }}>
+          <button type="button" onClick={() => setConvertTo('')} className="btn sm" style={{ background: 'var(--good-bg)', color: 'var(--good)' }}>
             {icon('M5 12.5l4.5 4.5L19 7.5')}
             Converted
           </button>
@@ -301,17 +305,25 @@ export function LeadHeader({
           )
         ) : null}
       </div>
-      {explain ? (
-        <p className="sm" style={{ margin: 0, padding: '10px 14px', borderRadius: 12, background: 'var(--soft)', color: 'var(--text2)' }}>
-          Converted means the booking advance is recorded. Mark a quotation&rsquo;s sales final first; then Record booking appears below and turns this lead into a project.
-        </p>
-      ) : null}
       {said ? (
         <p role={said.ok ? 'status' : 'alert'} className={said.ok ? 'cl-ok' : 'cl-err'}>
           {said.text}
         </p>
       ) : null}
 
+      {convertTo !== null ? (
+        <ConvertDialog
+          clientId={lead.id}
+          name={lead.name}
+          stageId={convertTo || null}
+          onClose={() => setConvertTo(null)}
+          onDone={(r) => {
+            setConvertTo(null);
+            setSaid({ ok: true, text: `Converted. The project has started${r.stage ? ` and the lead is in ${r.stage}` : ''}; the design head has been asked to assign a designer.` });
+            router.refresh();
+          }}
+        />
+      ) : null}
       {lostTo ? (
         <LostReasonDialog
           name={lead.name}

@@ -11,6 +11,7 @@ import { initials } from '@/modules/studio-sales/lead-view';
 import { LineIcon } from '../ui/icons';
 import { Modal, PillCold, PillDue, PillToday, TagChips } from './ax-ui';
 import { columnPageAction, moveLeadAction } from './list-actions';
+import { ConvertDialog } from './ConvertDialog';
 import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
 import { boardColumnContext, leadHrefIn } from '@/modules/studio-sales/lead-context';
 
@@ -63,6 +64,7 @@ export function AxBoard({
   const [drag, setDrag] = useState<{ lead: LeadView; from: string } | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [askLost, setAskLost] = useState<{ lead: LeadView; from: string; to: string } | null>(null);
+  const [askConvert, setAskConvert] = useState<{ lead: LeadView; from: string; to: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   /* Time-based pills only after mount, so the server's markup and the browser's agree. */
@@ -175,6 +177,8 @@ export function AxBoard({
     if (!d || d.from === to || !mayMove) return;
     const target = stages.find((s) => s.id === to);
     if (target?.kind === 'LOST') return setAskLost({ lead: d.lead, from: d.from, to });
+    /* Converted only through Convert (owner, 13 Nov 2026): quotation + handover, then the project starts. */
+    if (target?.kind === 'WON' && d.lead.stageKind !== 'WON') return setAskConvert({ lead: d.lead, from: d.from, to });
     void move(d.lead, d.from, to, null);
   }
 
@@ -241,6 +245,26 @@ export function AxBoard({
         })}
       </div>
       {anyMore ? <div ref={bottom} style={{ height: 1 }} aria-hidden /> : null}
+
+      {askConvert ? (
+        <ConvertDialog
+          clientId={askConvert.lead.id}
+          name={askConvert.lead.name}
+          stageId={askConvert.to}
+          onClose={() => setAskConvert(null)}
+          onDone={() => {
+            const a = askConvert;
+            setAskConvert(null);
+            const target = stages.find((s) => s.id === a.to);
+            setCols((cs) => ({
+              ...cs,
+              [a.from]: { ...(cs[a.from] ?? { rows: [], next: null }), rows: (cs[a.from]?.rows ?? []).filter((r) => r.id !== a.lead.id) },
+              [a.to]: { ...(cs[a.to] ?? { rows: [], next: null }), rows: [{ ...a.lead, stageId: a.to, stageName: target?.name ?? a.lead.stageName, stageColour: target?.colour ?? a.lead.stageColour, stageKind: 'WON' }, ...(cs[a.to]?.rows ?? [])] },
+            }));
+            router.refresh();
+          }}
+        />
+      ) : null}
 
       {askLost ? (
         <LostReasonDialog
