@@ -46,6 +46,7 @@ import { hasDatabase } from '@/lib/env';
 import { consume, bucketFor, type Limit } from '@/modules/rate-limit/store';
 import { landLead, leadSourceIdFor } from '@/modules/studio-practice/land';
 import { fallbackExternalId, secretMatches, verifyMetaSignature } from './secrets';
+import { BACKFILL_DAYS, GRAPH, afterCursor, campaignAllowed, campaignKey, formLeadsUrl, readForms, readLeadPage, sealingKey, unseal } from './meta-connect';
 import {
   adColumns,
   attributionFor,
@@ -78,6 +79,11 @@ export interface Door {
   enabled: boolean;
   secretHash: string;
   metaPageId: string | null;
+  /** "Connect Facebook": the Page token, sealed. Null: env STUDIO_META_PAGE_TOKENS. */
+  metaTokenSealed: string | null;
+  /** Which campaigns (owner, 12 Nov 2026). */
+  metaOnlyCampaigns: boolean;
+  metaCampaignIds: string[];
 }
 
 /** What a route answers: the status and the JSON body. */
@@ -94,6 +100,9 @@ const DOOR_SELECT = {
   enabled: true,
   secretHash: true,
   metaPageId: true,
+  metaTokenSealed: true,
+  metaOnlyCampaigns: true,
+  metaCampaignIds: true,
   studio: { select: { slug: true, status: true } },
 } satisfies Prisma.StudioLeadConnectionSelect;
 
@@ -110,6 +119,9 @@ function toDoor(row: DoorRow): Door {
     enabled: row.enabled,
     secretHash: row.secretHash,
     metaPageId: row.metaPageId,
+    metaTokenSealed: row.metaTokenSealed,
+    metaOnlyCampaigns: row.metaOnlyCampaigns,
+    metaCampaignIds: row.metaCampaignIds ?? [],
   };
 }
 
@@ -164,11 +176,23 @@ async function claim(doorId: string, externalId: string, isTest: boolean): Promi
   return count === 1 ? seen.id : null;
 }
 
-async function settle(eventId: string, status: IntakeStatusName, extra: { clientId?: string; error?: string } = {}): Promise<void> {
+interface SettleExtra {
+  clientId?: string;
+  error?: string;
+  /** The Meta campaign (owner, 12 Nov 2026), kept whatever the outcome. */
+  campaign?: { id: string; name: string | null };
+}
+
+async function settle(eventId: string, status: IntakeStatusName, extra: SettleExtra = {}): Promise<void> {
   try {
     await prisma.studioLeadIntakeEvent.update({
       where: { id: eventId },
-      data: { status, clientId: extra.clientId ?? null, error: extra.error ? extra.error.slice(0, 300) : null },
+      data: {
+        status,
+        clientId: extra.clientId ?? null,
+        error: extra.error ? extra.error.slice(0, 300) : null,
+        ...(extra.campaign ? { campaignId: extra.campaign.id, campaignName: extra.campaign.name?.slice(0, 160) ?? null } : {}),
+      },
     });
   } catch (error) {
     /* Bookkeeping never throws over the failure it is recording. */
@@ -176,15 +200,22 @@ async function settle(eventId: string, status: IntakeStatusName, extra: { client
   }
 }
 
-export type Outcome = 'landed' | 'duplicate' | 'failed' | 'test';
+export type Outcome = 'landed' | 'duplicate' | 'failed' | 'test' | 'skipped';
+
+interface LandOptions {
+  /** Past leads: nobody told, no "came in again" line (`landLead`). */
+  quiet?: boolean;
+  campaign?: SettleExtra['campaign'];
+}
 
 /**
  * Land one claimed lead and settle its claim. Never throws: every failure
  * becomes a FAILED event with a reason.
  */
-async function landClaimed(door: Door, eventId: string, incoming: IncomingLead): Promise<{ outcome: Outcome; error?: string }> {
+async function landClaimed(door: Door, eventId: string, incoming: IncomingLead, opts: LandOptions = {}): Promise<{ outcome: Outcome; error?: string }> {
+  const { campaign } = opts;
   const fail = async (error: string) => {
-    await settle(eventId, 'FAILED', { error });
+    await settle(eventId, 'FAILED', { error, campaign });
     return { outcome: 'failed' as const, error };
   };
 
@@ -194,7 +225,7 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead):
      recorded so the owner can see the door works, and never put on the
      board: a fake card in the pool would be rung by somebody. */
   if (incoming.isTest) {
-    await settle(eventId, 'LANDED');
+    await settle(eventId, 'LANDED', { campaign });
     return { outcome: 'test' };
   }
 
@@ -227,9 +258,10 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead):
       againSummary: `Came in again through ${where.how}${said}`,
       connectionId: door.id,
       ads: adColumns(incoming.ads),
+      quiet: opts.quiet === true,
     });
     if (landed.kind === 'no-stage') return fail('Your board has no columns to put the lead in.');
-    await settle(eventId, landed.kind === 'created' ? 'LANDED' : 'DUPLICATE', { clientId: landed.clientId });
+    await settle(eventId, landed.kind === 'created' ? 'LANDED' : 'DUPLICATE', { clientId: landed.clientId, campaign });
     await landed.alerted;
     return { outcome: landed.kind === 'created' ? 'landed' : 'duplicate' };
   } catch (error) {
@@ -361,35 +393,60 @@ export async function takeMeta(rawBody: string, signature: string | null): Promi
   return work;
 }
 
+/**
+ * The Page's token: the one sealed on the connection by "Connect Facebook",
+ * else env STUDIO_META_PAGE_TOKENS (set by One Interiors before 12 Nov 2026).
+ */
+function pageTokenFor(door: Door): { token: string } | { error: string } {
+  const pageId = door.metaPageId;
+  if (!pageId) return { error: 'This connection has no Facebook Page id.' };
+  if (door.metaTokenSealed) {
+    const token = unseal(door.metaTokenSealed, sealingKey());
+    return token ? { token } : { error: 'The Facebook connection needs renewing: press Connect Facebook again.' };
+  }
+  const entry = parsePageTokens(process.env.STUDIO_META_PAGE_TOKENS).get(pageId);
+  if (!entry) return { error: 'This Page is not connected to Facebook yet: press Connect Facebook.' };
+  if (entry.studio && entry.studio !== door.studioSlug) return { error: `Page ${pageId} is set up for a different studio on One Interiors.` };
+  return { token: entry.token };
+}
+
+/** One Graph GET with the token in a header (never in the URL). */
+async function graphGet(url: string, token: string, timeoutMs = 8000): Promise<{ ok: true; body: unknown } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(timeoutMs), cache: 'no-store' });
+    const body = await res.json().catch(() => null);
+    return res.ok ? { ok: true, body } : { ok: false, error: graphError(body, res.status) };
+  } catch (error) {
+    console.error('[intake/meta] graph unreachable', error instanceof Error ? error.name : 'error');
+    return { ok: false, error: 'Meta could not be reached to fetch the lead. Use "Try again" below.' };
+  }
+}
+
+/**
+ * Land one Meta lead Graph has given us, or skip it when its campaign is not
+ * one the studio picked (owner, 12 Nov 2026).
+ */
+async function landMetaLead(door: Door, eventId: string, graph: unknown, quiet: boolean): Promise<{ outcome: Outcome; error?: string }> {
+  const incoming = parseMetaLead(graph);
+  const campaign = { id: campaignKey(incoming.ads.campaignId), name: incoming.ads.campaignName };
+  if (!campaignAllowed({ only: door.metaOnlyCampaigns, ids: door.metaCampaignIds }, incoming.ads.campaignId)) {
+    await settle(eventId, 'SKIPPED', { campaign });
+    return { outcome: 'skipped' };
+  }
+  return landClaimed(door, eventId, incoming, { quiet, campaign });
+}
+
 /** Fetch one lead from Graph with the page's token, and land it. */
-async function fetchAndLandMeta(door: Door, eventId: string, leadgenId: string): Promise<{ outcome: Outcome; error?: string }> {
+async function fetchAndLandMeta(door: Door, eventId: string, leadgenId: string, quiet = false): Promise<{ outcome: Outcome; error?: string }> {
   const fail = async (error: string) => {
     await settle(eventId, 'FAILED', { error });
     return { outcome: 'failed' as const, error };
   };
-
-  const pageId = door.metaPageId;
-  if (!pageId) return fail('This connection has no Facebook Page id.');
-  const tokens = parsePageTokens(process.env.STUDIO_META_PAGE_TOKENS);
-  const entry = tokens.get(pageId);
-  if (!entry) return fail(`One Interiors has no page token for page ${pageId} yet (STUDIO_META_PAGE_TOKENS).`);
-  if (entry.studio && entry.studio !== door.studioSlug) return fail(`Page ${pageId} is set up for a different studio on One Interiors.`);
-
-  let graph: unknown;
-  try {
-    const res = await fetch(graphLeadUrl(leadgenId), {
-      headers: { authorization: `Bearer ${entry.token}` },
-      signal: AbortSignal.timeout(8000),
-      cache: 'no-store',
-    });
-    graph = await res.json().catch(() => null);
-    if (!res.ok) return fail(graphError(graph, res.status));
-  } catch (error) {
-    console.error('[intake/meta] graph fetch failed', leadgenId, error instanceof Error ? error.name : 'error');
-    return fail('Meta could not be reached to fetch the lead. Use "Try again" below.');
-  }
-
-  return landClaimed(door, eventId, parseMetaLead(graph));
+  const t = pageTokenFor(door);
+  if ('error' in t) return fail(t.error);
+  const got = await graphGet(graphLeadUrl(leadgenId), t.token);
+  if (!got.ok) return fail(got.error);
+  return landMetaLead(door, eventId, got.body, quiet);
 }
 
 /**
@@ -413,4 +470,120 @@ export async function retryMetaEvent(studioId: string, eventId: string): Promise
   if (count !== 1) return { ok: false, error: 'It is already being tried. Reload in a moment.' };
   const { outcome, error } = await fetchAndLandMeta(door, event.id, event.externalId);
   return outcome === 'failed' ? { ok: false, error: error ?? 'It failed again.' } : { ok: true, outcome };
+}
+
+// ── Past leads and skipped campaigns (owner, 12 Nov 2026) ──────
+
+/** Where "Bring in past leads" stopped: which form, and Graph's cursor in it. */
+export interface BackfillCursor {
+  form: number;
+  after: string | null;
+}
+
+export interface BackfillTally {
+  landed: number;
+  duplicate: number;
+  skipped: number;
+  failed: number;
+  /** Already brought in before (by the webhook or an earlier run). */
+  seen: number;
+}
+
+export type BackfillStep =
+  | { ok: true; done: boolean; next: BackfillCursor | null; tally: BackfillTally; forms: number }
+  | { ok: false; error: string };
+
+export const emptyTally = (): BackfillTally => ({ landed: 0, duplicate: 0, skipped: 0, failed: 0, seen: 0 });
+
+function count(tally: BackfillTally, outcome: Outcome): void {
+  if (outcome === 'landed') tally.landed += 1;
+  else if (outcome === 'duplicate') tally.duplicate += 1;
+  else if (outcome === 'skipped') tally.skipped += 1;
+  else if (outcome === 'failed') tally.failed += 1;
+}
+
+/**
+ * One stretch of "Bring in past leads": the Page's forms in order, each
+ * read back `BACKFILL_DAYS`, every lead claimed on its leadgen id like a
+ * webhook lead (so one already here is left alone) and landed quietly.
+ * Stops after `budgetMs` and returns where to go on; the screen calls again
+ * until `done`. Studio-scoped by the caller.
+ */
+export async function backfillMeta(studioId: string, connectionId: string, from: BackfillCursor | null, budgetMs: number): Promise<BackfillStep> {
+  const door = await doorById(connectionId);
+  if (!door || door.studioId !== studioId || door.kind !== 'META_PAGE' || !door.metaPageId) return { ok: false, error: 'That connection is not yours.' };
+  if (!door.enabled) return { ok: false, error: 'Turn it on first.' };
+  const t = pageTokenFor(door);
+  if ('error' in t) return { ok: false, error: t.error };
+
+  const formsGot = await graphGet(`${GRAPH}/${door.metaPageId}/leadgen_forms?fields=id,name&limit=200`, t.token);
+  if (!formsGot.ok) return { ok: false, error: formsGot.error };
+  const forms = readForms(formsGot.body);
+
+  const started = Date.now();
+  const since = Math.floor(started / 1000) - BACKFILL_DAYS * 86_400;
+  const tally = emptyTally();
+  let cur: BackfillCursor = from && from.form >= 0 ? from : { form: 0, after: null };
+
+  while (cur.form < forms.length) {
+    if (Date.now() - started > budgetMs) return { ok: true, done: false, next: cur, tally, forms: forms.length };
+    const page = await graphGet(formLeadsUrl(forms[cur.form]!.id, since, cur.after), t.token, 15_000);
+    if (!page.ok) return { ok: false, error: page.error };
+    const ids = readLeadPage(page.body).map((l) => String(l.id));
+    /* Looked up first, so a second run does not hit the unique index (and log an error) once per lead. */
+    const known = new Set(
+      (await prisma.studioLeadIntakeEvent.findMany({ where: { connectionId: door.id, externalId: { in: ids }, status: { not: 'FAILED' } }, select: { externalId: true } })).map((e) => e.externalId),
+    );
+    for (const lead of readLeadPage(page.body)) {
+      if (known.has(String(lead.id))) {
+        tally.seen += 1;
+        continue;
+      }
+      const eventId = await claim(door.id, String(lead.id), false);
+      if (!eventId) {
+        tally.seen += 1;
+        continue;
+      }
+      count(tally, (await landMetaLead(door, eventId, lead, true)).outcome);
+    }
+    const after = afterCursor(page.body);
+    cur = after ? { form: cur.form, after } : { form: cur.form + 1, after: null };
+  }
+
+  await prisma.studioLeadConnection.update({ where: { id: door.id }, data: { metaBackfillAt: new Date() } });
+  return { ok: true, done: true, next: null, tally, forms: forms.length };
+}
+
+/**
+ * After the owner changes which campaigns: the SKIPPED leads of campaigns now
+ * taken are fetched again and landed (quietly when older than a day: those
+ * came from past leads). Stops after `budgetMs`; `left` says how many wait.
+ */
+export async function releaseSkipped(studioId: string, connectionId: string, budgetMs: number): Promise<{ ok: true; tally: BackfillTally; left: number } | { ok: false; error: string }> {
+  const door = await doorById(connectionId);
+  if (!door || door.studioId !== studioId || door.kind !== 'META_PAGE') return { ok: false, error: 'That connection is not yours.' };
+  const tally = emptyTally();
+  if (!door.enabled) return { ok: true, tally, left: 0 };
+  const where: Prisma.StudioLeadIntakeEventWhereInput = door.metaOnlyCampaigns
+    ? { connectionId: door.id, status: 'SKIPPED', campaignId: { in: door.metaCampaignIds } }
+    : { connectionId: door.id, status: 'SKIPPED' };
+  const started = Date.now();
+  const dayAgo = new Date(started - 86_400_000);
+  let stuck = 0;
+  while (Date.now() - started <= budgetMs) {
+    const batch = await prisma.studioLeadIntakeEvent.findMany({ where, orderBy: { createdAt: 'asc' }, take: 25, select: { id: true, externalId: true, updatedAt: true, createdAt: true } });
+    if (batch.length === 0) break;
+    let moved = 0;
+    for (const e of batch) {
+      if (Date.now() - started > budgetMs) break;
+      const { count: took } = await prisma.studioLeadIntakeEvent.updateMany({ where: { id: e.id, status: 'SKIPPED', updatedAt: e.updatedAt }, data: { status: 'RECEIVED' } });
+      if (took !== 1) continue;
+      moved += 1;
+      count(tally, (await fetchAndLandMeta(door, e.id, e.externalId, e.createdAt < dayAgo)).outcome);
+    }
+    /* Another request is taking the same batch: stop rather than spin. */
+    if (moved === 0 && ++stuck >= 3) break;
+  }
+  const left = await prisma.studioLeadIntakeEvent.count({ where });
+  return { ok: true, tally, left };
 }
