@@ -45,6 +45,15 @@ export const TEMPLATE_MILESTONES: Readonly<Record<PlanKind, readonly string[]>> 
   HANDOVER: ['Snags listed', 'Provisional handover'],
 };
 
+/**
+ * The project closure step (owner, 13 Nov 2026): the last carpentry step, after the shutters. It shows in the
+ * execution timeline and in My work; ticking it shows the payments still due (closure-due.ts). It does not move the
+ * project's lifecycle (the provisional handover still does).
+ */
+export const PROJECT_CLOSURE_STEP = 'Project closure';
+/** Is this step the project closure? By name, as every template step is matched (lifecycle-rules.ts does the same). */
+export const isProjectClosureStep = (label: string): boolean => label.trim().toLowerCase() === PROJECT_CLOSURE_STEP.toLowerCase();
+
 /** The sheet's first day: where every offset counts from. */
 export const SHEET_START = '2026-07-17';
 /** The sheet's handover. */
@@ -100,7 +109,11 @@ export const STEP_TEMPLATE: readonly TemplateStep[] = [
   step('CARPENTRY', S2B, 'Handles and locks installed', 3, '2026-10-05'),
   step('CARPENTRY', S2B, 'Site inspection at shutter stage by the designer', 1, '2026-10-05'),
   step('CARPENTRY', S2B, 'Safety door installed', 2, '2026-10-06'),
-  step('CARPENTRY', S2B, 'Carpentry complete and site cleaned', 3, '2026-10-10'),
+  step('CARPENTRY', S2B, 'Carpentry complete and site cleaned', 2, '2026-10-10'),
+  /* Project closure as an activity (owner, 13 Nov 2026: "after the shutters stage, this should happen"): late extras
+     raised and paid 100% in advance, and the handover payment closed ("I give you the keys today, you give me the
+     money"). 1% taken from the step before it, so carpentry still weighs 47%. */
+  step('CARPENTRY', S2B, PROJECT_CLOSURE_STEP, 1, '2026-10-10'),
 
   step('FINISH', FIN, 'Profile door and mirror installed', 3, '2026-10-12'),
   step('FINISH', FIN, 'Painting started', 2, '2026-10-12'),

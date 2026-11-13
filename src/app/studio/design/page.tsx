@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { designWorkload, type DesignerRow } from '@/modules/studio-design/store';
 import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { can, currentMember } from '@/modules/studio/access';
+import { seesMoneyDue } from '@/modules/project/statement';
 import { asLifeTab, LifecycleTabs } from './LifecycleTabs';
 import { KpiRow } from '../ui/KpiRow';
 import { designKpis } from '@/modules/studio/app-kpis';
@@ -58,6 +59,12 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           <Link href="/studio/design/delays" className="btn ghost">
             Delays
           </Link>
+          {/* Who owes how much (owner, 13 Nov 2026): the design head too. */}
+          {member && member.role === 'DESIGNER' && seesMoneyDue(member) ? (
+            <Link href="/studio/payments/due" className="btn ghost">
+              Money due
+            </Link>
+          ) : null}
           {/* Delete and restore (the owner only, 29 Oct 2026; studio/project-delete.ts). */}
           {mayDeleteProjects(member) ? (
             <Link href="/studio/projects/deleted" className="btn ghost">

@@ -442,32 +442,48 @@ export function QuoteBuilder({
     return true;
   }
 
+  /* One save at a time (owner, 13 Nov 2026: saving twice made an extra copy). `saving` only turns true on the next
+     render, so a quick double click got in twice; this ref is set at once and the second press is ignored. */
+  const inFlight = useRef(false);
+
   function saveAs(stage: 'SALES' | 'DESIGN') {
+    if (inFlight.current) return;
+    inFlight.current = true;
     startSave(async () => {
-      const ok = await persist();
-      if (!ok) return;
-      if (stage === 'DESIGN' && quote.stage === 'SALES') {
-        setBanner(`Saved ✓ ${quote.number} · Sales Final. Making the Design Final from it…`);
-        const r = await copyQuoteAction(quote.id, 'design-final');
-        if (r && 'ok' in r && !r.ok) setBanner(`Saved ✓ ${quote.number} · Sales Final. ${r.error}`);
-        return;
+      try {
+        const ok = await persist();
+        if (!ok) return;
+        if (stage === 'DESIGN' && quote.stage === 'SALES') {
+          setBanner(`Saved ✓ ${quote.number} · Sales Final. Making the Design Final from it…`);
+          const r = await copyQuoteAction(quote.id, 'design-final');
+          if (r && 'ok' in r && !r.ok) setBanner(`Saved ✓ ${quote.number} · Sales Final. ${r.error}`);
+          return;
+        }
+        setBanner(`Saved ✓ ${quote.number} · ${STAGE_LABELS[quote.stage]} (overrides previous).`);
+      } finally {
+        inFlight.current = false;
       }
-      setBanner(`Saved ✓ ${quote.number} · ${STAGE_LABELS[quote.stage]} (overrides previous).`);
     });
   }
 
   function saveAndOpen(href: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     /* Opened now, inside the press, so a popup blocker lets it through; it
        goes to the page once the save has answered. */
     const w = window.open('about:blank', '_blank');
     startSave(async () => {
-      const ok = await persist();
-      if (ok) {
-        setBanner(`Saved ✓ ${quote.number} · ${STAGE_LABELS[quote.stage]}. The PDF opened in a new tab: choose “Save as PDF” in the print dialog.`);
-        if (w) w.location.href = href;
-        else window.location.href = href;
-      } else if (w) {
-        w.close();
+      try {
+        const ok = await persist();
+        if (ok) {
+          setBanner(`Saved ✓ ${quote.number} · ${STAGE_LABELS[quote.stage]}. The PDF opened in a new tab: choose “Save as PDF” in the print dialog.`);
+          if (w) w.location.href = href;
+          else window.location.href = href;
+        } else if (w) {
+          w.close();
+        }
+      } finally {
+        inFlight.current = false;
       }
     });
   }

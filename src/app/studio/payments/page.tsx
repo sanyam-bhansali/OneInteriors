@@ -8,6 +8,7 @@ import { ExtrasToCollect } from '../projects/[id]/ExtrasToCollect';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
 import { currentMember } from '@/modules/studio/access';
+import { seesMoneyDue } from '@/modules/project/statement';
 import { KpiRow } from '../ui/KpiRow';
 import { moneyKpis } from '@/modules/studio/app-kpis';
 import { Bookings } from './Bookings';
@@ -67,6 +68,14 @@ export default async function PaymentsDeskPage() {
             Every project&rsquo;s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker.
           </p>
         </div>
+        {/* Who owes how much (owner, 13 Nov 2026). */}
+        {seesMoneyDue(member) ? (
+          <div className="hstack">
+            <Link href="/studio/payments/due" className="btn sec">
+              Money due
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
+import { getQuote, projectIdOfQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
 import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
 import { signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
@@ -73,6 +73,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   ]);
   /* Every line needs a photo before it is sent (owner, 10 Nov 2026): what is missing, worked out on the server like the refusal itself. */
   const photoStudioId = await quotingStudioId();
+  /* "Back to project" (owner, 13 Nov 2026): a quotation that belongs to a project leads back to it. */
+  const backProjectId = quote.scopeForProjectId ?? project.projectId ?? (photoStudioId ? await projectIdOfQuote(quote, photoStudioId).catch(() => null) : null);
   const noPhotos = photoStudioId && quote.lines.length > 0 ? await missingPhotosOnQuote(quote.id, photoStudioId) : [];
   const signatures = await quotingStudioId()
     .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
@@ -101,10 +103,18 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           client, where it is, and what can happen to it next. */}
       <div className="phead hphead">
         <div style={{ minWidth: 0 }}>
-          <Link href="/studio/quotations" className="sm muted qback">
-            <LineIcon name="back" size={15} />
-            Quotations
-          </Link>
+          <span className="hstack" style={{ gap: 14 }}>
+            <Link href="/studio/quotations" className="sm muted qback">
+              <LineIcon name="back" size={15} />
+              Quotations
+            </Link>
+            {backProjectId ? (
+              <Link href={`/studio/projects/${backProjectId}`} className="sm acc-t qback" data-testid="back-to-project">
+                <LineIcon name="back" size={15} />
+                Back to project
+              </Link>
+            ) : null}
+          </span>
           <h1 style={{ marginTop: 4 }}>
             <span className="mono" style={{ letterSpacing: '-.02em' }}>
               {quote.number}

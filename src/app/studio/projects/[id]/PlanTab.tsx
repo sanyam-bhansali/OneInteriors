@@ -18,6 +18,9 @@ import {
 } from '@/modules/project/project-rules';
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
 import { doneLabel, parsePercent } from '@/modules/project/step-rules';
+import { isProjectClosureStep } from '@/modules/project/step-template';
+import type { ClosureDue } from '@/modules/project/closure-due';
+import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
 import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
 import { newClientRef, uploadFile } from '../../site/lib/queue';
@@ -737,9 +740,10 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
         setBusy(null);
         return;
       }
+      const stillDue = isProjectClosureStep(step.label) && plan.closureDue && plan.closureDue.openPaise > 0 ? ` Still due from ${customer}: ${formatINR(plan.closureDue.openPaise)}. Ask for it today.` : '';
       say(
         json.post?.ticked
-          ? { ok: true, message: `Ticked: ${step.label}. The photo and your sentence are in today's site log, and ${customer} sees them now.` }
+          ? { ok: true, message: `Ticked: ${step.label}. The photo and your sentence are in today's site log, and ${customer} sees them now.${stillDue}` }
           : { ok: false, error: `The photo is in today's site log, but “${step.label}” was already ticked.` },
       );
       close();
@@ -775,6 +779,8 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
             Close
           </button>
         </div>
+
+        {isProjectClosureStep(step.label) ? <ClosureDueBox due={plan.closureDue} customer={customer} projectId={plan.projectId} /> : null}
 
         <div>
           <span className={label}>1 · The photo that shows it done</span>
@@ -837,6 +843,50 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
         </div>
       </div>
     </dialog>
+  );
+}
+
+/**
+ * The project closure (owner, 13 Nov 2026: "at this stage you also close the 5% … I give you the keys today, you
+ * give me the money"): what is still due, so the team asks for it. Late extras are raised from Extra work and paid
+ * in full first. It never stops the tick.
+ */
+function ClosureDueBox({ due, customer, projectId }: { due: ClosureDue | null; customer: string; projectId: string }) {
+  if (!due) {
+    return <p className={`m-0 rounded-[10px] bg-[var(--soft)] p-3 ${muted}`}>Collect the handover payment and any late extras before you hand over the keys.</p>;
+  }
+  const clear = due.openPaise === 0 && due.waitingPaise === 0;
+  return (
+    <div className={`flex flex-col gap-2 rounded-[10px] p-3 text-[14px] ${clear ? 'bg-[var(--soft)]' : 'bg-[var(--warn-bg)]'}`} role="status" data-testid="closure-due">
+      <p className="m-0 font-semibold">{clear ? `${customer} has paid everything due.` : `Still due from ${customer}: ${formatINR(due.openPaise)}`}</p>
+      {due.stages.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {due.stages.map((s) => (
+            <li key={s.label} className="flex flex-wrap justify-between gap-2">
+              <span>
+                {s.label}
+                {s.last ? ' (handover payment)' : ''}
+              </span>
+              <span className="mono">
+                {formatINR(s.openPaise)}
+                {s.waitingPaise > 0 ? <span className={muted}> · {formatINR(s.waitingPaise)} waiting for {customer} to confirm</span> : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {due.extras.length ? (
+        <p className={`m-0 ${muted}`}>
+          Includes extra work not paid yet: {due.extras.map((e) => `${e.number} ${e.title} (${formatINR(e.openPaise)})`).join(', ')}. Extras are paid in full before the work.
+        </p>
+      ) : null}
+      <p className={`m-0 ${muted}`}>
+        Ask for it before you hand over the keys. Ticking does not wait for it.{' '}
+        <Link href={`/studio/projects/${projectId}?tab=payments`} className="acc-t">
+          Payments
+        </Link>
+      </p>
+    </div>
   );
 }
 
