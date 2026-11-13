@@ -271,7 +271,7 @@ async function lateDecisionDelay(
     to: addWorkingDays(target.plannedEnd, days, cal),
     reason: 'CUSTOMER_CHANGE',
     shiftLater: true,
-  });
+  }, cal);
   if (!planned.ok) return 0;
   for (const s of planned.plan.stages) {
     await tx.homeProjectStage.update({ where: { id: s.stageId }, data: { plannedStart: dayToDb(s.plannedStart), plannedEnd: dayToDb(s.plannedEnd) } });

@@ -78,7 +78,7 @@ import { templateFor } from '@/modules/project/step-template';
 import { designSteps } from '@/modules/studio-design/rules';
 import { designLengthFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
 import { spreadStepDays } from '@/modules/project/step-rules';
-import { dayToDb, istDay } from '@/modules/project/working-days';
+import { dayToDb, istDay, onWorkingDay, shiftWorkingDays, type StudioCalendar } from '@/modules/project/working-days';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, TRACKER_STAGES, type PlanKind } from './tracker';
 
 export type { PlanKind } from './tracker';
@@ -157,6 +157,10 @@ export interface DesignPlanInput {
   bhk?: number | null;
   /** "Design done in N days" (Start a project, 27 Oct 2026): the steps scale to end on it; the flat's size when left out. */
   days?: number | null;
+  /** Essential, Premium or Luxe (owner, 13 Nov 2026): Premium's days, Essential half, Luxe 30% more. Ignored with `days`. */
+  category?: string | null;
+  /** The studio's working days and holidays (owner, 13 Nov 2026: Monday off): every date counted in working days. Every day when left out. */
+  calendar?: StudioCalendar | null;
 }
 
 export interface PlanStage {
@@ -229,11 +233,20 @@ export function kindWeights(): number[] {
  * design days), design lasts exactly that and the other four share the rest
  * by their usual weights — when that leaves each of them at least a day.
  */
-export function stageDates(startOn: Date, totalDays: number, designDays: number | null = null): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
+export function stageDates(startOn: Date, totalDays: number, designDays: number | null = null, cal: StudioCalendar | null = null): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
   const total = Math.max(0, Math.round(totalDays));
   const weights = kindWeights();
   const fixed = designDays !== null && Number.isInteger(designDays) && designDays > 0 && total - designDays >= PLAN_KINDS.length - 1;
   const days = fixed ? [designDays, ...splitAcross(total - designDays, weights.slice(1))] : splitAcross(total, weights);
+  if (cal) {
+    // Working days (owner, 13 Nov 2026: "planned as per the working days, Monday being our weekly off").
+    let day = onWorkingDay(istDay(startOn), cal);
+    return PLAN_KINDS.map((kind, i) => {
+      const plannedStart = dayToDb(day);
+      day = shiftWorkingDays(day, days[i]!, cal);
+      return { kind, plannedStart, plannedEnd: dayToDb(day) };
+    });
+  }
   let at = startOn.getTime();
   return PLAN_KINDS.map((kind, i) => {
     const plannedStart = new Date(at);
@@ -296,8 +309,16 @@ export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): 
  * scaled to the stage's window, gates matched to the payment stages by name
  * (studio-design/rules.ts `designSteps`).
  */
-export function designStepsFor(plannedStart: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[], bhk: number | null = null, length: number | null = null): PlanItem[] {
-  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, istDay(plannedStart), payments, bhk, length).map((st) => ({
+export function designStepsFor(
+  plannedStart: Date,
+  template: readonly DesignTemplateStep[] | null | undefined,
+  payments: readonly { label: string }[],
+  bhk: number | null = null,
+  length: number | null = null,
+  cal: StudioCalendar | null = null,
+  category: string | null = null,
+): PlanItem[] {
+  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, istDay(plannedStart), payments, bhk, length, cal ?? undefined, category).map((st) => ({
     room: st.room,
     label: st.label,
     quoteLineId: null,
@@ -324,12 +345,14 @@ export function designStepsFor(plannedStart: Date, template: readonly DesignTemp
  */
 export function templateStages(startOn: Date, totalDays: number, design?: (DesignPlanInput & { payments: readonly { label: string }[] }) | null): PlanStage[] {
   const steps = design ? (design.template && design.template.length ? design.template : HAUSPIRE_DESIGN) : null;
-  return stageDates(startOn, totalDays, steps ? designLengthFor(steps, design?.bhk, design?.days ?? null) : null).map((d, i) => ({
+  const cal = design?.calendar ?? null;
+  const category = design?.category ?? null;
+  return stageDates(startOn, totalDays, steps ? designLengthFor(steps, design?.bhk, design?.days ?? null, category) : null, cal).map((d, i) => ({
     ...d,
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null, cal, category) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
   }));
 }
 

@@ -16,6 +16,7 @@ import { recordEvent, type ProjectActor } from '@/modules/project/events';
 import { dayFromDb, dayToDb } from '@/modules/project/working-days';
 import { planRedateAfterPayment } from './rules';
 import { GATE_SELECT, gateStagesOf } from './store';
+import { projectCalendar } from './step-settle';
 
 export async function redateAfterPayment(projectId: string, paidOn: string, byUserId: string): Promise<void> {
   try {
@@ -36,6 +37,7 @@ export async function redateAfterPayment(projectId: string, paidOn: string, byUs
       items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null, inScope: i.inScope, gatePayment: i.gatePayment, gapDays: i.gapDays })),
       gateStagesOf(p),
       paidOn,
+      await projectCalendar(prisma, projectId),
     );
     if (!plan) return;
     const first = plan.moves[0]!;

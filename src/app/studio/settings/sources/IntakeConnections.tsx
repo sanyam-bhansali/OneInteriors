@@ -16,6 +16,7 @@ import type { RoutingPerson } from '@/modules/studio-sales/settings';
 import type { LeadRouteModeName } from '@/modules/studio-sales/lead-routing';
 import { saveConnectionRoutingAction } from './routing-actions';
 import { useRouter } from 'next/navigation';
+import { MetaBackfill, MetaCampaigns, MetaConnectBar } from './MetaLeads';
 
 /**
  * Settings → Lead sources, "Leads that come in by themselves" (lead intake,
@@ -38,7 +39,8 @@ const KIND_SHORT: Record<ConnectionKindName, string> = {
   PORTAL: 'Portal or tool',
 };
 
-const KIND_ORDER: ConnectionKindName[] = ['META_PAGE', 'GOOGLE_LEAD_FORM', 'WEBSITE', 'PORTAL'];
+/* Meta Pages are connected with Connect Facebook (owner, 12 Nov 2026), not typed in. */
+const KIND_ORDER: ConnectionKindName[] = ['GOOGLE_LEAD_FORM', 'WEBSITE', 'PORTAL'];
 
 type Act = (fn: () => Promise<IntakeResult>, after?: (r: IntakeResult) => void) => void;
 
@@ -91,8 +93,8 @@ function Copyable({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function IntakeConnections({ screen, people = [] }: { screen: IntakeScreen; people?: RoutingPerson[] }) {
-  const [kind, setKind] = useState<ConnectionKindName>('META_PAGE');
+export function IntakeConnections({ screen, people = [], metaNotice = null }: { screen: IntakeScreen; people?: RoutingPerson[]; metaNotice?: string | null }) {
+  const [kind, setKind] = useState<ConnectionKindName>('GOOGLE_LEAD_FORM');
   const [label, setLabel] = useState('');
   const [pageId, setPageId] = useState('');
   const [fresh, setFresh] = useState<{ secret: string; label: string } | null>(null);
@@ -116,6 +118,8 @@ export function IntakeConnections({ screen, people = [] }: { screen: IntakeScree
         </p>
       </div>
 
+      <MetaConnectBar screen={screen} notice={metaNotice} />
+
       <form
         className="flex flex-col gap-2 rounded-[9px] bg-[var(--s-surface-2)] p-3"
         onSubmit={(e) => {
@@ -133,7 +137,7 @@ export function IntakeConnections({ screen, people = [] }: { screen: IntakeScree
           );
         }}
       >
-        <span className="text-[13.5px] font-medium">Connect a source</span>
+        <span className="text-[13.5px] font-medium">Connect another source</span>
         <div className="flex flex-wrap gap-2">
           <select aria-label="Where the leads come from" value={kind} onChange={(e) => setKind(e.target.value as ConnectionKindName)} className="fld w-auto">
             {KIND_ORDER.map((k) => (
@@ -196,6 +200,7 @@ const STATUS_WORDS: Record<string, string> = {
   DUPLICATE: 'Already on your board: added to their timeline',
   FAILED: 'Did not land',
   RECEIVED: 'Being taken…',
+  SKIPPED: 'Kept aside: its campaign is not one you take',
 };
 
 function ConnectionCard({ c, screen, people }: { c: ConnectionRow; screen: IntakeScreen; people: RoutingPerson[] }) {
@@ -215,7 +220,14 @@ function ConnectionCard({ c, screen, people }: { c: ConnectionRow; screen: Intak
       </div>
 
       {c.kind === 'META_PAGE' ? (
-        <p className="m-0 text-[12.5px] muted">Facebook Page {c.metaPageId}</p>
+        <>
+          <p className="m-0 text-[12.5px] muted">
+            Facebook Page {c.meta?.pageName ? `${c.meta.pageName} (${c.metaPageId})` : c.metaPageId}
+            {c.meta?.viaLogin ? ' · connected with Facebook' : ''}
+          </p>
+          {c.meta ? <MetaCampaigns c={c} /> : null}
+          {c.meta && (c.meta.viaLogin || screen.metaReady.pageTokens) ? <MetaBackfill c={c} /> : null}
+        </>
       ) : (
         <Copyable value={c.url} label={`Address for ${c.label}`} />
       )}
@@ -237,6 +249,7 @@ function ConnectionCard({ c, screen, people }: { c: ConnectionRow; screen: Intak
             <li key={e.id} className="flex flex-wrap items-baseline gap-x-2">
               <span className="muted">{e.atLabel}</span>
               <span className={e.status === 'FAILED' ? 'text-[var(--s-bad)]' : ''}>{e.isTest ? 'Test lead received (not put on your board)' : STATUS_WORDS[e.status]}</span>
+              {e.campaignName ? <span className="muted">· {e.campaignName}</span> : null}
               {e.clientId ? (
                 <Link href={`/studio/clients/${e.clientId}`} className="underline">
                   Open the lead
@@ -335,16 +348,16 @@ function SetupHelp({ c, screen }: { c: ConnectionRow; screen: IntakeScreen }) {
     const ready = screen.metaReady;
     return (
       <>
-        <p className="m-0">Leads from this Page&rsquo;s lead ads, on Facebook and on Instagram, land here by themselves. One Interiors switches it on once for your Page:</p>
+        <p className="m-0">Leads from this Page&rsquo;s lead ads, on Facebook and on Instagram, land here by themselves, from the campaigns you pick.</p>
         <ol className="m-0 flex flex-col gap-1 pl-5">
-          <li>Make One Interiors&rsquo;s Meta app a partner on your Page (Meta Business Suite → Settings → Partners), or share the Page with us, so we can read its leads.</li>
-          <li>
-            We subscribe the app to the Page&rsquo;s <code>leadgen</code> field, with this callback address:
-            <Copyable value={screen.metaCallbackUrl} label="Meta callback address" />
-          </li>
-          <li>We add the Page&rsquo;s access token on our side. You do not paste any token here.</li>
-          <li>Test it with Meta&rsquo;s Lead Ads Testing Tool: the test lead should show below within a minute.</li>
+          <li>Press Connect Facebook (above) and log in with the Facebook account that runs your ads. Allow every permission it asks for.</li>
+          <li>Pick this Page. We switch its lead ads on for you; you never paste a token.</li>
+          <li>Choose campaigns: every campaign, or only the ones you tick.</li>
+          <li>Test it with Meta&rsquo;s Lead Ads Testing Tool: the test lead shows below within a minute.</li>
         </ol>
+        <p className="m-0 muted">
+          Meta sends new leads to <code>{screen.metaCallbackUrl}</code>.
+        </p>
         <p className="m-0 muted">
           On our side: {ready.appSecret ? 'app secret set' : 'app secret not set yet'} · {ready.verifyToken ? 'verify token set' : 'verify token not set yet'} · {ready.pageTokens ? 'page tokens set' : 'page tokens not set yet'}.
         </p>

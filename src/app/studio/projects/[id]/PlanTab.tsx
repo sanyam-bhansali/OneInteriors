@@ -934,7 +934,7 @@ function MoveDialog({
   const reason: DelayReason | null = choice === 'DECISION' ? 'CUSTOMER_CHANGE' : choice;
   const linked = choice === 'DECISION' && decisionId ? decisionId : null;
   const rules: RuleStage[] = plan.stages.map((s) => ({ id: s.id, kind: s.kind, name: s.name, plannedStart: s.plannedStart, plannedEnd: s.plannedEnd, actualEnd: s.actualEnd }));
-  const result = planMove(rules, { stageId, field, to, reason: reason ?? 'OTHER', shiftLater: field === 'PLANNED_END' && shiftLater });
+  const result = planMove(rules, { stageId, field, to, reason: reason ?? 'OTHER', shiftLater: field === 'PLANNED_END' && shiftLater }, cal);
 
   const preview = (() => {
     if (!result.ok || !reason) return null;

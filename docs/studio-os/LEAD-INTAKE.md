@@ -85,7 +85,7 @@ The webhook carries only ids: `entry[].id` (the Page) and
 `changes[].value.leadgen_id` for `field: "leadgen"`. The studio is found by the
 Page id (`StudioLeadConnection.metaPageId`, unique). The lead is then fetched:
 
-`GET https://graph.facebook.com/v21.0/{leadgen_id}?fields=created_time,field_data,ad_id,ad_name,adset_name,campaign_name,form_id,platform`
+`GET https://graph.facebook.com/v23.0/{leadgen_id}?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform`
 
 with the Page's token in an `Authorization: Bearer` header (never in the URL).
 `field_data` is mapped like the generic fields (`full_name`, `phone_number`,
@@ -96,6 +96,54 @@ A Page no studio has added is logged by Page id and dropped. A failure (no
 token, Graph refused, Meta unreachable, `META_APP_SECRET` missing) is recorded
 as a FAILED event with the reason, and the owner can press **Try again** on
 Settings once it is fixed: Meta does not resend a lead we answered 200 for.
+
+### Connect Facebook, campaigns and past leads (owner, 12 Nov 2026)
+
+Settings → Lead sources → **Connect Facebook** (`lead.settings`, never a
+developer viewing as the member):
+
+1. `GET /api/studio/meta/connect` sends the owner to Facebook's login
+   (`meta-connect.ts` `META_SCOPES`: pages_show_list, pages_read_engagement,
+   pages_manage_metadata, pages_manage_ads, leads_retrieval, ads_read,
+   business_management) with a one-time state in an httpOnly cookie.
+2. `GET /api/studio/meta/callback` checks the state, swaps the code for a
+   long-lived user token (about 60 days) server to server, and keeps it sealed
+   in `studio_meta_logins` (one per studio). Errors come back as a code in
+   `?meta=` (never words from the address).
+3. `/studio/settings/sources/meta` lists the Pages the login manages. **Connect**
+   takes that Page's token, subscribes the Page to our app's `leadgen` field
+   (`POST /{page}/subscribed_apps`), and makes or renews the Page's connection
+   with the token sealed in `metaTokenSealed`. Removing the connection
+   unsubscribes the Page (best effort).
+
+Tokens are sealed with AES-256-GCM (`meta-connect.ts` `seal`), key from env
+`STUDIO_TOKEN_KEY`, else `SESSION_SECRET`; changing it means connecting again.
+A connection without a sealed token still uses env `STUDIO_META_PAGE_TOKENS`.
+
+**Which campaigns.** Each Page takes every campaign, or only the ticked ones
+(`metaOnlyCampaigns`, `metaCampaignIds`). A new Page starts with none ticked,
+so nothing lands until the owner chooses. A lead from a campaign not taken is
+settled `SKIPPED` with its campaign on the event, and is never taken again by a
+resend. Ticking its campaign later fetches and lands it (`releaseSkipped`). A
+lead from a form opened on the Page has no campaign and counts as `none`. The
+picker lists the ad accounts' leads-objective campaigns (while the login
+lasts), every campaign seen on a lead, and the saved ones.
+
+**Past leads.** "Bring in past leads (last 90 days)" reads every form of the Page
+(`/{page}/leadgen_forms`, then `/{form}/leads` filtered on `time_created`,
+paged by cursor, never by Graph's `next` URL). Each lead is claimed on its
+leadgen id like a webhook lead and landed **quietly**: nobody is notified, and
+a person already on the board gets no "came in again" line. It works about 40
+seconds per call; the screen calls again until done, and a second run skips
+what is already in.
+
+**Meta app setup (One Interiors, once).** Env `META_APP_ID`, `META_APP_SECRET`,
+`META_VERIFY_TOKEN`, and `STUDIO_TOKEN_KEY` (recommended). In the Meta app:
+Facebook Login for Business with redirect URI
+`https://studio.oneinteriors.in/api/studio/meta/callback`; Webhooks → Page →
+callback `https://studio.oneinteriors.in/api/studio/intake/meta`, the verify
+token, field `leadgen`. Pages of businesses outside the app's own need Meta's
+App Review (advanced access) for these permissions.
 
 ## Each lead once
 

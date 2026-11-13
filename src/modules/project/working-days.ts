@@ -178,3 +178,34 @@ export function addWorkingDays(day: string, n: number, cal: StudioCalendar = DEF
   }
   return d;
 }
+
+/**
+ * Every day a working day: what the design dates counted before Monday off
+ * (owner, 13 Nov 2026), and the default where a caller has no studio's
+ * calendar, so a shift by `n` is exactly `n` calendar days.
+ */
+export const EVERY_DAY: StudioCalendar = { workingDays: [1, 2, 3, 4, 5, 6, 7], holidays: new Set() };
+
+/**
+ * The day `n` working days later (or earlier, negative) — moving a planned
+ * date by working days (owner, 13 Nov 2026: "Monday being our weekly off, it
+ * should be considered in the overall planning for both design and
+ * execution"). 0 returns the day itself.
+ */
+export function shiftWorkingDays(day: string, n: number, cal: StudioCalendar = EVERY_DAY): string {
+  assertDay(day);
+  const k = Math.trunc(n);
+  if (k >= 0) return addWorkingDays(day, k, cal);
+  let d = day;
+  for (let left = -k; left > 0; left--) {
+    const prev = previousWorkingDay(d, cal);
+    if (!prev) throw new Error('No working day within a year');
+    d = prev;
+  }
+  return d;
+}
+
+/** This day if the studio works on it, else the next day it does (a planned date never lands on a day off). */
+export function onWorkingDay(day: string, cal: StudioCalendar = EVERY_DAY): string {
+  return nextWorkingDay(day, cal, { inclusive: true }) ?? day;
+}

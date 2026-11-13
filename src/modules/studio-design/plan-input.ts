@@ -11,14 +11,18 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import type { DesignPlanInput } from '@/modules/portal/quote-to-plan';
+import { calendarOf, type StudioCalendar } from '@/modules/project/working-days';
 import { bhkOf, readDesignTemplate } from './template';
 
 export async function designPlanInput(studioId: string, home: { propertyType?: string | null; briefId?: string | null }): Promise<DesignPlanInput> {
   let template: DesignPlanInput['template'] = null;
+  let calendar: StudioCalendar | null = null;
   let propertyType = home.propertyType ?? null;
   try {
-    const s = await prisma.studio.findUnique({ where: { id: studioId }, select: { designTemplate: true } });
+    const s = await prisma.studio.findUnique({ where: { id: studioId }, select: { designTemplate: true, workingDays: true, holidays: { select: { day: true } } } });
     template = s?.designTemplate ? readDesignTemplate(s.designTemplate) : null;
+    // The studio's working days and holidays (owner, 13 Nov 2026: Monday off): the plan's dates skip its days off.
+    calendar = s ? calendarOf({ workingDays: s.workingDays, holidays: s.holidays }) : null;
   } catch {
     template = null;
   }
@@ -30,5 +34,5 @@ export async function designPlanInput(studioId: string, home: { propertyType?: s
       propertyType = null;
     }
   }
-  return { template, bhk: bhkOf(propertyType) };
+  return { template, bhk: bhkOf(propertyType), calendar };
 }
