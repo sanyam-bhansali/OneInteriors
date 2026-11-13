@@ -17,7 +17,7 @@ import { calendarOf, dayFromDb, istDay } from '@/modules/project/working-days';
 import { homeLabel } from '@/modules/studio/workspace-view';
 import { daysBetween } from '@/modules/project/working-days';
 import { dedupeKey, recordEventOnce } from '@/modules/project/events';
-import { chainLocks, lateDays, reasonLabel } from './rules';
+import { chainLocks, countsAsDelay, lateDays, reasonLabel } from './rules';
 import { GATE_SELECT, gateStagesOf } from './store';
 import { RESPONSIBLE_LABEL, isResponsible } from './template';
 
@@ -32,6 +32,8 @@ export interface DelayRow {
   days: number;
   side: 'CLIENT' | 'STUDIO';
   reason: string;
+  /** False for a holiday (owner, 13 Nov 2026): nobody's delay, listed but not counted. */
+  counted: boolean;
   note: string | null;
   by: string;
   on: string;
@@ -118,6 +120,7 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
       days: Math.max(0, daysBetween(from, to)),
       side: r.side,
       reason: reasonLabel(r.reason),
+      counted: countsAsDelay(r.reason),
       note: r.note,
       by: name(r.byId),
       on: istDay(r.at),

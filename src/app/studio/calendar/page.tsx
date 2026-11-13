@@ -72,6 +72,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </p>
         </div>
         <div className="hstack" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* The team's leave and the studio's holidays (owner, 13 Nov 2026). */}
+          <Link href="/studio/calendar/leave" className="btn ghost">
+            Leave and holidays
+          </Link>
           <NewMeeting people={guests} day={day} primary={!cal.leads} />
           <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />
         </div>
