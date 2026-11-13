@@ -62,6 +62,8 @@ export type ProjectEvent =
   | { kind: 'decision-redo'; projectId: string; title: string; note: string }
   // To the studio: the client sent in their requirement form (owner, 1 Nov 2026; project/requirement-form.ts).
   | { kind: 'requirements-filled'; projectId: string }
+  // Convert (owner, 13 Nov 2026; studio-sales/convert.ts), to the design head: a converted lead's new project needs a designer.
+  | { kind: 'project-needs-designer'; projectId: string; client: string; by: string | null }
   // To the client, the evening before a booked visit (cron/site-reminders, the 18:00 run).
   | { kind: 'visit-tomorrow'; studio: string; purpose: string; time: string }
   // My work (owner, 15 Oct 2026; studio/my-work-rules.ts), to studio staff only: the morning digest,
@@ -78,7 +80,7 @@ export type ProjectEvent =
   | { kind: 'office-meeting'; what: 'asked' | 'accepted' | 'proposed' | 'moved' | 'cancelled'; by: string; meetingId: string; title: string; when: string };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer'];
 
 export interface Message {
   title: string;
@@ -297,6 +299,13 @@ export function messageFor(e: ProjectEvent): Message {
         template: 'visit.answered',
         title: e.confirmed ? 'The client will be there' : 'The client asks for another day',
         body: clip(e.confirmed ? `${e.purpose}, ${e.when}: confirmed.` : `${e.purpose}, ${e.when}: ${e.reason ?? 'asked to move it'}`, 160),
+        url: `/studio/projects/${e.projectId}?tab=design`,
+      };
+    case 'project-needs-designer':
+      return {
+        template: 'project.needs-designer',
+        title: `New project: ${clip(e.client, 60)} needs a designer`,
+        body: clip(`${e.by ? `${e.by} converted` : 'Converted'} ${e.client}. The sales handover is on the project, under Design. Assign a designer.`, 160),
         url: `/studio/projects/${e.projectId}?tab=design`,
       };
     case 'requirements-filled':

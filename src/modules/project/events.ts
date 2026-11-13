@@ -93,6 +93,8 @@ export const PROJECT_EVENT_TYPES = [
   'customer.joined',
   // Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the booking advance refunded
   'project.cancelled',
+  // Convert (owner, 13 Nov 2026; studio-sales/convert.ts): the salesperson converted the lead and the project started
+  'project.converted',
   // The owner deleted a project (a mistake, a duplicate) and may restore it (owner, 27 Oct 2026; studio/project-delete.ts)
   'project.deleted',
   'project.restored',

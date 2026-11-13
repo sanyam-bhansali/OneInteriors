@@ -55,7 +55,7 @@ export interface RecordBookingInput extends BookingInput {
 
 export type BookingResult = { ok: true; projectId: string; clientId: string | null; invitedBy: string[] } | { ok: false; error: string };
 
-const BOOKING_QUOTE = {
+export const BOOKING_QUOTE = {
   id: true,
   number: true,
   status: true,
@@ -131,7 +131,7 @@ export async function bookingDraft(member: StudioMemberRef | null, quoteId: stri
 
 type BookingQuote = Prisma.StudioQuoteGetPayload<{ select: typeof BOOKING_QUOTE }>;
 
-async function factsFor(q: BookingQuote, amountPaise: number) {
+export async function factsFor(q: BookingQuote, amountPaise: number) {
   const schedule = readStages(q.salesFinalSchedule) ?? templateOrDefault(q.studio.paymentTemplate);
   const final = q.salesFinalRevision;
   const total = final ? fromDb(final.totalPaise) : 0;
@@ -153,7 +153,7 @@ async function factsFor(q: BookingQuote, amountPaise: number) {
 }
 
 /** The first WON column, in the studio's order — where a booked lead goes. */
-async function firstWonStage(studioId: string): Promise<{ id: string; name: string } | null> {
+export async function firstWonStage(studioId: string): Promise<{ id: string; name: string } | null> {
   return prisma.studioStage.findFirst({ where: { studioId, kind: 'WON' }, orderBy: { sortOrder: 'asc' }, select: { id: true, name: true } });
 }
 

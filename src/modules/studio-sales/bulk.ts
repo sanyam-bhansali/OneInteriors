@@ -30,6 +30,7 @@ import { BULK_CHUNK, BULK_MAX, bulkFence, chunks, mayBulk, readLimit, splitEvenl
 import { parseLeadFilters, parseSort, type LeadFilters } from './lead-filters';
 import { orderByFor, scopedLeadWhere } from './lead-where';
 import { queueConversions } from './conversions';
+import { BULK_CONVERT } from './convert-rules';
 
 /** Ticked ids, or everything the filters show (optionally only the first `limit`). */
 export type BulkTarget = { ids: string[] } | { query: string; limit?: number | null };
@@ -240,6 +241,8 @@ export async function bulkMove(target: BulkTarget, stageId: string, lostReason: 
     if (!stage) return { ok: false, error: 'Pick a column.' };
     const reason = lostReason && Object.prototype.hasOwnProperty.call(LOST_LABELS, lostReason) ? (lostReason as LostReasonName) : null;
     if (stage.kind === 'LOST' && !reason) return { ok: false, error: 'Why were they lost? Pick a reason; it is what the dashboard counts.' };
+    /* Converted only through Convert, one lead at a time (owner, 13 Nov 2026). */
+    if (stage.kind === 'WON') return { ok: false, error: BULK_CONVERT };
     const ids = await targetIds(scope, target, 'move', { stageId: { not: stage.id } });
     if ('error' in ids) return { ok: false, error: ids.error };
     if (ids.length === 0) return { ok: false, error: `They are all in ${stage.name} already.` };

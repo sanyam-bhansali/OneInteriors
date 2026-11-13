@@ -205,6 +205,13 @@ export type StartOwnProjectResult = { ok: true; projectId: string; introductionI
  */
 export interface StartOwnProjectOptions {
   action?: 'project.create' | 'booking.record' | 'project.bringIn';
+  /**
+   * Convert (owner, 13 Nov 2026): the salesperson converting their own lead.
+   * The caller has checked `quote.salesFinal` on that lead with `mayOnLead`
+   * (a per-lead right `can()` cannot answer without the lead), so the
+   * role-wide check is skipped. Only `studio-sales/convert.ts` sets it.
+   */
+  leadChecked?: boolean;
   contractPaise?: number;
   stages?: { label: string; pct: number | null; amountPaise: number }[];
   onCreated?: (tx: Prisma.TransactionClient, project: { id: string; introductionId: string; customerUserId: string }) => Promise<void>;
@@ -233,7 +240,8 @@ export async function startOwnProject(
   opts: StartOwnProjectOptions = {},
 ): Promise<StartOwnProjectResult> {
   if (!member) return { ok: false, error: ACCESS_ERRORS.signIn };
-  if (!can(member, opts.action ?? 'project.create')) return { ok: false, error: ACCESS_ERRORS.notYourRole };
+  /* `leadChecked`: Convert (studio-sales/convert.ts) has already checked `quote.salesFinal` on this lead, per lead. */
+  if (!opts.leadChecked && !can(member, opts.action ?? 'project.create')) return { ok: false, error: ACCESS_ERRORS.notYourRole };
 
   const customer = checkCustomer(input.customer);
   if (!customer.ok) return customer;

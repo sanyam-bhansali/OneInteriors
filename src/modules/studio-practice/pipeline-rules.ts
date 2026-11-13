@@ -15,9 +15,9 @@
  *     the damage was done.
  *   - Delete the last "in play" column and new clients have nowhere to land.
  *
- * The other two kinds are less dramatic and still wrong: with no LOST column a
- * studio cannot close anything off, and with no DONE column finished work
- * stays on the board.
+ * With no LOST column a studio cannot close anything off. A DONE column is
+ * optional (owner, 13 Nov 2026): the project, not the lead, follows the work
+ * to handover.
  *
  * So the check runs before the write, and it answers in the sentence a studio
  * owner should read rather than in a boolean.
@@ -52,7 +52,9 @@ export function wouldStrand(
     return 'You need at least one column that means the job was won — projects can only be started from one.';
   }
   if (!has('LOST')) return 'You need somewhere to put the ones that go.';
-  if (!has('DONE')) return 'You need at least one column for finished work.';
+  /* No "finished" column is required (owner, 13 Nov 2026): a won lead becomes a
+     project, and the project carries it to handover, so Hauspire's leads
+     pipeline ends at Converted. */
 
   return null;
 }

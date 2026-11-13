@@ -41,10 +41,15 @@ describe('the pipeline cannot be edited into a broken state', () => {
     expect(message).toContain('projects can only be started');
   });
 
-  it('refuses to delete the last open, done or lost column', () => {
+  it('refuses to delete the last open or lost column', () => {
     expect(wouldStrand(DEFAULT.filter((s) => s.id !== 'b'), 'a', null)).toContain('in play');
-    expect(wouldStrand(DEFAULT, 'e', null)).toContain('finished');
     expect(wouldStrand(DEFAULT, 'f', null)).toContain('the ones that go');
+  });
+
+  it('lets the last finished column go (owner, 13 Nov 2026: the project carries it to handover)', () => {
+    expect(wouldStrand(DEFAULT, 'e', null)).toBeNull();
+    // A pipeline with no finished column can still be edited.
+    expect(wouldStrand(DEFAULT.filter((s) => s.id !== 'e'), 'a', null)).toBeNull();
   });
 
   it('applies the same rule to changing what a column means', () => {
@@ -57,8 +62,8 @@ describe('the pipeline cannot be edited into a broken state', () => {
   });
 
   it('counts the replacement, not just the removal', () => {
-    // Changing the only DONE column into another LOST column strands DONE.
-    expect(wouldStrand(DEFAULT, 'e', 'LOST')).toContain('finished');
+    // Changing the last LOST column into an OPEN one strands LOST.
+    expect(wouldStrand(DEFAULT, 'f', 'OPEN')).toContain('the ones that go');
     // But changing an OPEN column into a DONE one while another OPEN remains
     // is harmless.
     expect(wouldStrand(DEFAULT, 'b', 'DONE')).toBeNull();
