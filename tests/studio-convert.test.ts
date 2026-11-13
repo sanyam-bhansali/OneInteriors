@@ -20,10 +20,10 @@ describe('a plain move into a won column', () => {
 });
 
 describe('the handover to design', () => {
-  it(`needs at least ${HANDOVER_MIN} characters`, () => {
-    const r = checkHandover('3 BHK, modular kitchen.');
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain(`${HANDOVER_MIN}`);
+  it('has no minimum length (owner, 13 Nov 2026), but cannot be empty', () => {
+    expect(HANDOVER_MIN).toBe(1);
+    expect(checkHandover('3 BHK, modular kitchen.')).toEqual({ ok: true, value: '3 BHK, modular kitchen.' });
+    expect(checkHandover('   ').ok).toBe(false);
   });
   it('is kept tidy', () => {
     const long = `Rooms: kitchen, master bedroom, living.   Style: warm wood, beige.\r\n\r\n\r\nMust-haves: tall unit, loft storage. ${'Detail. '.repeat(30)}`;
