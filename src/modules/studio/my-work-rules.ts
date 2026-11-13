@@ -26,6 +26,7 @@
  * `changeOrderSources`); nothing here needs to change.
  */
 
+import { isProjectClosureStep } from '@/modules/project/step-template';
 import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
 
 export type WorkKind =
@@ -374,7 +375,9 @@ export function projectSources(p: ProjectFacts, me: Me, today: string, opts: { s
   if (seesProject && isMineExecStep(me, isDesigner)) {
     for (const s of p.execSteps) {
       if (!s.plannedOn) continue;
-      out.push({ key: `step:${s.id}`, kind: 'step', title: s.label, place: p.place, due: s.plannedOn, detail: s.stage, href: `${base}?tab=plan#step-${s.id}` });
+      /* The project closure (owner, 13 Nov 2026): in the designer's tasks, saying what it is for. */
+      const detail = isProjectClosureStep(s.label) ? `${s.stage} · raise late extras (paid in advance) and collect the handover payment` : s.stage;
+      out.push({ key: `step:${s.id}`, kind: 'step', title: s.label, place: p.place, due: s.plannedOn, detail, href: `${base}?tab=plan#step-${s.id}` });
     }
   }
 

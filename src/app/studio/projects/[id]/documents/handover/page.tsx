@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { projectDocuments } from '@/modules/studio-design/documents-store';
-import { nameWord } from '@/modules/studio-design/documents';
+import { inHandoverPack, nameWord } from '@/modules/studio-design/documents';
 import { DownloadAll } from './DownloadAll';
 import '../../../projects.css';
 
@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
 /**
  * The handover pack (owner and Hauspire's design team, 24 Oct 2026;
  * docs/studio-os/DESIGN-PROCESS-PLAN.md §3.5): the final of every document,
- * in one list, with "Download all (.zip)". Working and electrical drawings
- * must be approved, and a material list and cut list there, before the
- * "Final documentation for handover" step can be ticked.
+ * in one list, with "Download all (.zip)". A material list and a cut list
+ * marked final are needed before the "Final documentation for handover" step
+ * can be ticked (owner, 13 Nov 2026: only those, not site photos; site
+ * photos stay out of the pack).
  */
 
 const TAG: Record<string, string> = { approved: 'Approved', waiting: 'Waiting for approval', changes: 'Changes asked', shared: 'Shared', draft: 'Draft (team only)' };
@@ -25,7 +26,7 @@ export default async function HandoverPage({ params }: { params: Promise<{ id: s
   if (!view) notFound();
   const zipName = `Handover_${nameWord(view.client, 'Client')}_${new Date().toISOString().slice(0, 10)}.zip`;
   /* Only the versions the designer marked final (owner, 1 Nov 2026); the paper agreement goes in the zip too. */
-  const finals = view.finals.filter((f) => f.marked);
+  const finals = view.finals.filter((f) => f.marked && inHandoverPack(f.type));
   const zipPapers = view.papers.filter((x) => x.url && x.fileName).map((x) => ({ url: x.url!, fileName: x.fileName! }));
   return (
     <div className="content oi-proj">

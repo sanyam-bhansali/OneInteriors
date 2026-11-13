@@ -12,7 +12,7 @@ describe('STEP_TEMPLATE', () => {
   });
 
   it('has the table’s steps per stage, in stage order', () => {
-    expect(PLAN_KINDS.map((k) => templateFor(k).length)).toEqual([1, 8, 22, 6, 7]);
+    expect(PLAN_KINDS.map((k) => templateFor(k).length)).toEqual([1, 8, 23, 6, 7]);
     const kinds = STEP_TEMPLATE.map((s) => PLAN_KINDS.indexOf(s.kind));
     expect(kinds).toEqual([...kinds].sort((a, b) => a - b));
   });

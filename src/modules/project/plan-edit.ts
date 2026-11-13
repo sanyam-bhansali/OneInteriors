@@ -35,6 +35,9 @@ import { memberOnProject } from '@/modules/studio/access';
 import { PLAN_KINDS, type PlanKind } from '@/modules/portal/tracker';
 import { movesOf, type CustomerMove } from '@/modules/portal/tracker-view';
 import { recordEvent, type ProjectActor } from './events';
+import type { ClosureDue } from './closure-due';
+import { closureDueFor } from './statement';
+import { isProjectClosureStep } from './step-template';
 import {
   canMarkStageDone,
   currentStatus,
@@ -494,6 +497,11 @@ export interface StudioPlan {
   /** For the Move a date preview, worked out in the browser with the same rules. */
   changes: RuleChange[];
   calendar: { workingDays: number[]; holidays: string[] };
+  /**
+   * The project closure step (owner, 13 Nov 2026): what is still due, shown when it is ticked so the team asks for
+   * it (the handover payment first). Null without a closure step, a signed plan, or the right to read payments.
+   */
+  closureDue: ClosureDue | null;
 }
 
 export type StudioPlanResult = { ok: true; plan: StudioPlan | null } | { ok: false; error: string };
@@ -554,6 +562,8 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
   const names = new Map(stages.map((s) => [s.id, s.name]));
   const progress = progressOf(stored.flatMap((s) => s.items.map((it) => ({ id: it.id, stageId: s.id, weightBp: it.weightBp, inScope: it.inScope, done: it.doneAt !== null }))));
   const weightTotalBp = stored.reduce((a, s) => a + s.items.filter((i) => i.inScope).reduce((b, i) => b + i.weightBp, 0), 0);
+  const hasClosure = stored.some((s) => s.items.some((i) => isProjectClosureStep(i.label)));
+  const closureDue = hasClosure && check.access.may('payment.read') ? await closureDueFor(projectId).catch(() => null) : null;
 
   return {
     ok: true,
@@ -612,6 +622,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
       canPost: check.access.may('update.post'),
       changes,
       calendar: { workingDays: [...cal.workingDays], holidays: [...cal.holidays] },
+      closureDue,
     },
   };
 }

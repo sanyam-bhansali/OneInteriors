@@ -69,6 +69,10 @@ export const SITE_HOME = '/studio/site';
 export const STUDIO_HOME = '/studio/home';
 export const TODAY_HOME = '/studio/today';
 export const PAYMENTS_HOME = '/studio/payments';
+/** Money due (owner, 13 Nov 2026: "who owes how much"): the owner, accounts and the design head. */
+export const MONEY_DUE_PATH = '/studio/payments/due';
+/** A project's statement (owner, 13 Nov 2026): whoever reads its money; which project is checked on the page. */
+const isStatementPath = (path: string): boolean => /^\/studio\/projects\/[^/?#]+\/statement\/?$/.test(path);
 export const TEAM_PATH = '/studio/settings/team';
 /** The unassigned leads (closed on Pro Solo). */
 export const POOL_PATH = '/studio/clients/pool';
@@ -155,7 +159,7 @@ function designerMayOpen(path: string): boolean {
   const q = path.match(/^\/studio\/quotations\/([A-Za-z0-9_-]+)(?:\/(?:compare|print))?\/?$/);
   if (q && !['first', 'builder', 'requests', 'terms', 'new', 'import'].includes(q[1]!)) return true;
   /* A project page, and its documents (all versions, the handover pack); which project is checked on the page. */
-  const m = path.match(/^\/studio\/projects\/([^/?#]+)(?:\/documents(?:\/handover)?)?\/?$/);
+  const m = path.match(/^\/studio\/projects\/([^/?#]+)(?:\/documents(?:\/handover)?|\/statement)?\/?$/);
   return Boolean(m && m[1] !== 'start' && m[1] !== 'deleted' && m[1] !== 'bring-in');
 }
 
@@ -254,10 +258,11 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   /* Every other role's home: the launcher, which shows only the apps below. */
   if (path === STUDIO_HOME) return true;
   /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
-  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH)) || calendarForAll(path);
+  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || isStatementPath(path) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH)) || calendarForAll(path);
   if (member.role === 'SALES') return salesMayOpen(member, path);
   /* The design head starts projects (27 Oct 2026); deleting is the owner's only (29 Oct 2026; studio/project-delete.ts). */
   if (member.role === 'DESIGNER' && member.designHead === true && under(path, '/studio/projects/start')) return true;
+  if (member.role === 'DESIGNER' && member.designHead === true && under(path, MONEY_DUE_PATH)) return true;
   if (member.role === 'DESIGNER') return designerMayOpen(path) || calendarForAll(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');

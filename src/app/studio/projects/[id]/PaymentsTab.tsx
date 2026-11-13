@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { formatINR } from '@/lib/money';
 import { MODE_LABEL, type LedgerStage } from '@/modules/project/payment-ledger';
 import { studioPayments, type StudioPaymentRow, type StudioPayments } from '@/modules/project/payments-flow';
@@ -180,7 +181,15 @@ export async function PaymentsTab({ projectId, customer }: { projectId: string; 
             </span>
           ) : null}
         </h2>
-        <CustomerSees name={customer} />
+        <span className="flex flex-wrap items-center gap-3">
+          {/* One statement (owner, 13 Nov 2026): the quotation, electrical, additional items, then total, paid and remaining. */}
+          {data ? (
+            <Link href={`/studio/projects/${projectId}/statement`} className="btn sec sm" data-testid="statement-link">
+              Statement (PDF)
+            </Link>
+          ) : null}
+          <CustomerSees name={customer} />
+        </span>
       </div>
       <p className={`m-0 mt-1 mb-4 ${muted}`}>
         {customer} pays you directly. A payment counts once you record it and {customer} confirms it in the app.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkUpload, docFileName, finalsOf, handoverMissing, isHandoverDocsStep, markFinalWarning, nameWord, versionLabels, type DocVersion } from '@/modules/studio-design/documents';
+import { checkUpload, docFileName, finalsOf, handoverMissing, inHandoverPack, isHandoverDocsStep, markFinalWarning, nameWord, OFFERED_TYPES, versionLabels, type DocVersion } from '@/modules/studio-design/documents';
 import { crc32, makeZip } from '@/lib/zip';
 
 /** Project documents (owner and Hauspire's design team, 24 Oct 2026; docs/studio-os/DESIGN-PROCESS-PLAN.md §3). */
@@ -86,15 +86,15 @@ describe('finals', () => {
     ]);
   });
 
-  it('the handover pack needs working and electrical drawings, a material and cut list, each marked final', () => {
-    expect(handoverMissing(finalsOf([d('w', { type: 'WORKING', answer: 'APPROVED' })]))).toEqual(['Working drawings', 'Electrical drawings & quotation', 'Material list', 'Factory cut list']);
-    const ready = finalsOf([
-      d('w', { type: 'WORKING', answer: 'APPROVED', markedFinal: true }),
-      d('e', { type: 'ELECTRICAL', answer: 'APPROVED', markedFinal: true }),
-      d('m', { type: 'MATERIAL_LIST', shared: false, markedFinal: true }),
-      d('c', { type: 'CUT_LIST', markedFinal: true }),
-    ]);
+  it('the handover pack needs only the material list and cut list, each marked final (owner, 13 Nov 2026)', () => {
+    expect(handoverMissing(finalsOf([d('w', { type: 'WORKING', answer: 'APPROVED' })]))).toEqual(['Material list', 'Factory cut list']);
+    expect(handoverMissing(finalsOf([d('m', { type: 'MATERIAL_LIST', shared: false })]))).toEqual(['Material list', 'Factory cut list']);
+    const ready = finalsOf([d('m', { type: 'MATERIAL_LIST', shared: false, markedFinal: true }), d('c', { type: 'CUT_LIST', markedFinal: true })]);
     expect(handoverMissing(ready)).toEqual([]);
+    // Site photos are uploadable, never required, and stay out of the pack.
+    expect(inHandoverPack('SITE_PHOTO')).toBe(false);
+    expect(inHandoverPack('MATERIAL_LIST')).toBe(true);
+    expect(OFFERED_TYPES).toContain('SITE_PHOTO');
     expect(isHandoverDocsStep('Final documentation for handover')).toBe(true);
     expect(isHandoverDocsStep('Working drawings final')).toBe(false);
   });
