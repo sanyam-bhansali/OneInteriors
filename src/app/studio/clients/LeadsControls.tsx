@@ -197,7 +197,7 @@ export function Toolbar({
   base?: string;
   /** Page parameters to carry through every filter change (the pool's `all`, `group`). */
   keep?: Record<string, string>;
-  /** The pool: Stage, Source, Tags and your fields only; no Today, sort or saved views. */
+  /** The pool: every filter, Today and the sort (owner, 13 Nov 2026), but no saved views (they open the leads page). */
   pool?: boolean;
   /** Shown first on the toolbar's row (the leads page's Board/List and source tabs). */
   lead?: React.ReactNode;
@@ -261,7 +261,7 @@ export function Toolbar({
           </button>
         ) : null}
         <span style={{ flex: 1 }} />
-        {pool ? null : (
+        {(
         <>
         <button type="button" aria-pressed={f.kpi === 'today'} onClick={() => go(f.kpi === 'today' ? without(f, 'kpi') : { ...f, kpi: 'today' })} title="Due today — calls and tasks due today, and new leads nobody has touched (overdue ones are in Needs action)" className={f.kpi === 'today' ? btnPrimary : btnOutline}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -288,7 +288,7 @@ export function Toolbar({
                 options={[...(Object.keys(SOURCE_LABELS) as ClientSourceName[]).map((k) => ({ value: k, label: SOURCE_LABELS[k] })), ...sources.map((s) => ({ value: `own:${s.id}`, label: s.name }))]}
                 onChange={(v) => setDraft((d) => (v.length ? { ...d, source: v } : without(d, 'source')))}
               />
-              {pool ? null : <MultiSelect label="Due" allLabel="Any time" values={draft.due ?? []} options={PANEL_DUE.map((d) => ({ value: d, label: DUE_LABELS[d] }))} onChange={(v) => setDraft((d) => (v.length ? { ...d, due: v as DueFilter[] } : without(d, 'due')))} /> }
+              {<MultiSelect label="Due" allLabel="Any time" values={draft.due ?? []} options={PANEL_DUE.map((d) => ({ value: d, label: DUE_LABELS[d] }))} onChange={(v) => setDraft((d) => (v.length ? { ...d, due: v as DueFilter[] } : without(d, 'due')))} /> }
               {tags.length > 0 ? (
                 <MultiSelect label="Tags" allLabel="All tags" values={draft.tags ?? []} options={tags.map((t) => ({ value: t.value, label: `${t.value} (${t.n.toLocaleString('en-IN')})` }))} onChange={(v) => setDraft((d) => (v.length ? { ...d, tags: v } : without(d, 'tags')))} />
               ) : null}
@@ -302,7 +302,7 @@ export function Toolbar({
                   onChange={(v) => setDraft((d) => withCustom(d, g.key, v))}
                 />
               ))}
-              {!pool && (kpis.stale > 0 || draft.stale) ? (
+              {kpis.stale > 0 || draft.stale ? (
                 <button type="button" aria-pressed={draft.stale === true} onClick={() => setDraft((d) => (d.stale ? without(d, 'stale') : { ...d, stale: true }))} title={`Only leads with no contact in ${QUIET_AFTER_DAYS}+ days`} className={draft.stale ? btnPrimary : btnOutline}>
                   Cold {QUIET_AFTER_DAYS}d+ ({kpis.stale.toLocaleString('en-IN')})
                 </button>

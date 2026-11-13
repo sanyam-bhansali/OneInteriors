@@ -10,7 +10,7 @@ import { countMatching, headTeam, leadKpis, poolTabsFor, tagAndGroupFacets, view
 import { can, hasSalesRole } from '@/modules/studio/roles';
 import { reachOf } from '@/modules/studio/sales-access';
 import { mayOpen } from '@/modules/studio/surfaces';
-import { leadFiltersToQuery, parseLeadFilters, without } from '@/modules/studio-sales/lead-filters';
+import { leadFiltersToQuery, parseLeadFilters, parseSort, without } from '@/modules/studio-sales/lead-filters';
 import { bulkActionsFor } from '@/modules/studio-sales/bulk-rules';
 import { taskPeople } from '@/modules/studio-sales/tasks';
 import { Toolbar } from '../LeadsControls';
@@ -50,8 +50,11 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
     );
   }
   const showingAll = scope.seesAll && one('all') === '1';
-  const asked = without(parseLeadFilters(sp), 'owner');
-  const filters = showingAll ? without(asked, 'poolTeam') : { ...asked, owner: 'pool' };
+  /* Salesperson (owner, 13 Nov 2026): with "All leads", the owner and PMs narrow to one person's leads. */
+  const parsed = parseLeadFilters(sp);
+  const asked = without(parsed, 'owner');
+  const filters = showingAll ? { ...without(asked, 'poolTeam'), ...(parsed.owner && parsed.owner !== 'pool' ? { owner: parsed.owner } : {}) } : { ...asked, owner: 'pool' };
+  const sort = parseSort(one('sort'));
   const query = leadFiltersToQuery(filters);
   const groupKey = one('group') ?? '';
   const [stages, fields, sources, allPeople, tabs] = await Promise.all([myStages(), myFields(), myLeadSources(), taskPeople(), poolTabsFor(scope, asked)]);
@@ -77,12 +80,12 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
   };
   const groupFields = fields.filter((f) => f.groupBy);
   const [page, total, facets, kpis] = await Promise.all([
-    viewPage(scope, filters, 'newest', null),
+    viewPage(scope, filters, sort, null),
     countMatching(scope, filters),
     tagAndGroupFacets(scope, filters, groupFields.map((f) => f.key)),
     leadKpis(scope, filters),
   ]);
-  const listQuery = [query, 'sort=newest', showingAll ? 'all=1' : '', groupKey ? `group=${groupKey}` : ''].filter(Boolean).join('&');
+  const listQuery = [query, `sort=${sort}`, showingAll ? 'all=1' : '', groupKey ? `group=${groupKey}` : ''].filter(Boolean).join('&');
 
   return (
     <main className="content cl-page">
@@ -118,7 +121,7 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
           <Toolbar
             query={query}
             view="list"
-            sort="newest"
+            sort={sort}
             kpis={kpis}
             stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour }))}
             sources={sources.map((s) => ({ id: s.id, name: s.name }))}
@@ -145,6 +148,8 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
           meId={me.id}
           moveTo={moveTo}
           showingAll={showingAll}
+          owner={showingAll ? (filters.owner ?? 'all') : 'pool'}
+          salespeople={allPeople}
           groups={groupFields.map((g) => ({ key: g.key, label: g.label, values: facets.groups[g.key] ?? [] }))}
           groupKey={groupKey}
           stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind }))}
