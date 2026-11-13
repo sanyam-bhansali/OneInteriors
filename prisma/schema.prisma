@@ -871,6 +871,7 @@ model Studio {
   /// Lead intake (21 Oct 2026): Meta lead ads, Google lead forms, the
   /// studio's website and portals posting leads straight onto the board.
   studioLeadConnections StudioLeadConnection[]
+  studioMetaLogin       StudioMetaLogin?
   /// Meta Conversions API outbox (22 Oct 2026): one row per lead and event.
   conversionEvents      StudioConversionEvent[]
   studioStages          StudioStage[]
@@ -2227,10 +2228,10 @@ model HomeChecklistItem {
   /// its days after the previous step. doneNote is the team's sentence: it
   /// never crosses to the customer.
   responsible    String?
-  needsDocument  Boolean         @default(false)
+  needsDocument  Boolean          @default(false)
   gatePayment    Int?
   gapDays        Int?
-  doneNote       String?         @db.Text
+  doneNote       String?          @db.Text
   doneDocumentId String?
   delays         HomeStepDelay[]
   unticks        HomeStepUntick[]
@@ -3648,9 +3649,9 @@ model ItemPage {
   /// Which room it usually belongs in ("Kitchen", "Bedroom", "Whole home").
   room        String
   /// One sentence: what it is.
-  summary     String  @db.Text
+  summary     String   @db.Text
   /// What it does for the household, in two or three sentences.
-  whatItDoes  String  @db.Text
+  whatItDoes  String   @db.Text
   materials   String[] @default([])
   finishes    String[] @default([])
   /// "1800 × 2100 mm for a double wardrobe". Free text: sizes vary by item.
@@ -3774,7 +3775,7 @@ model StudioQuote {
   /// The quotation this one was made from: a Design Final points at its
   /// Sales Final, so the two can be compared line by line. Null for a
   /// quotation written fresh or copied as a template.
-  basedOnId String?
+  basedOnId         String?
   /// Additional scope (owner, 12 Nov 2026): the project this quotation adds
   /// to after its design final (numbered like 101-A1). Only its new items;
   /// sent to the client as a change order with its payment due at once.
@@ -4703,6 +4704,21 @@ model StudioLeadConnection {
   createdById String?
   createdAt   DateTime @default(now())
 
+  /// "Connect Facebook" (owner, 12 Nov 2026): the Page's access token, sealed
+  /// with AES-256-GCM (studio-intake/meta-token.ts). Never logged, never sent
+  /// to a browser. Null: the token comes from env STUDIO_META_PAGE_TOKENS.
+  metaTokenSealed   String?
+  metaPageName      String?
+  metaConnectedAt   DateTime?
+  /// Which campaigns (owner, 12 Nov 2026): false takes every campaign; true
+  /// only `metaCampaignIds`, and a lead from any other is SKIPPED, not landed.
+  metaOnlyCampaigns Boolean   @default(false)
+  metaCampaignIds   String[]  @default([])
+  /// The picked campaigns' names for the screen: [{ "id": "…", "name": "…" }].
+  metaCampaigns     Json?
+  /// When past leads (Meta keeps 90 days) were last brought in.
+  metaBackfillAt    DateTime?
+
   events StudioLeadIntakeEvent[]
 
   @@index([studioId])
@@ -4719,6 +4735,9 @@ enum LeadIntakeStatus {
   FAILED
   /// The phone was already on the board: added to that lead's timeline instead.
   DUPLICATE
+  /// From a campaign the studio did not pick (owner, 12 Nov 2026): not landed.
+  /// Picking the campaign later brings it in.
+  SKIPPED
 }
 
 /// One incoming lead, once (lead intake, 21 Oct 2026). Unique on the
@@ -4744,12 +4763,35 @@ model StudioLeadIntakeEvent {
   /// Google's "Send test data": recorded here, not put on the board.
   isTest   Boolean          @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  /// The Meta campaign it came from, when Graph said (owner, 12 Nov 2026):
+  /// the campaign picker lists these, and picking one lands its SKIPPED leads.
+  campaignId   String?
+  campaignName String?
 
   @@unique([connectionId, externalId])
   @@index([connectionId, createdAt])
   @@map("studio_lead_intake_events")
+}
+
+/// "Connect Facebook" (owner, 12 Nov 2026): the Facebook login that picked a
+/// studio's Pages, kept so the owner can add another Page and list the ad
+/// account's campaigns without logging in again. The long-lived user token
+/// (about 60 days) is sealed like a Page token. One per studio, replaced on
+/// each login.
+model StudioMetaLogin {
+  studioId String @id
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  tokenSealed String
+  fbUserName  String?
+  expiresAt   DateTime?
+  /// The member who logged in (StudioMember id), plain text.
+  createdById String?
+  updatedAt   DateTime  @updatedAt
+
+  @@map("studio_meta_logins")
 }
 
 /// Who gets a lead that arrives by itself (owner, 22 Oct 2026).
@@ -5821,25 +5863,25 @@ model HomeStepUntick {
 /// ON) per project at a time. The customer sees "on hold" and the reason in
 /// plain words, never `note`.
 model HomeProjectHold {
-  id        String      @id @default(cuid())
-  projectId String
-  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status    String      @default("ASKED")
+  id            String      @id @default(cuid())
+  projectId     String
+  project       HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        String      @default("ASKED")
   /// CLIENT_NOT_RESPONDING | CLIENT_NEEDS_TIME | POSSESSION_LATE | OTHER (studio-hold/rules.ts).
-  reason    String
+  reason        String
   /// The team's words. Internal: NEVER crosses.
-  note      String?     @db.Text
-  askedById String
-  askedAt   DateTime    @default(now())
+  note          String?     @db.Text
+  askedById     String
+  askedAt       DateTime    @default(now())
   /// Who approved or declined, and when.
-  decidedById String?
-  decidedAt   DateTime?
+  decidedById   String?
+  decidedAt     DateTime?
   /// The IST day the hold started (approved) and ended (taken off).
-  startedOn DateTime? @db.Date
-  endedOn   DateTime? @db.Date
-  endedById String?
+  startedOn     DateTime?   @db.Date
+  endedOn       DateTime?   @db.Date
+  endedById     String?
   /// Days the plan moved when it ended.
-  shiftedDays Int?
+  shiftedDays   Int?
   /// Additional scope (owner, 12 Nov 2026): the change order whose payment
   /// this hold waits on; it starts when the client approves and ends when
   /// the payment is recorded. Null on a hold someone asked for.

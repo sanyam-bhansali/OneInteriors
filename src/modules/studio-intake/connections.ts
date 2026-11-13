@@ -21,7 +21,9 @@ import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
 import { hashSecret, newSecret } from './secrets';
 import { isMetaId, type ConnectionKindName, type IntakeStatusName } from './payloads';
-import { retryMetaEvent } from './intake';
+import { backfillMeta, releaseSkipped, retryMetaEvent, type BackfillCursor, type BackfillStep, type BackfillTally } from './intake';
+import { connectBlocker, unsubscribePage } from './meta-account';
+import { readSavedCampaigns } from './meta-connect';
 import type { LeadRouteModeName } from '@/modules/studio-sales/lead-routing';
 
 export const CONNECTION_KINDS: readonly ConnectionKindName[] = ['WEBSITE', 'GOOGLE_LEAD_FORM', 'PORTAL', 'META_PAGE'];
@@ -35,6 +37,8 @@ export interface IntakeEventRow {
   clientId: string | null;
   error: string | null;
   isTest: boolean;
+  /** The Meta campaign it came from, when known. */
+  campaignName: string | null;
   at: string;
   /** "21 Oct, 4:05 pm", India time, written on the server. */
   atLabel: string;
@@ -46,6 +50,16 @@ export interface ConnectionRow {
   label: string;
   enabled: boolean;
   metaPageId: string | null;
+  /** Meta (owner, 12 Nov 2026): the Page's name, whether Connect Facebook holds its token, which campaigns. */
+  meta: {
+    pageName: string | null;
+    viaLogin: boolean;
+    onlyCampaigns: boolean;
+    campaigns: { id: string; name: string }[];
+    /** Leads kept aside from campaigns not picked. */
+    waiting: number;
+    backfillLabel: string | null;
+  } | null;
   /** "New leads go to" for this door (22 Oct 2026): null follows the studio. */
   routeMode: LeadRouteModeName | null;
   routeMemberId: string | null;
@@ -65,6 +79,8 @@ export interface IntakeScreen {
   metaCallbackUrl: string;
   /** Whether the server has what Meta needs (never the values). */
   metaReady: { appSecret: boolean; verifyToken: boolean; pageTokens: boolean };
+  /** Connect Facebook (owner, 12 Nov 2026): what stops it, if anything, and who last logged in. */
+  metaConnect: { blocker: string | null; loginName: string | null; loggedIn: boolean };
 }
 
 export type IntakeResult = { ok: true; message: string; secret?: string } | { ok: false; error: string };
@@ -94,7 +110,8 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
     pageTokens: Boolean(process.env.STUDIO_META_PAGE_TOKENS?.trim()),
   };
   const metaCallbackUrl = `${base()}/api/studio/intake/meta`;
-  if (!canManage) return { canManage, connections: [], metaCallbackUrl, metaReady };
+  const metaConnect = { blocker: connectBlocker(), loginName: null as string | null, loggedIn: false };
+  if (!canManage) return { canManage, connections: [], metaCallbackUrl, metaReady, metaConnect };
   try {
     const rows = await prisma.studioLeadConnection.findMany({
       where: { studioId: member.studioId },
@@ -105,6 +122,11 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
         label: true,
         enabled: true,
         metaPageId: true,
+        metaPageName: true,
+        metaTokenSealed: true,
+        metaOnlyCampaigns: true,
+        metaCampaigns: true,
+        metaBackfillAt: true,
         routeMode: true,
         routeMemberId: true,
         lastEventAt: true,
@@ -112,21 +134,43 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
         events: {
           orderBy: { createdAt: 'desc' },
           take: 6,
-          select: { id: true, status: true, clientId: true, error: true, isTest: true, createdAt: true },
+          select: { id: true, status: true, clientId: true, error: true, isTest: true, campaignName: true, createdAt: true },
         },
         _count: { select: { events: { where: { status: 'FAILED' } } } },
       },
     });
+    const metaIds = rows.filter((r) => r.kind === 'META_PAGE').map((r) => r.id);
+    const [waitingRows, login] = await Promise.all([
+      metaIds.length > 0
+        ? prisma.studioLeadIntakeEvent.groupBy({ by: ['connectionId'], where: { connectionId: { in: metaIds }, status: 'SKIPPED' }, _count: { _all: true } })
+        : Promise.resolve([]),
+      prisma.studioMetaLogin.findUnique({ where: { studioId: member.studioId }, select: { fbUserName: true, expiresAt: true } }),
+    ]);
+    const waiting = new Map(waitingRows.map((w) => [w.connectionId, w._count._all]));
+    metaConnect.loginName = login?.fbUserName ?? null;
+    metaConnect.loggedIn = Boolean(login && (!login.expiresAt || login.expiresAt.getTime() > Date.now()));
     return {
       canManage,
       metaCallbackUrl,
       metaReady,
+      metaConnect,
       connections: rows.map((r) => ({
         id: r.id,
         kind: r.kind,
         label: r.label,
         enabled: r.enabled,
         metaPageId: r.metaPageId,
+        meta:
+          r.kind === 'META_PAGE'
+            ? {
+                pageName: r.metaPageName,
+                viaLogin: Boolean(r.metaTokenSealed),
+                onlyCampaigns: r.metaOnlyCampaigns,
+                campaigns: readSavedCampaigns(r.metaCampaigns).map((c) => ({ id: c.id, name: c.name })),
+                waiting: waiting.get(r.id) ?? 0,
+                backfillLabel: r.metaBackfillAt ? when(r.metaBackfillAt) : null,
+              }
+            : null,
         routeMode: r.routeMode,
         routeMemberId: r.routeMemberId,
         url: doorUrl(r.kind, r.id),
@@ -140,6 +184,7 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
           clientId: e.clientId,
           error: e.error,
           isTest: e.isTest,
+          campaignName: e.campaignName,
           at: e.createdAt.toISOString(),
           atLabel: when(e.createdAt),
         })),
@@ -147,7 +192,7 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
     };
   } catch (error) {
     console.error('[intake] screen failed', error instanceof Error ? error.message : error);
-    return { canManage, connections: [], metaCallbackUrl, metaReady };
+    return { canManage, connections: [], metaCallbackUrl, metaReady, metaConnect };
   }
 }
 
@@ -218,7 +263,10 @@ export async function removeConnection(id: unknown): Promise<IntakeResult> {
   const member = await manager();
   if (!member) return REFUSED;
   if (typeof id !== 'string') return { ok: false, error: 'That connection is not yours.' };
+  const meta = await prisma.studioLeadConnection.findFirst({ where: { id, studioId: member.studioId, kind: 'META_PAGE' }, select: { metaPageId: true, metaTokenSealed: true } });
   const { count } = await prisma.studioLeadConnection.deleteMany({ where: { id, studioId: member.studioId } });
+  /* Stop Meta sending this Page's leads; a failure here changes nothing for the studio. */
+  if (count > 0 && meta?.metaPageId) await unsubscribePage(meta.metaPageId, meta.metaTokenSealed).catch(() => undefined);
   if (count === 0) return { ok: false, error: 'That connection is not yours.' };
   return { ok: true, message: 'Removed. The leads it brought are still on your board.' };
 }
@@ -231,4 +279,36 @@ export async function retryFailedLead(eventId: unknown): Promise<IntakeResult> {
   const r = await retryMetaEvent(member.studioId, eventId);
   if (!r.ok) return r;
   return { ok: true, message: r.outcome === 'duplicate' ? 'Done: they were already on your board, so it is on their timeline.' : 'Done: the lead is in your pool.' };
+}
+
+// ── Meta: past leads and kept-aside leads (owner, 12 Nov 2026) ─
+
+/** A server action has about a minute; leave room to answer. */
+const STEP_MS = 40_000;
+
+function readCursor(raw: unknown): BackfillCursor | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as { form?: unknown; after?: unknown };
+  if (typeof o.form !== 'number' || !Number.isInteger(o.form) || o.form < 0 || o.form > 1000) return null;
+  return { form: o.form, after: typeof o.after === 'string' && o.after.length < 500 ? o.after : null };
+}
+
+/** One stretch of "Bring in past leads"; the screen calls again with `next` until done. */
+export async function backfillStep(connectionId: unknown, cursor: unknown): Promise<BackfillStep> {
+  const member = await manager();
+  if (!member) return REFUSED;
+  if (typeof connectionId !== 'string') return { ok: false, error: 'That connection is not yours.' };
+  const step = await backfillMeta(member.studioId, connectionId, readCursor(cursor), STEP_MS);
+  if (step.ok && step.done) {
+    await prisma.auditLog.create({ data: { actorId: member.userId, action: 'studio.meta.backfill', entityType: 'StudioLeadConnection', entityId: connectionId, after: { forms: step.forms } } }).catch(() => undefined);
+  }
+  return step;
+}
+
+/** Land the kept-aside leads of campaigns now picked. */
+export async function releaseStep(connectionId: unknown): Promise<{ ok: true; tally: BackfillTally; left: number } | { ok: false; error: string }> {
+  const member = await manager();
+  if (!member) return REFUSED;
+  if (typeof connectionId !== 'string') return { ok: false, error: 'That connection is not yours.' };
+  return releaseSkipped(member.studioId, connectionId, STEP_MS);
 }

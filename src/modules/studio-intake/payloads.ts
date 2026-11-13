@@ -769,7 +769,7 @@ export function attributionFor(kind: ConnectionKindName, label: string, lead: In
 
 // ── Idempotency ────────────────────────────────────────────────
 
-export type IntakeStatusName = 'RECEIVED' | 'LANDED' | 'FAILED' | 'DUPLICATE';
+export type IntakeStatusName = 'RECEIVED' | 'LANDED' | 'FAILED' | 'DUPLICATE' | 'SKIPPED';
 
 /**
  * How long a lead may sit as RECEIVED before a retry may take it over. Far
@@ -786,7 +786,8 @@ export const RECLAIM_AFTER_MS = 10 * 60 * 1000;
  * so long that it must have died.
  */
 export function onSeenAgain(existing: { status: IntakeStatusName; updatedAt: Date }, now: Date): 'skip' | 'retry' {
-  if (existing.status === 'LANDED' || existing.status === 'DUPLICATE') return 'skip';
+  /* SKIPPED (a campaign not picked) is let in again only by the picker, never by a resend. */
+  if (existing.status === 'LANDED' || existing.status === 'DUPLICATE' || existing.status === 'SKIPPED') return 'skip';
   if (existing.status === 'FAILED') return 'retry';
   return now.getTime() - existing.updatedAt.getTime() >= RECLAIM_AFTER_MS ? 'retry' : 'skip';
 }
@@ -830,7 +831,7 @@ export function parsePageTokens(raw: string | null | undefined): Map<string, Pag
 }
 
 /** Graph's address for one lead. The token goes in a header, never here. */
-export const GRAPH_VERSION = 'v21.0';
+export const GRAPH_VERSION = 'v23.0';
 export function graphLeadUrl(leadgenId: string): string {
   return `https://graph.facebook.com/${GRAPH_VERSION}/${leadgenId}?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform`;
 }

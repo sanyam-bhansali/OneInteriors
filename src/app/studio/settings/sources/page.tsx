@@ -10,6 +10,8 @@ import { MetaFeedback } from './MetaFeedback';
 
 export const metadata: Metadata = { title: 'Lead sources', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
+/* Bringing in past Meta leads works about 40 seconds per call (owner, 12 Nov 2026). */
+export const maxDuration = 60;
 
 /**
  * Settings → Lead sources (Studio OS Phase 1): the studio's own names for
@@ -21,7 +23,8 @@ export const dynamic = 'force-dynamic';
  * and per door); and whether Meta is told which lead-ad leads became
  * customers (off by default, the owner's switch).
  */
-export default async function LeadSourcesPage() {
+export default async function LeadSourcesPage({ searchParams }: { searchParams: Promise<{ meta?: string }> }) {
+  const { meta } = await searchParams;
   const [sources, intake, routing, feedback] = await Promise.all([myLeadSources(), myIntakeScreen(), myLeadRouting(), myConversionScreen()]);
   const ours = Object.entries(SOURCE_LABELS)
     .filter(([k]) => k !== 'ONE_INTERIORS' && k !== 'OTHER')
@@ -40,7 +43,7 @@ export default async function LeadSourcesPage() {
         ) : null}
         {intake ? (
           <div className="mt-6">
-            <IntakeConnections screen={intake} people={routing?.canManage ? routing.people : []} />
+            <IntakeConnections screen={intake} people={routing?.canManage ? routing.people : []} metaNotice={typeof meta === 'string' ? meta.slice(0, 20) : null} />
           </div>
         ) : null}
         {feedback ? (
