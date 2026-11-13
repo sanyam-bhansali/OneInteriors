@@ -32,6 +32,8 @@ export function PoolTable({
   meId = '',
   moveTo = [],
   showingAll,
+  owner = 'pool',
+  salespeople = people,
   groups,
   groupKey,
   stages,
@@ -51,6 +53,10 @@ export function PoolTable({
   /** Pools a lead may be moved into (`studio` or a head's id). */
   moveTo?: { key: string; label: string }[];
   showingAll: boolean;
+  /** The Salesperson picker: `pool`, `all`, `me` or a member id (owner, 13 Nov 2026). */
+  owner?: string;
+  /** Everyone the picker offers (not narrowed to one head's team). */
+  salespeople?: { id: string; name: string }[];
   groups: { key: string; label: string; values: { value: string; n: number }[] }[];
   groupKey: string;
   stages: { id: string; name: string; kind: string }[];
@@ -120,19 +126,25 @@ export function PoolTable({
           <span className="mono">{total.toLocaleString('en-IN')}</span> {showingAll ? 'leads' : 'unassigned'}
         </span>
         {seesAll ? (
-          <label className="hstack sm" style={{ gap: 6 }} title="Include leads that already have an owner">
-            <input
-              type="checkbox"
-              checked={showingAll}
-              onChange={(e) => {
-                const p = new URLSearchParams(query);
-                if (e.target.checked) p.set('all', '1');
-                else p.delete('all');
-                router.push(`/studio/clients/pool?${p.toString()}`);
-              }}
-            />
-            All leads
-          </label>
+          /* Salesperson (owner, 13 Nov 2026): the pool, everyone's leads, or one person's. */
+          <SelectMenu
+            value={owner}
+            options={[
+              { value: 'pool', label: 'Unassigned (pool)' },
+              { value: 'all', label: 'All leads' },
+              { value: 'me', label: 'My leads' },
+              ...salespeople.filter((p) => p.id !== meId).map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            onChange={(v) => {
+              const p = new URLSearchParams(query);
+              p.delete('owner');
+              p.delete('all');
+              p.delete('pool');
+              if (v !== 'pool') p.set('all', '1');
+              if (v !== 'pool' && v !== 'all') p.set('owner', v);
+              router.push(`/studio/clients/pool?${p.toString()}`);
+            }}
+          />
         ) : null}
         {groups.length > 0 ? (
           <SelectMenu value={groupKey} options={[{ value: '', label: 'No grouping' }, ...groups.map((g) => ({ value: g.key, label: `Group by ${g.label.toLowerCase()}` }))]} onChange={goGroup} />
