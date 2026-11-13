@@ -45,6 +45,7 @@ import { quoteWriteRefusal } from './write-rules';
 import { cleanNote } from './line-note';
 import { readRevisionLines, readRevisionTerms, type RevisionLine, type RevisionTerms } from '@/modules/studio-sales/revision-rules';
 import { currentMember } from '@/modules/studio/access';
+import { asQuoteCategory, categoryRefusal, CATEGORY_ERRORS } from './category-rules';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -413,6 +414,15 @@ export interface NewQuoteInput {
    * a quotation with no lead is not theirs to see.
    */
   clientId?: string;
+  /**
+   * Essential, Premium or Luxe (owner, 13 Nov 2026: "If it is not there, you
+   * cannot make a quotation"). New quotation asks for it and refuses without
+   * it; drafts made for the team (from a floor plan, a quotation request)
+   * may start without one and cannot be sent until it is picked.
+   */
+  category?: unknown;
+  /** Refuse when `category` is missing (New quotation, filled in by a person). */
+  categoryRequired?: boolean;
 }
 
 /**
@@ -494,6 +504,8 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
 
   const clientName = input.clientName.trim();
   if (clientName.length < 2) return { ok: false, error: 'Who is it for?' };
+  const category = asQuoteCategory(input.category);
+  if (input.categoryRequired && !category) return { ok: false, error: CATEGORY_ERRORS.pick };
 
   /**
    * Branding is required, not optional.
@@ -528,6 +540,7 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         society: input.society?.trim() || null,
         config: input.config?.trim() || null,
         carpetSqft: input.carpetSqft ?? null,
+        category,
         ...(input.link
           ? { clientId: input.link.clientId, introductionId: input.link.introductionId, briefId: input.link.briefId }
           : lead
@@ -713,6 +726,9 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
   const clientName = template ? copy.clientName.trim().slice(0, 120) : source.clientName;
   if (clientName.length < 2) return { ok: false, error: 'Who is the new quotation for?' };
   if (!template && source.stage === 'DESIGN') return { ok: false, error: 'This is already the Design Final.' };
+  /* A copy carries the category, so it needs one (owner, 13 Nov 2026: mandatory on every quotation). */
+  const noCategory = categoryRefusal(source);
+  if (noCategory) return { ok: false, error: noCategory };
 
   let number = template ? await nextNumber(studioId) : `${source.number}-D`;
   if (!template) {
@@ -970,6 +986,8 @@ export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<A
   if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
   const category = raw === 'ESSENTIAL' || raw === 'PREMIUM' || raw === 'LUXURY' ? raw : null;
   if (raw !== null && raw !== '' && raw !== undefined && !category) return { ok: false, error: 'Pick Essential, Premium or Luxe.' };
+  /* Mandatory (owner, 13 Nov 2026; category-rules.ts): it can be changed, not removed. */
+  if (!category) return { ok: false, error: CATEGORY_ERRORS.clear };
   const q = await prisma.studioQuote.findFirst({ where: { ...qs.write, id: quoteId, studioId }, select: { id: true, basedOnId: true } });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
   try {
@@ -1002,6 +1020,12 @@ export async function setQuoteStatus(
   /* Every line needs a photo before the client sees it (owner, 10 Nov 2026;
      modules/items/rules.ts). Checked on the way to Sent only: Won, Lost and
      Reopen never send anything. */
+  /* Essential, Premium or Luxe before it goes to the client or is won (owner, 13 Nov 2026; category-rules.ts). */
+  if (status === 'ISSUED' || status === 'ACCEPTED') {
+    const row = await prisma.studioQuote.findUnique({ where: { id: quoteId }, select: { category: true, scopeForProjectId: true } });
+    const noCategory = row ? categoryRefusal(row) : null;
+    if (noCategory) return { ok: false, error: noCategory };
+  }
   if (status === 'ISSUED') {
     const studioId = (await quoteScope())?.studioId ?? null;
     const refusal = studioId ? await photoGate({ studioId, quoteId }, 'send') : null;

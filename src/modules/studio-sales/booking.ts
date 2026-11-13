@@ -37,6 +37,7 @@ import { readRevisionLines, readRevisionTotals, revisionLabel, sameLinesAs } fro
 import { readStages, refundDaysOf, scheduleAmounts, templateOrDefault } from './payment-template';
 import { snapshotOf } from './revisions';
 import { queueConversions } from './conversions';
+import { categoryRefusal } from '@/modules/studio-quote/category-rules';
 import {
   bookedSummary,
   bookingRefusal,
@@ -60,6 +61,8 @@ export const BOOKING_QUOTE = {
   number: true,
   status: true,
   stage: true,
+  category: true,
+  scopeForProjectId: true,
   studioId: true,
   briefId: true,
   introductionId: true,
@@ -145,6 +148,7 @@ export async function factsFor(q: BookingQuote, amountPaise: number) {
     hasSalesFinal: final !== null,
     alreadyBooked: live !== null || Boolean(q.client?.bookedIntroductionId),
     changedSinceFinal: changed,
+    noCategory: categoryRefusal(q) !== null,
     fromOneInteriors: q.briefId !== null || q.introductionId !== null || q.client?.source === 'ONE_INTERIORS' || q.client?.introductionId != null,
     leadDeleted: q.client?.deletedAt != null,
     bookingStagePaise: amounts?.ok ? (amounts.stages[0]?.amountPaise ?? 0) : 0,

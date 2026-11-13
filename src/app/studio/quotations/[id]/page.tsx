@@ -117,7 +117,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               {STATUS_LABELS[quote.status]}
             </span>
             <span className="chip">{STAGE_LABELS[quote.stage]}</span>
-            <CategoryPick quoteId={quote.id} initial={quote.category} canEdit={!quote.fromMarketplace} />
+            {/* Mandatory on every quotation (owner, 13 Nov 2026), One Interiors' too; additional scope takes the project's. */}
+            <CategoryPick quoteId={quote.id} initial={quote.category} canEdit={!quote.scopeForProjectId} />
             {quote.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
             {quote.issuedOn ? (
               <span>

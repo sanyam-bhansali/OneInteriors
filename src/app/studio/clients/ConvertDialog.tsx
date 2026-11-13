@@ -97,10 +97,17 @@ export function ConvertDialog({
                     <input type="radio" name="convert-quote" value={q.quoteId} checked={quoteId === q.quoteId} disabled={Boolean(q.blocked)} onChange={() => setQuoteId(q.quoteId)} />
                     <span>
                       <b>{q.number}</b> · {q.revision} · {formatINR(q.totalPaise)}
-                      {q.blocked ? <span className="muted"> · {q.blocked}</span> : null}
+                      {q.blocked ? <span className="muted"> · {q.blocked}</span> : null}{' '}
+                      <Link href={`/studio/quotations/${q.quoteId}`} className="underline sm">
+                        Open
+                      </Link>
                     </span>
                   </label>
                 ))}
+                {/* Owner, 13 Nov 2026: "if none fits, they revise and mark final". */}
+                <p className="muted" style={{ fontSize: 12.5, margin: '2px 0 0' }}>
+                  None of these is the one? Open the quotation, revise and send it, mark the new revision as sales final, then convert.
+                </p>
               </fieldset>
             ) : null}
 
