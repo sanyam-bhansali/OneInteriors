@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
-import { checkExtraLines, extraTotals, STATUS_LABEL, type ProductForExtra } from '@/modules/project/change-order-rules';
+import { checkExtraLines, extraTotals, scopeImpactWords, scopeShortDay, STATUS_LABEL, type ProductForExtra } from '@/modules/project/change-order-rules';
 import { MODE_LABEL, PAYMENT_MODES } from '@/modules/project/payment-ledger';
 import type { StudioExtra, StudioExtras } from '@/modules/project/change-orders';
 import { UNIT_LABELS } from '@/modules/studio-quote/pricing';
@@ -303,8 +303,9 @@ function ExtraCard({ e, data, customer, onEdit }: { e: StudioExtra; data: Studio
       {e.reason ? <span className="sm">Why: {e.reason}</span> : null}
       {e.scope ? (
         <span className="sm" data-testid="scope-terms">
-          Additional scope · needs {e.scope.daysRequired} more day{e.scope.daysRequired === 1 ? '' : 's'}
-          {e.scope.dueOn ? ` · payment due ${new Date(`${e.scope.dueOn}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}` : ''}
+          Additional scope · {customer} reads: &ldquo;{scopeImpactWords(e.scope.impact)}&rdquo;
+          {e.scope.dueOn ? ` · payment due ${scopeShortDay(e.scope.dueOn)}` : ''}
+          {e.scope.inclGst ? ' · amounts include GST' : ''}
           {e.status === 'APPROVED' ? ' · the project is on hold until it is paid' : ''}
         </span>
       ) : null}
@@ -328,10 +329,13 @@ function ExtraCard({ e, data, customer, onEdit }: { e: StudioExtra; data: Studio
                 <td className="mono text-right">− {formatINR(e.discountPaise)}</td>
               </tr>
             ) : null}
-            <tr>
-              <td>GST ({pct(e.gstBps)})</td>
-              <td className="mono text-right">{formatINR(e.gstPaise)}</td>
-            </tr>
+            {/* Simple scope (owner, 13 Nov 2026): one amount per line, GST included, so no GST line. */}
+            {e.scope?.inclGst ? null : (
+              <tr>
+                <td>GST ({pct(e.gstBps)})</td>
+                <td className="mono text-right">{formatINR(e.gstPaise)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

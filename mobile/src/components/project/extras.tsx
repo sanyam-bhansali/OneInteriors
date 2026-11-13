@@ -24,8 +24,17 @@ import type { Extra, Signoff } from '../../lib/types';
  * The owner answers; family see the same and cannot.
  */
 
+type Impact = NonNullable<Extra['impact']>;
+
 const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 ? 2 : 0)}%`;
 const day = (d: string) => shortDate(`${d}T12:00:00Z`);
+
+/** "Your handover moves by 7 days" / "No change to your handover" / "This item comes by 5 Dec" (owner, 13 Nov 2026). */
+function impactWords(t: T, i: Impact): string {
+  if (i.kind === 'MOVES_PROJECT') return i.days === 1 ? t('life.scope.moves.one') : t('life.scope.moves', { n: i.days });
+  if (i.kind === 'WITHIN_TIMELINE') return t('life.scope.within');
+  return t('life.scope.item', { date: day(i.on) });
+}
 
 export function SignoffsCard({ signoffs, t }: { signoffs: Signoff[]; t: T }) {
   return (
@@ -87,18 +96,22 @@ function ExtraItem({ e, onChanged, t }: { e: Extra; onChanged: () => void; t: T 
   };
 
   const state = e.state === 'approved' ? t('life.extra.state.approved', { amount: inr(e.duePaise) }) : t(`life.extra.state.${e.state}` as Parameters<T>[0]);
+  /* Additional scope; servers before 13 Nov send only the due day (the builder kind moved the project by its days). */
+  const scope: Impact | null = e.impact ?? (e.dueOn ? { kind: 'MOVES_PROJECT', days: e.daysRequired ?? 0 } : null);
   return (
     <View style={styles.item}>
       <View style={styles.head}>
         <Text style={[styles.big, { flex: 1 }]}>
-          {e.dueOn ? e.title : `${t('life.extra.number', { n: e.number })}: ${e.title}`}
+          {scope ? e.title : `${t('life.extra.number', { n: e.number })}: ${e.title}`}
         </Text>
         <Text style={styles.big}>{inr(e.totalPaise)}</Text>
       </View>
       <Meta>{state}</Meta>
-      {e.dueOn ? (
+      {scope ? (
+        /* Additional scope (owner, 13 Nov 2026): the impact in plain words, never a reason. */
         <Text style={styles.text}>
-          {t('life.scope.days', { n: e.daysRequired ?? 0 })}. {t('life.scope.due', { date: shortDate(e.dueOn) })}.
+          <Text style={{ fontFamily: font.sansSemi }}>{impactWords(t, scope)}.</Text>
+          {e.state === 'waiting' || e.state === 'approved' ? ` ${t('life.scope.pay')}` : ''}
         </Text>
       ) : null}
       {e.reason ? (
@@ -110,13 +123,21 @@ function ExtraItem({ e, onChanged, t }: { e: Extra; onChanged: () => void; t: T 
       {e.lines.map((l, i) => (
         <View key={i} style={styles.line}>
           <Text style={[styles.text, { flex: 1 }]}>
+            {scope ? `${i + 1}. ` : ''}
             {l.product}
             {l.room ? ` · ${l.room}` : ''}
             {l.size ? ` · ${l.size}` : ''}
+            {scope && l.details ? <Text style={styles.note}>{` · ${l.details}`}</Text> : null}
           </Text>
           <Text style={styles.text}>{inr(l.amountPaise)}</Text>
         </View>
       ))}
+      {scope && e.inclGst ? (
+        <View style={styles.line}>
+          <Text style={[styles.big, { flex: 1 }]}>{t('life.scope.inclGst')}</Text>
+          <Text style={styles.big}>{inr(e.totalPaise)}</Text>
+        </View>
+      ) : null}
       {e.discountPaise > 0 ? (
         <View style={styles.line}>
           <Text style={[styles.note, { flex: 1 }]}>{t('life.extra.discount')}</Text>

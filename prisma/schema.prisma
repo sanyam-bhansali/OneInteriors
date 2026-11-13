@@ -2016,6 +2016,15 @@ model HomeChangeOrder {
   scopeQuoteId    String?
   daysRequired    Int?
   dueOn           DateTime?         @db.Date
+  /// Simple additional scope (owner, 13 Nov 2026): "just a click: write the
+  /// element, write the cost, write the days, send for approval". Set on
+  /// scope sent from the project page (no quotation behind it); null on
+  /// ordinary extra work and on the 12 Nov builder-made scope (read as
+  /// MOVES_PROJECT by its daysRequired). MOVES_PROJECT moves the plan by
+  /// daysRequired once paid; WITHIN_TIMELINE moves nothing; ITEM_ONLY gives
+  /// the item its own date (itemDueOn) and moves nothing.
+  scopeImpact     ScopeImpact?
+  itemDueOn       DateTime?         @db.Date
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -2037,6 +2046,13 @@ enum ChangeOrderStatus {
   PAID
   RELEASED
   CANCELLED
+}
+
+/// What an additional scope does to the timeline (owner, 13 Nov 2026).
+enum ScopeImpact {
+  MOVES_PROJECT
+  WITHIN_TIMELINE
+  ITEM_ONLY
 }
 
 /// One line of a change order: from the product master (sized like the

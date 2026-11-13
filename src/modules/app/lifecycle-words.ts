@@ -53,9 +53,17 @@ export const lifecycleWords = {
     mr: 'डिझाइन साइन-ऑफनंतर जोडलेले काम. तुमची मंजुरी आणि पेमेंट झाल्याशिवाय काहीही बनत नाही.',
   },
   'life.extra.number': { en: 'Extra work {n}', hi: 'अतिरिक्त काम {n}', mr: 'अतिरिक्त काम {n}' },
-  /* Additional scope (owner, 12 Nov 2026): the extra days and the payment due at once. */
-  'life.scope.days': { en: 'Adds {n} days to your timeline', hi: 'आपकी टाइमलाइन में {n} दिन जुड़ेंगे', mr: 'तुमच्या वेळापत्रकात {n} दिवस वाढतील' },
-  'life.scope.due': { en: 'Payment due on approval ({date}); work restarts once it is paid', hi: 'मंज़ूरी पर भुगतान देय ({date}); भुगतान होते ही काम फिर शुरू होगा', mr: 'मंजुरीवर पेमेंट देय ({date}); पेमेंट झाल्यावर काम पुन्हा सुरू होईल' },
+  /* Additional scope (owner, 13 Nov 2026): item, details, cost and the impact in plain words, never a reason; due on approval, the project holds until paid. */
+  'life.scope.moves': { en: 'Your handover moves by {n} days', hi: 'आपका हैंडओवर {n} दिन आगे बढ़ेगा', mr: 'तुमचे हँडओव्हर {n} दिवसांनी पुढे जाईल' },
+  'life.scope.moves.one': { en: 'Your handover moves by 1 day', hi: 'आपका हैंडओवर 1 दिन आगे बढ़ेगा', mr: 'तुमचे हँडओव्हर 1 दिवसाने पुढे जाईल' },
+  'life.scope.within': { en: 'No change to your handover', hi: 'आपके हैंडओवर में कोई बदलाव नहीं', mr: 'तुमच्या हँडओव्हरमध्ये काही बदल नाही' },
+  'life.scope.item': { en: 'This item comes by {date}', hi: 'यह आइटम {date} तक आएगा', mr: 'ही वस्तू {date} पर्यंत येईल' },
+  'life.scope.pay': {
+    en: 'Payment is due when you approve. The work pauses until it is paid.',
+    hi: 'मंज़ूरी देते ही भुगतान देय है। भुगतान होने तक काम रुका रहेगा।',
+    mr: 'मंजुरी देताच पेमेंट देय आहे. पेमेंट होईपर्यंत काम थांबलेले राहील.',
+  },
+  'life.scope.inclGst': { en: 'Total, including GST', hi: 'कुल, जीएसटी सहित', mr: 'एकूण, जीएसटीसह' },
   'life.extra.why': { en: 'Why', hi: 'क्यों', mr: 'का' },
   'life.extra.discount': { en: 'Discount', hi: 'छूट', mr: 'सवलत' },
   'life.extra.gst': { en: 'GST {pct}', hi: 'जीएसटी {pct}', mr: 'जीएसटी {pct}' },

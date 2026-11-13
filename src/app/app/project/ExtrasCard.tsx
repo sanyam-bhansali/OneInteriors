@@ -25,8 +25,17 @@ import { shortDate } from '@/modules/app/project-view';
 type Extra = MyProject['extras'][number];
 type Signoff = MyProject['signoffs'][number];
 
+type Impact = NonNullable<Extra['impact']>;
+
 const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 ? 2 : 0)}%`;
 const day = (d: string) => shortDate(`${d}T12:00:00Z`);
+
+/** "Your handover moves by 7 days" / "No change to your handover" / "This item comes by 5 Dec" (owner, 13 Nov 2026). */
+function impactWords(lang: Parameters<typeof lw>[0], i: Impact): string {
+  if (i.kind === 'MOVES_PROJECT') return i.days === 1 ? lw(lang, 'life.scope.moves.one') : lw(lang, 'life.scope.moves', { n: i.days });
+  if (i.kind === 'WITHIN_TIMELINE') return lw(lang, 'life.scope.within');
+  return lw(lang, 'life.scope.item', { date: day(i.on) });
+}
 
 export function SignoffsCard({ signoffs }: { signoffs: Signoff[] }) {
   const lang = useLang();
@@ -99,18 +108,22 @@ function ExtraItem({ e, onChanged }: { e: Extra; onChanged: () => void }) {
 
   const stateLine =
     e.state === 'approved' ? lw(lang, 'life.extra.state.approved', { amount: formatINR(e.duePaise) }) : lw(lang, `life.extra.state.${e.state}`);
+  /* Additional scope; older servers send only the due day (12 Nov builder kind: it moved the project by its days). */
+  const scope: Impact | null = e.impact ?? (e.dueOn ? { kind: 'MOVES_PROJECT', days: e.daysRequired ?? 0 } : null);
   return (
     <article style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 12, borderTop: '1px solid var(--line)' }} data-testid="extra" data-state={e.state}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
         <b>
-          {e.dueOn ? e.title : `${lw(lang, 'life.extra.number', { n: e.number })}: ${e.title}`}
+          {scope ? e.title : `${lw(lang, 'life.extra.number', { n: e.number })}: ${e.title}`}
         </b>
         <b className="mono">{formatINR(e.totalPaise)}</b>
       </div>
       <span className="oa-meta">{stateLine}</span>
-      {e.dueOn !== null && e.dueOn !== undefined ? (
+      {scope ? (
+        /* Additional scope (owner, 13 Nov 2026): the impact in plain words, never a reason. */
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45 }} data-testid="scope-terms">
-          {lw(lang, 'life.scope.days', { n: e.daysRequired ?? 0 })}. {lw(lang, 'life.scope.due', { date: shortDate(`${e.dueOn}T00:00:00Z`) })}.
+          <b>{impactWords(lang, scope)}.</b>
+          {e.state === 'waiting' || e.state === 'approved' ? ` ${lw(lang, 'life.scope.pay')}` : ''}
         </p>
       ) : null}
       {e.reason ? (
@@ -123,9 +136,11 @@ function ExtraItem({ e, onChanged }: { e: Extra; onChanged: () => void }) {
         {e.lines.map((l, i) => (
           <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <span>
+              {scope ? `${i + 1}. ` : ''}
               {l.product}
               {l.room ? ` · ${l.room}` : ''}
               {l.size ? <span className="oa-row-sub"> · {l.size}</span> : null}
+              {scope && l.details ? <span className="oa-row-sub"> · {l.details}</span> : null}
             </span>
             <span className="mono">{formatINR(l.amountPaise)}</span>
           </li>
@@ -143,7 +158,7 @@ function ExtraItem({ e, onChanged }: { e: Extra; onChanged: () => void }) {
           </li>
         ) : null}
         <li style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontWeight: 600 }}>
-          <span>{lw(lang, 'life.extra.total')}</span>
+          <span>{e.inclGst ? lw(lang, 'life.scope.inclGst') : lw(lang, 'life.extra.total')}</span>
           <span className="mono">{formatINR(e.totalPaise)}</span>
         </li>
       </ul>

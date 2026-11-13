@@ -9,7 +9,11 @@
 import { useState } from 'react';
 import { formatINR } from '@/lib/money';
 import type { ExtraToCollect } from '@/modules/project/change-orders';
+import { scopeShortDay } from '@/modules/project/change-order-rules';
 import { RecordExtraPayment } from './ExtrasPanel';
+
+/** Today in India, YYYY-MM-DD. */
+const istToday = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
 
 export function ExtrasToCollect({ items, canRecord }: { items: ExtraToCollect[]; canRecord: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -20,8 +24,10 @@ export function ExtrasToCollect({ items, canRecord }: { items: ExtraToCollect[];
         <div key={x.id} className="flex flex-col gap-2">
           <span className="flex flex-wrap items-center gap-2 sm">
             <span>
-              Extra work {x.number}: {x.title} · <span className="mono">{formatINR(x.totalPaise)}</span>
+              {x.scopeDueOn ? x.title : `Extra work ${x.number}: ${x.title}`} · <span className="mono">{formatINR(x.totalPaise)}</span>
               {x.paid.recordedPaise > 0 ? ` · ${formatINR(x.paid.recordedPaise)} recorded` : ''}
+              {/* Additional scope (owner, 13 Nov 2026): "shows in Payments as due today"; the project is on hold until it is paid. */}
+              {x.scopeDueOn ? <b>{` · due ${x.scopeDueOn >= istToday() ? 'today' : `since ${scopeShortDay(x.scopeDueOn)}`} · project on hold until paid`}</b> : null}
             </span>
             {canRecord && open !== x.id ? (
               <button type="button" className="btn pri sm" onClick={() => setOpen(x.id)}>
