@@ -55,7 +55,15 @@ import {
 } from './project-rules';
 import { bpToPct, checkGroup, checkLabel, checkRemove, checkScope, checkWeight, progressOf } from './step-rules';
 import { countedSteps, photosByStage, settleStageAfterTicks, shiftStepsWithStage, writeDone } from './stage-settle';
-import { calendarOf, dayFromDb, dayToDb, istDay } from './working-days';
+import { calendarOf, dayFromDb, dayToDb, EVERY_DAY, istDay } from './working-days';
+
+/** The project's studio calendar (owner, 13 Nov 2026: Monday off): a moved end moves later stages by working days. */
+async function studioCalendarOf(projectId: string) {
+  const p = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { introduction: { select: { studio: { select: { workingDays: true, holidays: { select: { day: true } } } } } } } });
+  const studio = p?.introduction?.studio;
+  // Unreadable: every day counts, as before Monday off.
+  return studio ? calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays }) : EVERY_DAY;
+}
 
 export { settleStageAfterTicks } from './stage-settle';
 
@@ -126,7 +134,7 @@ export async function moveDate(input: MoveDateInput, now = new Date()): Promise<
     reason = 'CUSTOMER_CHANGE'; // a late decision is the customer's delay, whatever was picked
   }
   const stages = rows.map(toRule);
-  const planned = planMove(stages, { stageId: input.stageId, field: input.field, to: input.to, reason, shiftLater: input.shiftLater === true });
+  const planned = planMove(stages, { stageId: input.stageId, field: input.field, to: input.to, reason, shiftLater: input.shiftLater === true }, await studioCalendarOf(input.projectId));
   if (!planned.ok) return planned;
   const { plan } = planned;
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
@@ -387,6 +395,7 @@ export async function addStep(
         weightBp: input.weightBp,
         inScope: true,
         plannedOn: after?.plannedOn ?? stage.plannedEnd,
+        firstPlannedOn: after?.plannedOn ?? stage.plannedEnd,
       },
       select: { id: true },
     });

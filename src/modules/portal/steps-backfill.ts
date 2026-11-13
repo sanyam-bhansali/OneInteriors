@@ -98,6 +98,7 @@ export async function stepsFromTemplate(db: StepsBackfillDb, opts: { apply: bool
               weightBp: st.weightBp,
               inScope: true,
               plannedOn: st.plannedOn,
+              firstPlannedOn: st.plannedOn,
               doneAt: st.doneAt,
               doneSource: st.doneSource,
               customerMilestone: st.customerMilestone === true,

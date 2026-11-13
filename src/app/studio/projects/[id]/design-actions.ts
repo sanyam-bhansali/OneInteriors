@@ -16,6 +16,7 @@ import {
   moveDesignStep,
   moveDesignStepOrder,
   saveMeasurements,
+  setDesignEnd,
   setProjectPriority,
   setStepTask,
   setVisitStatus,
@@ -55,7 +56,7 @@ export async function tickDesignStepAction(form: FormData): Promise<DesignResult
     await tickDesignStep(
       projectId,
       id(form.get('stepId')),
-      { note: text(form.get('note'), 600), share: form.get('share'), reason: text(form.get('reason'), 40) || null, reasonNote: text(form.get('reasonNote'), 600) },
+      { note: text(form.get('note'), 600), share: form.get('share'), reason: text(form.get('reason'), 40) || null, reasonNote: text(form.get('reasonNote'), 600), doneOn: text(form.get('doneOn'), 10) },
       fileOf(form.get('file')),
       new Date(),
       // Uploaded straight to storage by the browser (any size up to 50 MB).
@@ -191,4 +192,10 @@ export async function setProjectPriorityAction(projectId: string, stars: number 
     revalidatePath('/studio/design');
   }
   return done(pid, r);
+}
+
+/** The final design date (owner or design head, 13 Nov 2026): the open steps spread to fit it. */
+export async function setDesignEndAction(projectId: string, to: string): Promise<DesignResult> {
+  const p = id(projectId);
+  return done(p, await setDesignEnd(p, text(to, 10)));
 }

@@ -12,7 +12,7 @@
  * tests/project-hold.test.ts.
  */
 
-import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
+import { addDays, daysBetween, EVERY_DAY, isDay, onWorkingDay, type StudioCalendar } from '@/modules/project/working-days';
 import { planMove, type MovePlan, type RuleStage } from '@/modules/project/project-rules';
 
 export const HOLD_REASONS = {
@@ -109,12 +109,13 @@ export interface HoldShift {
  * stage's steps move with their stage). Done steps and finished stages never
  * move. Nothing when the hold lasted no days.
  */
-export function holdEndShift(stages: readonly RuleStage[], steps: readonly HoldStep[], days: number): HoldShift {
+export function holdEndShift(stages: readonly RuleStage[], steps: readonly HoldStep[], days: number, cal: StudioCalendar = EVERY_DAY): HoldShift {
   if (days <= 0) return { days: 0, steps: [], plan: null };
   const current = stages.find((s) => s.actualEnd === null) ?? null;
   if (!current) return { days, steps: [], plan: null };
-  const moved = steps.filter((s) => s.stageId === current.id && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
-  const r = planMove(stages, { stageId: current.id, field: 'PLANNED_END', to: addDays(current.plannedEnd, days), reason: 'CUSTOMER_CHANGE', shiftLater: true });
+  // The hold's calendar days, each date then on a working day (owner, 13 Nov 2026: Monday off).
+  const moved = steps.filter((s) => s.stageId === current.id && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: onWorkingDay(addDays(s.plannedOn!, days), cal) }));
+  const r = planMove(stages, { stageId: current.id, field: 'PLANNED_END', to: onWorkingDay(addDays(current.plannedEnd, days), cal), reason: 'CUSTOMER_CHANGE', shiftLater: true }, cal);
   return { days, steps: moved, plan: r.ok ? r.plan : null };
 }
 

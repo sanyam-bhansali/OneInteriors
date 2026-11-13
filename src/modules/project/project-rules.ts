@@ -32,7 +32,7 @@
  *   customer reason gives the days back to the customer's side first.
  */
 
-import { addDays, addWorkingDays, daysBetween, DEFAULT_CALENDAR, isDay, workingDaysBetween, type StudioCalendar } from './working-days';
+import { addWorkingDays, daysBetween, DEFAULT_CALENDAR, EVERY_DAY, isDay, shiftWorkingDays, workingDaysBetween, type StudioCalendar } from './working-days';
 
 export const STAGE_KINDS = ['DESIGN', 'CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER'] as const;
 export type StageKind = (typeof STAGE_KINDS)[number];
@@ -307,7 +307,7 @@ export type MoveResult = { ok: true; plan: MovePlan } | { ok: false; error: stri
  * Works out every date a move changes, or why it cannot be made, in words
  * a studio PM reads. A reason is required: it decides whose delay it is.
  */
-export function planMove(stages: readonly RuleStage[], req: MoveRequest): MoveResult {
+export function planMove(stages: readonly RuleStage[], req: MoveRequest, cal: StudioCalendar = EVERY_DAY): MoveResult {
   if (!isDelayReason(req.reason)) return { ok: false, error: 'Pick why the date is moving. It decides whose delay it is.' };
   if (!isDay(req.to)) return { ok: false, error: 'Pick the new date.' };
   const i = stages.findIndex((s) => s.id === req.stageId);
@@ -329,14 +329,16 @@ export function planMove(stages: readonly RuleStage[], req: MoveRequest): MoveRe
   if (req.to === s.plannedEnd) return { ok: false, error: 'That is already its end date.' };
   if (daysBetween(s.plannedStart, req.to) < 0) return { ok: false, error: `${s.name} cannot end before it starts. Move its start date first.` };
   const days = daysBetween(s.plannedEnd, req.to);
+  // Later stages move by the same working days (owner, 13 Nov 2026: Monday off); every day without a calendar.
+  const wd = workingDaysBetween(s.plannedEnd, req.to, cal);
   const endField = (x: RuleStage): DateField => (x === handover ? 'HANDOVER' : 'PLANNED_END');
   const rows: MovePlan['rows'] = [{ stageId: s.id, field: endField(s), from: s.plannedEnd, to: req.to }];
   const out: MovePlan['stages'] = [{ stageId: s.id, plannedStart: s.plannedStart, plannedEnd: req.to }];
   if (req.shiftLater) {
     for (const later of stages.slice(i + 1)) {
       if (later.actualEnd !== null) continue; // a finished stage keeps its dates
-      const start = addDays(later.plannedStart, days);
-      const end = addDays(later.plannedEnd, days);
+      const start = shiftWorkingDays(later.plannedStart, wd, cal);
+      const end = shiftWorkingDays(later.plannedEnd, wd, cal);
       rows.push({ stageId: later.id, field: 'PLANNED_START', from: later.plannedStart, to: start });
       rows.push({ stageId: later.id, field: endField(later), from: later.plannedEnd, to: end });
       out.push({ stageId: later.id, plannedStart: start, plannedEnd: end });
