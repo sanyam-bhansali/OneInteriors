@@ -93,3 +93,6 @@ main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
+
+// A module, so its helpers do not clash with the other scripts.
+export {};
