@@ -4,7 +4,7 @@
  *
  * A lead goes into a won column ("Converted") only through Convert: the
  * salesperson picks the lead's sales-final quotation and writes the handover
- * to design, and the project is created there and then. The ₹25,000 booking
+ * to design (required, any length), and the project is created there and then. The ₹25,000 booking
  * advance is recorded later by accounts, as the project's first payment.
  * The design head then assigns a designer.
  *
@@ -14,7 +14,8 @@
  * converted from AxLeads).
  */
 
-export const HANDOVER_MIN = 200;
+/* Owner, 13 Nov 2026: no minimum length; the handover is still required (not empty). */
+export const HANDOVER_MIN = 1;
 export const HANDOVER_MAX = 3000;
 
 export const CONVERT_FIRST =
@@ -38,7 +39,7 @@ export function checkHandover(raw: unknown): { ok: true; value: string } | { ok:
   if (text.length < HANDOVER_MIN) {
     return {
       ok: false,
-      error: `Write the handover to design in detail: at least ${HANDOVER_MIN} characters (${text.length} so far). Rooms, style and colours, must-haves, budget comfort, possession and timeline, the family, anything promised.`,
+      error: 'Write the handover to design: rooms, style and colours, must-haves, budget comfort, possession and timeline, the family, anything promised.',
     };
   }
   if (text.length > HANDOVER_MAX) return { ok: false, error: `Keep the handover under ${HANDOVER_MAX} characters.` };

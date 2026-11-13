@@ -118,9 +118,11 @@ export function ConvertDialog({
                 style={{ resize: 'vertical', minHeight: 160 }}
                 aria-describedby="convert-count"
               />
-              <span id="convert-count" className="muted" style={{ fontSize: 12, color: length > 0 && length < HANDOVER_MIN ? 'var(--bad)' : undefined }}>
-                {length < HANDOVER_MIN ? `${length} / at least ${HANDOVER_MIN} characters` : `${length} characters`}
-              </span>
+              {length > HANDOVER_MAX ? (
+                <span id="convert-count" style={{ fontSize: 12, color: 'var(--bad)' }}>
+                  {length} characters: keep it under {HANDOVER_MAX}.
+                </span>
+              ) : null}
             </label>
 
             {screen.quotes.length === 0 ? (
