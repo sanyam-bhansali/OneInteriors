@@ -27,7 +27,7 @@ import { readSignedStages } from '@/modules/portal/payments';
 import { ledger } from '@/modules/project/payment-ledger';
 import { toLedgerRow } from '@/modules/project/payments-flow';
 import { progressOf } from '@/modules/project/step-rules';
-import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { calendarOf, dayFromDb, istDay } from '@/modules/project/working-days';
 import { signedDocDownloads, signedDocUrls } from '@/modules/storage/project-docs';
 import { prepForBrief, type OpsPrepRoom } from '@/modules/prepare/prep';
 import { ROOM_KEYS, ROOM_LABELS } from '@/modules/prepare/rooms';
@@ -103,6 +103,8 @@ export interface DesignStepView {
   done: boolean;
   doneOn: string | null;
   plannedOn: string | null;
+  /** The day it was first planned for, when that is not its day now (owner, 13 Nov 2026: planned and current side by side). Team only. */
+  firstPlannedOn: string | null;
   lateDays: number;
   /** The step's share of the design phase, as a percentage. */
   sharePct: number;
@@ -163,6 +165,10 @@ export interface FinalView extends FinalDoc {
 export interface DesignTab {
   projectId: string;
   today: string;
+  /** The studio's working days and holidays (owner, 13 Nov 2026: Monday off): how late a tick on a picked day is. */
+  calendar: { workingDays: number[]; holidays: string[] };
+  /** On hold: a tick is never late. */
+  onHold: boolean;
   customerFirst: string;
   studio: string;
   bhk: number | null;
@@ -211,6 +217,8 @@ export interface DesignTab {
   canEditPlan: boolean;
   /** May untick a design step: the owner, a PM or the design head (owner, 12 Nov 2026). */
   canUntick: boolean;
+  /** May set the final design date: the owner or the design head (owner, 13 Nov 2026). */
+  canSetEnd: boolean;
 }
 
 export type DesignTabResult = { ok: true; tab: DesignTab } | { ok: false; error: string };
@@ -240,7 +248,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       introduction: {
         select: {
           studioId: true,
-          studio: { select: { tradeName: true, branding: { select: { documentName: true } } } },
+          studio: { select: { tradeName: true, workingDays: true, holidays: { select: { day: true } }, branding: { select: { documentName: true } } } },
           brief: { select: { id: true, contactName: true, propertyType: true, user: { select: { name: true } } } },
         },
       },
@@ -262,6 +270,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               needsDocument: true,
               gatePayment: true,
               plannedOn: true,
+              firstPlannedOn: true,
               doneAt: true,
               doneNote: true,
               doneSource: true,
@@ -294,6 +303,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   const customerFirst = firstName(brief.contactName || brief.user?.name);
   const studio = p.introduction.studio.tradeName;
   const today = istDay(now);
+  const cal = calendarOf({ workingDays: p.introduction.studio.workingDays, holidays: p.introduction.studio.holidays });
   const onHold = (p.holds?.length ?? 0) > 0;
   const stage = p.stages[0] ?? null;
   const items = stage?.items ?? [];
@@ -373,7 +383,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       done,
       doneOn: i.doneAt ? istDay(i.doneAt) : null,
       plannedOn,
-      lateDays: i.inScope && !lockedBy && !onHold ? lateDays({ plannedOn, done }, today) : 0,
+      firstPlannedOn: i.firstPlannedOn && dayFromDb(i.firstPlannedOn) !== (done && i.doneAt ? istDay(i.doneAt) : plannedOn) ? dayFromDb(i.firstPlannedOn) : null,
+      lateDays: i.inScope && !lockedBy && !onHold ? lateDays({ plannedOn, done }, today, cal) : 0,
       sharePct: i.inScope && stageBp > 0 ? Math.round(((progress.weights.get(i.id) ?? 0) * 1000) / stageBp) / 10 : 0,
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
@@ -471,6 +482,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     tab: {
       projectId,
       today,
+      calendar: { workingDays: [...cal.workingDays], holidays: [...cal.holidays] },
+      onHold,
       customerFirst,
       studio,
       bhk: bhkOf(brief.propertyType),
@@ -511,6 +524,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       canClose: may('design.close'),
       canEditPlan: may('plan.edit'),
       canUntick: !check.member.viewOnly && (may('plan.edit') || mayApproveHold(check.member)),
+      canSetEnd: !check.member.viewOnly && mayApproveHold(check.member),
     },
   };
 }

@@ -11,7 +11,7 @@
  */
 
 import { splitAcross } from '@/lib/money';
-import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
+import { daysBetween, EVERY_DAY, isDay, onWorkingDay, shiftWorkingDays, workingDaysBetween, type StudioCalendar } from '@/modules/project/working-days';
 import { planMove, type MovePlan as StageMovePlan, type RuleStage } from '@/modules/project/project-rules';
 import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, PRE_EXECUTION_GROUP, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
 
@@ -22,16 +22,17 @@ import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, PRE_EXECUTION_GROUP, DE
  * the last step lands on the end of the window (`length` days after `start`).
  * Rounded on the running total, so the days never go backwards and the last
  * is exactly on the end. With no length, the gaps are used as they are.
+ * Counted in the studio's working days (owner, 13 Nov 2026: Monday off), so
+ * no step lands on a day off; every day counts without a calendar.
  */
-export function linkedDays(gaps: readonly number[], start: string, length: number | null): string[] {
+export function linkedDays(gaps: readonly number[], start: string, length: number | null, cal: StudioCalendar = EVERY_DAY): string[] {
   const clean = gaps.map((g) => (Number.isFinite(g) && g > 0 ? Math.round(g) : 0));
   const total = clean.reduce((a, b) => a + b, 0);
   let run = 0;
   return clean.map((g) => {
     run += g;
-    if (length === null) return addDays(start, run);
-    if (total === 0) return addDays(start, Math.max(0, length));
-    return addDays(start, Math.round((run * Math.max(0, length)) / total));
+    const n = length === null ? run : total === 0 ? Math.max(0, length) : Math.round((run * Math.max(0, length)) / total);
+    return onWorkingDay(shiftWorkingDays(start, n, cal), cal);
   });
 }
 
@@ -88,9 +89,18 @@ export interface DesignPlanStep {
  * DESIGN-PROCESS-PLAN.md Decision 1), days and effort scaled by the flat's
  * size, weights by effort, gates matched to its payment stages.
  */
-export function designSteps(template: readonly DesignTemplateStep[], start: string, payments: readonly { label: string }[], bhk: number | null = null, length: number | null = null): DesignPlanStep[] {
-  const gaps = scaledGaps(template.map((t) => t.days), bhk, length);
-  const days = linkedDays(gaps, start, null);
+export function designSteps(
+  template: readonly DesignTemplateStep[],
+  start: string,
+  payments: readonly { label: string }[],
+  bhk: number | null = null,
+  length: number | null = null,
+  cal: StudioCalendar = EVERY_DAY,
+  /** Premium is the base; Essential and Luxe scale the days (owner, 13 Nov 2026). Ignored when `length` is set. */
+  category: string | null = null,
+): DesignPlanStep[] {
+  const gaps = scaledGaps(template.map((t) => t.days), bhk, length, category);
+  const days = linkedDays(gaps, start, null, cal);
   const efforts = template.map((t) => scaledEffort(t.effortMin, bhk));
   const weights = designWeights(efforts);
   return template.map((t, i) => ({
@@ -169,6 +179,7 @@ export function planRedateAfterPayment(
   steps: readonly { id: string; plannedOn: string | null; done: boolean; inScope: boolean; gatePayment: number | null; gapDays: number | null }[],
   stages: readonly GateStage[] | null,
   paidOn: string,
+  cal: StudioCalendar = EVERY_DAY,
 ): { stepId: string; days: number; moves: { id: string; from: string; to: string }[] } | null {
   if (!stages || !isDay(paidOn)) return null;
   const at = steps.findIndex((s) => !s.done && s.inScope && s.gatePayment !== null && gateOf(s.gatePayment, stages).open);
@@ -177,13 +188,13 @@ export function planRedateAfterPayment(
   if (chainLocks(steps.slice(0, at), stages).some(Boolean)) return null;
   const step = steps[at]!;
   if (!step.plannedOn) return null;
-  const earliest = addDays(paidOn, Math.max(0, step.gapDays ?? 0));
-  const days = daysBetween(step.plannedOn, earliest);
+  const earliest = onWorkingDay(shiftWorkingDays(paidOn, Math.max(0, step.gapDays ?? 0), cal), cal);
+  const days = workingDaysBetween(step.plannedOn, earliest, cal);
   if (days <= 0) return null;
   const moves = steps
     .slice(at)
     .filter((s, k) => (k === 0 || (!s.done && s.inScope)) && s.plannedOn)
-    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
+    .map((s) => ({ id: s.id, from: s.plannedOn!, to: shiftWorkingDays(s.plannedOn!, days, cal) }));
   return { stepId: step.id, days, moves };
 }
 
@@ -210,14 +221,14 @@ export function designPhaseAfterTicks(items: readonly { room: string; inScope: b
  * days after; a done step keeps its day and the next counts from it. The
  * moves to make, oldest first.
  */
-export function rechainDays(steps: readonly { id: string; plannedOn: string | null; done: boolean; gapDays: number | null }[], from: number): { id: string; from: string | null; to: string }[] {
+export function rechainDays(steps: readonly { id: string; plannedOn: string | null; done: boolean; gapDays: number | null }[], from: number, cal: StudioCalendar = EVERY_DAY): { id: string; from: string | null; to: string }[] {
   const days = steps.map((s) => s.plannedOn);
   const moves: { id: string; from: string | null; to: string }[] = [];
   for (let k = Math.max(1, from); k < steps.length; k += 1) {
     const s = steps[k]!;
     const prev = days[k - 1];
     if (s.done || !prev) continue;
-    const to = addDays(prev, Math.max(0, s.gapDays ?? 0));
+    const to = onWorkingDay(shiftWorkingDays(prev, Math.max(0, s.gapDays ?? 0), cal), cal);
     if (to !== s.plannedOn) moves.push({ id: s.id, from: s.plannedOn, to });
     days[k] = to;
   }
@@ -237,6 +248,24 @@ export function checkTask(raw: unknown): { ok: true; label: string } | { ok: fal
 export type DesignCheck = { ok: true } | { ok: false; error: string };
 
 export const DONE_NOTE_MAX = 500;
+
+/** How far back a tick's done date may go (owner, 13 Nov 2026: ticking work done days ago). */
+export const DONE_ON_BACK_DAYS = 60;
+
+/**
+ * The day a step was really done (owner, 13 Nov 2026: "2D layout was done on
+ * 5th … main abhi tick karungi toh woh aaj ki date le lega"): today when
+ * left empty; never a day still to come, nor more than two months back.
+ * Late or early is counted from this day.
+ */
+export function checkDoneOn(raw: unknown, today: string): { ok: true; day: string } | { ok: false; error: string } {
+  const v = typeof raw === 'string' ? raw.trim() : '';
+  if (!v) return { ok: true, day: today };
+  if (!isDay(v)) return { ok: false, error: 'Pick the day it was done.' };
+  if (v > today) return { ok: false, error: 'The day it was done cannot be after today.' };
+  if (daysBetween(v, today) > DONE_ON_BACK_DAYS) return { ok: false, error: `Pick a day in the last ${DONE_ON_BACK_DAYS} days.` };
+  return { ok: true, day: v };
+}
 
 /** May this design step be ticked now? In scope, open, its payment recorded, and its file there when one is needed. */
 export function checkDesignTick(step: { done: boolean; inScope: boolean; needsDocument: boolean; label: string }, gate: GateState, hasFile: boolean, note = ''): DesignCheck {
@@ -324,8 +353,9 @@ export function lateTickCheck(
   step: { plannedOn: string | null; responsible: string | null },
   today: string,
   reason: unknown,
+  cal: StudioCalendar = EVERY_DAY,
 ): { ok: true; delay: { reason: DelayReasonKey; side: DelaySideName; days: number } | null } | { ok: false; error: string } {
-  const days = step.plannedOn ? Math.max(0, daysBetween(step.plannedOn, today)) : 0;
+  const days = step.plannedOn ? Math.max(0, workingDaysBetween(step.plannedOn, today, cal)) : 0;
   if (days === 0) return { ok: true, delay: null };
   if (isDelayReasonKey(reason)) return { ok: true, delay: { reason, side: sideOfReason(reason), days } };
   if (step.responsible === 'CLIENT') return { ok: true, delay: { reason: 'CLIENT_DELAY', side: 'CLIENT', days } };
@@ -346,20 +376,21 @@ export type MovePlan = { ok: true; days: number; moves: { id: string; from: stri
  * steps stay where they were. Refused for a ticked step or a day that is not
  * a day.
  */
-export function planStepMove(steps: readonly StepDay[], stepId: string, to: string): MovePlan {
+export function planStepMove(steps: readonly StepDay[], stepId: string, to: string, cal: StudioCalendar = EVERY_DAY): MovePlan {
   if (!isDay(to)) return { ok: false, error: 'Pick the new day.' };
   const at = steps.findIndex((s) => s.id === stepId);
   if (at < 0) return { ok: false, error: 'That step is not on this plan any more. Reload the page.' };
   const step = steps[at]!;
   if (step.done) return { ok: false, error: 'This step is done; there is nothing to move.' };
   if (!step.plannedOn) return { ok: false, error: 'This step has no planned day to move.' };
-  const days = daysBetween(step.plannedOn, to);
-  if (days === 0) return { ok: false, error: 'That is the day it is planned already.' };
+  if (daysBetween(step.plannedOn, to) === 0) return { ok: false, error: 'That is the day it is planned already.' };
+  // The step goes to the day picked; the open steps after it by the same working days (Monday off, 13 Nov 2026).
+  const days = workingDaysBetween(step.plannedOn, to, cal);
   const moves = steps
     .slice(at)
     .filter((s, k) => (k === 0 || !s.done) && s.plannedOn)
-    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
-  return { ok: true, days, moves };
+    .map((s, k) => ({ id: s.id, from: s.plannedOn!, to: k === 0 ? to : shiftWorkingDays(s.plannedOn!, days, cal) }));
+  return { ok: true, days: days === 0 ? daysBetween(step.plannedOn, to) : days, moves };
 }
 
 /**
@@ -370,16 +401,16 @@ export function planStepMove(steps: readonly StepDay[], stepId: string, to: stri
  * before it. Steps already ticked never move. `days` 0 and no moves when the
  * tick is on time (or early), or the step has no planned day.
  */
-export function lateTickShift(steps: readonly StepDay[], tickedId: string, today: string): { days: number; moves: { id: string; from: string; to: string }[] } {
+export function lateTickShift(steps: readonly StepDay[], tickedId: string, today: string, cal: StudioCalendar = EVERY_DAY): { days: number; moves: { id: string; from: string; to: string }[] } {
   const at = steps.findIndex((s) => s.id === tickedId);
   const ticked = steps[at];
   if (!ticked?.plannedOn || !isDay(today)) return { days: 0, moves: [] };
-  const days = daysBetween(ticked.plannedOn, today);
+  const days = workingDaysBetween(ticked.plannedOn, today, cal);
   if (days <= 0) return { days: 0, moves: [] };
   const moves = steps
     .slice(at + 1)
     .filter((s) => !s.done && s.plannedOn)
-    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
+    .map((s) => ({ id: s.id, from: s.plannedOn!, to: shiftWorkingDays(s.plannedOn!, days, cal) }));
   return { days, moves };
 }
 
@@ -390,17 +421,17 @@ export function lateTickShift(steps: readonly StepDay[], tickedId: string, today
  * the past: the move stops so no step lands before today. `days` is
  * negative (or 0 when nothing moves).
  */
-export function earlyTickShift(steps: readonly StepDay[], tickedId: string, doneDay: string, today: string): { days: number; moves: { id: string; from: string; to: string }[] } {
+export function earlyTickShift(steps: readonly StepDay[], tickedId: string, doneDay: string, today: string, cal: StudioCalendar = EVERY_DAY): { days: number; moves: { id: string; from: string; to: string }[] } {
   const at = steps.findIndex((s) => s.id === tickedId);
   const ticked = steps[at];
   if (!ticked?.plannedOn || !isDay(doneDay) || !isDay(today)) return { days: 0, moves: [] };
   const later = steps.slice(at + 1).filter((s) => !s.done && s.plannedOn);
-  let days = daysBetween(ticked.plannedOn, doneDay);
+  let days = workingDaysBetween(ticked.plannedOn, doneDay, cal);
   if (days >= 0 || later.length === 0) return { days: 0, moves: [] };
   // No step pulled before today.
-  for (const s of later) days = Math.max(days, daysBetween(s.plannedOn!, today));
+  for (const s of later) days = Math.max(days, workingDaysBetween(s.plannedOn!, today, cal));
   if (days >= 0) return { days: 0, moves: [] };
-  return { days, moves: later.map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) })) };
+  return { days, moves: later.map((s) => ({ id: s.id, from: s.plannedOn!, to: shiftWorkingDays(s.plannedOn!, days, cal) })) };
 }
 
 /** Whose move: the client's delay, ours, or a step done early (filed as rescheduled, never anyone's delay). */
@@ -414,12 +445,12 @@ const reasonOfSide = (side: ShiftSide) => (side === 'CLIENT' ? 'CUSTOMER_CHANGE'
  * delay, so the plan says whose days they are (project-rules.ts
  * `overallDelay`). Null when there is no design stage or nothing to move.
  */
-export function lateTickPlanMove(stages: readonly RuleStage[], days: number, side: ShiftSide): StageMovePlan | null {
+export function lateTickPlanMove(stages: readonly RuleStage[], days: number, side: ShiftSide, cal: StudioCalendar = EVERY_DAY): StageMovePlan | null {
   // Later for a late tick; earlier (negative days) for one done early (owner, 12 Nov 2026: design end and handover too).
   if (days === 0 || (side !== 'EARLY' && days < 0)) return null;
   const design = stages.find((s) => s.kind === 'DESIGN');
   if (!design) return null;
-  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, days), reason: reasonOfSide(side), shiftLater: true });
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: shiftWorkingDays(design.plannedEnd, days, cal), reason: reasonOfSide(side), shiftLater: true }, cal);
   return r.ok ? r.plan : null;
 }
 
@@ -465,25 +496,25 @@ export function readTickUndo(payload: unknown): TickUndo | null {
  * still open goes back by the same days. A step ticked since stays where it
  * is (its day is history now).
  */
-export function untickStepMoves(steps: readonly StepDay[], undo: Pick<TickUndo, 'days' | 'movedSteps'>): { id: string; from: string; to: string }[] {
+export function untickStepMoves(steps: readonly StepDay[], undo: Pick<TickUndo, 'days' | 'movedSteps'>, cal: StudioCalendar = EVERY_DAY): { id: string; from: string; to: string }[] {
   if (undo.days === 0) return [];
   const moved = new Set(undo.movedSteps);
-  return steps.filter((s) => moved.has(s.id) && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, -undo.days) }));
+  return steps.filter((s) => moved.has(s.id) && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: shiftWorkingDays(s.plannedOn!, -undo.days, cal) }));
 }
 
 /** The design's end and every later stage back by the late tick's days, filed with the same side so the two moves cancel out. */
-export function lateTickPlanUndo(stages: readonly RuleStage[], days: number, side: ShiftSide): StageMovePlan | null {
+export function lateTickPlanUndo(stages: readonly RuleStage[], days: number, side: ShiftSide, cal: StudioCalendar = EVERY_DAY): StageMovePlan | null {
   if (days === 0) return null;
   const design = stages.find((s) => s.kind === 'DESIGN');
   if (!design) return null;
-  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, -days), reason: reasonOfSide(side), shiftLater: true });
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: shiftWorkingDays(design.plannedEnd, -days, cal), reason: reasonOfSide(side), shiftLater: true }, cal);
   return r.ok ? r.plan : null;
 }
 
 /** Days a step is late on `today`: past its planned day and still open. 0 when not late. */
-export function lateDays(step: { plannedOn: string | null; done: boolean }, today: string): number {
+export function lateDays(step: { plannedOn: string | null; done: boolean }, today: string, cal: StudioCalendar = EVERY_DAY): number {
   if (step.done || !step.plannedOn) return 0;
-  return Math.max(0, daysBetween(step.plannedOn, today));
+  return Math.max(0, workingDaysBetween(step.plannedOn, today, cal));
 }
 
 // ── Drawings and the client's answers ─────────────────────────

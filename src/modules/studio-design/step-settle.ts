@@ -15,7 +15,7 @@ import { recordEvent, type EventPayload, type ProjectActor } from '@/modules/pro
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { settleStageAfterTicks, shiftStepsWithStage } from '@/modules/project/stage-settle';
 import type { RuleStage, StageKind } from '@/modules/project/project-rules';
-import { dayFromDb, dayToDb, istDay } from '@/modules/project/working-days';
+import { calendarOf, dayFromDb, dayToDb, EVERY_DAY, istDay, type StudioCalendar } from '@/modules/project/working-days';
 import { designPhaseAfterTicks, earlyTickShift, lateTickCheck, lateTickPlanMove, lateTickShift, type ShiftSide } from './rules';
 import type { ApprovalKind } from './template';
 
@@ -34,6 +34,22 @@ export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId:
   } else if (event === 'design.done') {
     await applyPhaseEvent(tx, projectId, { kind: 'design.done' }, actor, now);
   }
+}
+
+/**
+ * The project's studio calendar: its working days and holidays (owner, 13 Nov
+ * 2026: "Monday being our weekly off, it should be considered in the overall
+ * planning for both design and execution"). Every date a tick, untick or move
+ * shifts is counted in these days.
+ */
+export async function projectCalendar(db: Pick<Prisma.TransactionClient, 'homeProject'>, projectId: string): Promise<StudioCalendar> {
+  const p = await db.homeProject.findUnique({
+    where: { id: projectId },
+    select: { introduction: { select: { studio: { select: { workingDays: true, holidays: { select: { day: true } } } } } } },
+  });
+  const studio = p?.introduction?.studio;
+  // Unreadable: every day counts, as before Monday off.
+  return studio ? calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays }) : EVERY_DAY;
 }
 
 /** Is the project on hold (studio-hold/)? A tick then asks nothing and moves nothing: the hold moves the dates when it ends. */
@@ -61,7 +77,7 @@ export interface TickShift {
  */
 export async function shiftAfterLateTick(
   tx: Prisma.TransactionClient,
-  /** `doneDay`: the day it was done, when not today (scripts/relink-design-dates.ts). */
+  /** `doneDay`: the day it was done, when not today (picked on the tick, 13 Nov 2026; scripts/relink-design-dates.ts). */
   input: { projectId: string; stepId: string; label: string; side: ShiftSide; today: string; byId: string; actor: ProjectActor; now: Date; doneDay?: string },
 ): Promise<TickShift> {
   const stage = await tx.homeProjectStage.findFirst({
@@ -69,9 +85,11 @@ export async function shiftAfterLateTick(
     select: { items: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, plannedOn: true, doneAt: true } } },
   });
   if (!stage) return { days: 0, movedSteps: [], planMoved: false };
+  const cal = await projectCalendar(tx, input.projectId);
   const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== input.stepId }));
   // Late: later by the days late. Early (owner, 12 Nov 2026): earlier by the days early, never into the past.
-  const shift = input.side === 'EARLY' ? earlyTickShift(steps, input.stepId, input.doneDay ?? input.today, input.today) : lateTickShift(steps, input.stepId, input.today);
+  const doneDay = input.doneDay ?? input.today;
+  const shift = input.side === 'EARLY' ? earlyTickShift(steps, input.stepId, doneDay, input.today, cal) : lateTickShift(steps, input.stepId, doneDay, cal);
   if (shift.days === 0) return { days: 0, movedSteps: [], planMoved: false };
   for (const m of shift.moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
 
@@ -81,7 +99,7 @@ export async function shiftAfterLateTick(
     select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true },
   });
   const stages: RuleStage[] = rows.map((s) => ({ id: s.id, kind: s.kind as StageKind, name: s.name, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd), actualEnd: s.actualEnd ? istDay(s.actualEnd) : null }));
-  const plan = lateTickPlanMove(stages, shift.days, input.side);
+  const plan = lateTickPlanMove(stages, shift.days, input.side, cal);
   if (plan) {
     for (const s of plan.stages) {
       await tx.homeProjectStage.update({ where: { id: s.stageId }, data: { plannedStart: dayToDb(s.plannedStart), plannedEnd: dayToDb(s.plannedEnd) } });
@@ -144,7 +162,7 @@ export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: 
   if (count !== 1) return false;
   const actor: ProjectActor = { type: 'CUSTOMER', id: userId };
   const planned = step.plannedOn ? dayFromDb(step.plannedOn) : null;
-  const late = held ? null : lateTickCheck({ plannedOn: planned, responsible: 'CLIENT' }, istDay(now), null);
+  const late = held ? null : lateTickCheck({ plannedOn: planned, responsible: 'CLIENT' }, istDay(now), null, await projectCalendar(tx, projectId));
   let undo: Record<string, unknown> = {};
   if (late?.ok && late.delay && planned) {
     const delay = await tx.homeStepDelay.create({

@@ -13,6 +13,7 @@ import { recordEvent, type ProjectActor } from '@/modules/project/events';
 import { shiftStepsWithStage } from '@/modules/project/stage-settle';
 import type { RuleStage, StageKind } from '@/modules/project/project-rules';
 import { dayFromDb, dayToDb, istDay } from '@/modules/project/working-days';
+import { projectCalendar } from '@/modules/studio-design/step-settle';
 import { checkHoldAsk, holdDays, holdEndShift, HOLD_REASONS, isHoldReason, mayApproveHold, mayEndHold, openHold, type HoldReason } from './rules';
 
 export type HoldResult = { ok: true; message: string } | { ok: false; error: string };
@@ -181,7 +182,7 @@ export async function shiftPlanForClient(
   });
   const stages: RuleStage[] = rows.map((s) => ({ id: s.id, kind: s.kind as StageKind, name: s.name, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd), actualEnd: s.actualEnd ? istDay(s.actualEnd) : null }));
   const steps = rows.flatMap((s) => s.items.map((i) => ({ id: i.id, stageId: s.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null })));
-  const shift = holdEndShift(stages, steps, days);
+  const shift = holdEndShift(stages, steps, days, await projectCalendar(tx, projectId));
   for (const m of shift.steps) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
   if (shift.plan) {
     const current = shift.plan.stages[0]!.stageId;

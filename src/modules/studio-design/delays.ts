@@ -13,7 +13,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
-import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { calendarOf, dayFromDb, istDay } from '@/modules/project/working-days';
 import { homeLabel } from '@/modules/studio/workspace-view';
 import { daysBetween } from '@/modules/project/working-days';
 import { dedupeKey, recordEventOnce } from '@/modules/project/events';
@@ -145,6 +145,9 @@ async function lateRightNow(studioId: string, designerId: string | null, today: 
       },
     },
   });
+  // Late in working days (owner, 13 Nov 2026: Monday off).
+  const studio = await prisma.studio.findUnique({ where: { id: studioId }, select: { workingDays: true, holidays: { select: { day: true } } } });
+  const cal = calendarOf({ workingDays: studio?.workingDays, holidays: studio?.holidays ?? [] });
   const out: LateNowRow[] = [];
   for (const p of projects) {
     const items = p.stages[0]?.items ?? [];
@@ -152,7 +155,7 @@ async function lateRightNow(studioId: string, designerId: string | null, today: 
     items.forEach((i, k) => {
       if (!i.inScope || i.doneAt || locks[k] || !i.plannedOn) return;
       const plannedOn = dayFromDb(i.plannedOn);
-      const days = lateDays({ plannedOn, done: false }, today);
+      const days = lateDays({ plannedOn, done: false }, today, cal);
       if (days <= 0) return;
       out.push({
         projectId: p.id,

@@ -34,6 +34,7 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             weightBp: it.weightBp,
             inScope: it.inScope,
             plannedOn: it.plannedOn,
+            firstPlannedOn: it.plannedOn,
             doneAt: it.doneAt ?? null,
             doneSource: it.doneAt ? (it.doneSource ?? null) : null,
             customerMilestone: it.customerMilestone === true,
@@ -147,16 +148,17 @@ export interface SignedProjectInput {
  * quote are filed in the Locker.
  */
 export async function createSignedProject(db: SignedProjectDb, input: SignedProjectInput): Promise<{ id: string; payments: PlanPayment[] }> {
+  const signed = await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' }, select: { category: true } });
   const built = quoteToPlan({
     lines: input.quote.lines,
     startOn: input.startOn,
     totalDays: input.totalDays,
     contractPaise: input.contractPaise,
     stages: input.stages,
-    design: input.design ?? null,
+    // The quotation's category sets the design days (owner, 13 Nov 2026): Essential half of Premium's, Luxe 30% more.
+    design: input.design ? { ...input.design, category: input.design.category ?? signed?.category ?? null } : null,
   });
   const payments = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
-  const signed = await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' }, select: { category: true } });
   const created = await db.homeProject.create({
     data: {
       introductionId: input.introductionId,

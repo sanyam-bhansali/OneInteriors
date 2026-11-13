@@ -178,16 +178,24 @@ export const SIZE_FACTOR: Readonly<Record<1 | 2 | 3 | 4, number>> = { 1: 0.8, 2:
 export const sizeFactor = (bhk: number | null | undefined): number => SIZE_FACTOR[(bhk ? Math.min(4, Math.max(1, Math.round(bhk))) : BASE_BHK) as 1 | 2 | 3 | 4];
 
 /**
+ * How the project's category scales the design days (owner, 13 Nov 2026):
+ * Premium is the base, Essential "50% kam" (factory work, little design),
+ * Luxe "30% badhna chahiye". A project with no category is Premium.
+ */
+export const CATEGORY_DAYS_FACTOR: Readonly<Record<string, number>> = { ESSENTIAL: 0.5, PREMIUM: 1, LUXURY: 1.3 };
+export const categoryFactor = (category: string | null | undefined): number => (category ? (CATEGORY_DAYS_FACTOR[category] ?? 1) : 1);
+
+/**
  * A 2 BHK's days after each step, for this flat. The running total is
  * scaled and rounded, not each step on its own, so the whole plan is exactly
  * the factor longer or shorter (rounding a 1-day step on its own would make
  * a 1 BHK no shorter and a 3 BHK far longer), and a same-day step stays on
  * the same day.
  */
-export function scaledGaps(days: readonly number[], bhk: number | null | undefined, length: number | null = null): number[] {
+export function scaledGaps(days: readonly number[], bhk: number | null | undefined, length: number | null = null, category: string | null = null): number[] {
   /* A length asked for (owner, 27 Oct 2026: "Design done in N days" on Start a project): every step's days scaled to end on it. */
   const base = days.reduce((a, d) => a + (Number.isFinite(d) && d > 0 ? d : 0), 0);
-  const f = length !== null && Number.isInteger(length) && length > 0 && base > 0 ? length / base : sizeFactor(bhk);
+  const f = length !== null && Number.isInteger(length) && length > 0 && base > 0 ? length / base : sizeFactor(bhk) * categoryFactor(category);
   let run = 0;
   let prev = 0;
   return days.map((d) => {
@@ -203,8 +211,8 @@ export function scaledGaps(days: readonly number[], bhk: number | null | undefin
 export const scaledEffort = (effortMin: number, bhk: number | null | undefined): number => Math.max(0, Math.round(effortMin * sizeFactor(bhk)));
 
 /** The DESIGN stage's length in days for this flat: every step's days, scaled, end to end (at least a day). */
-export const designLengthFor = (template: readonly Pick<DesignTemplateStep, 'days'>[], bhk: number | null | undefined, length: number | null = null): number =>
-  Math.max(1, scaledGaps(template.map((t) => t.days), bhk, length).reduce((a, b) => a + b, 0));
+export const designLengthFor = (template: readonly Pick<DesignTemplateStep, 'days'>[], bhk: number | null | undefined, length: number | null = null, category: string | null = null): number =>
+  Math.max(1, scaledGaps(template.map((t) => t.days), bhk, length, category).reduce((a, b) => a + b, 0));
 
 /** Designer-days a project takes, by flat size (Hauspire's capacity sheet; 4 BHK is our estimate). */
 export const DESIGNER_DAYS: Readonly<Record<1 | 2 | 3 | 4, number>> = { 1: 14, 2: 20, 3: 27, 4: 32 };

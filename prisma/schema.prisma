@@ -812,7 +812,7 @@ model Studio {
   /// only through modules/project/working-days.ts `calendarOf`, which repairs
   /// a bad value rather than trusting it. Reminders, "no update today" and
   /// delays in working days all count on it, with `holidays`.
-  workingDays Int[] @default([1, 2, 3, 4, 5, 6])
+  workingDays Int[] @default([2, 3, 4, 5, 6, 7])
 
   // Derived performance — recomputed by a job, never written by hand.
   // Null until enough completed projects exist. Do NOT default these to
@@ -2195,6 +2195,11 @@ model HomeChecklistItem {
   /// The planned day, spread across the stage's window from the template's
   /// sheet days; moves with the stage.
   plannedOn   DateTime? @db.Date
+  /// The day it was first planned for, never moved (owner, 13 Nov 2026: "har
+  /// case mein dikhana hai … previous date kya tha aur abhi"): the studio sees
+  /// planned and current side by side; the client never sees dates. Null on a
+  /// step made before this, where the current day stands in.
+  firstPlannedOn DateTime? @db.Date
   /// The signed quote line it came from. A snapshot reference, not a key:
   /// quote lines are copied at signing and may be edited or deleted later.
   quoteLineId String?

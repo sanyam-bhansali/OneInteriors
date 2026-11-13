@@ -33,12 +33,12 @@ import { currentMember, memberOnProject } from '@/modules/studio/access';
 import { can, needsAssignment } from '@/modules/studio/roles';
 import { dedupeKey, recordEvent, recordEventOnce, type EventPayload, type ProjectActor } from '@/modules/project/events';
 import { shiftStepsWithStage } from '@/modules/project/stage-settle';
-import type { RuleStage, StageKind } from '@/modules/project/project-rules';
+import { planMove, type RuleStage, type StageKind } from '@/modules/project/project-rules';
 import { mayApproveHold } from '@/modules/studio-hold/rules';
 import { canSupersede } from '@/modules/project/locker-rules';
 import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
-import { addDays, dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
+import { calendarOf, dayFromDb, dayToDb, daysBetween, isDay, istDay, istTime, onWorkingDay, shiftWorkingDays, workingDaysBetween, type StudioCalendar } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
 import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
@@ -52,6 +52,7 @@ import {
   asksApproval,
   checkAnswer,
   checkDesignTick,
+  checkDoneOn,
   checkMeasurements,
   checkVisit,
   DELAY_NOTE_MAX,
@@ -63,6 +64,7 @@ import {
   checkTask,
   designWeights,
   isDesignKind,
+  linkedDays,
   rechainDays,
   checkUntickReason,
   lateTickPlanUndo,
@@ -77,7 +79,7 @@ import {
 } from './rules';
 import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
-import { projectOnHold, settleDesignPhase, shiftAfterLateTick, tickApprovalStep, type TickShift } from './step-settle';
+import { projectCalendar, projectOnHold, settleDesignPhase, shiftAfterLateTick, tickApprovalStep, type TickShift } from './step-settle';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -156,6 +158,7 @@ export function designItemData(stageId: string, st: PlanItem): Prisma.HomeCheckl
     weightBp: st.weightBp,
     inScope: st.inScope,
     plannedOn: st.plannedOn,
+    firstPlannedOn: st.plannedOn,
     responsible: st.responsible ?? null,
     needsDocument: st.needsDocument === true,
     gatePayment: st.gatePayment ?? null,
@@ -188,7 +191,8 @@ const STEP_SELECT = {
 export async function tickDesignStep(
   projectId: string,
   stepId: string,
-  input: { note?: unknown; share?: unknown; reason?: unknown; reasonNote?: unknown },
+  /* `doneOn`: the day it was really done, when not today (owner, 13 Nov 2026: "2D layout was done on 5th … it will take today's date"). */
+  input: { note?: unknown; share?: unknown; reason?: unknown; reasonNote?: unknown; doneOn?: unknown },
   file: File | null,
   now = new Date(),
   /* A drawing uploaded straight to storage (up to 50 MB; owner, 12 Nov 2026: a working drawing over 4 MB broke the tick): its path, checked here. */
@@ -206,6 +210,12 @@ export async function tickDesignStep(
   });
   const step = p?.stages[0]?.items[0];
   if (!p || !step) return { ok: false, error: GONE };
+  const today = istDay(now);
+  const doneDay = checkDoneOn(input.doneOn, today);
+  if (!doneDay.ok) return doneDay;
+  const doneOn = doneDay.day;
+  // Today's tick keeps its moment; an earlier day is filed at noon that day.
+  const doneAt = doneOn === today ? now : istTime(doneOn, '12:00');
   const note = typeof input.note === 'string' ? input.note.replace(/\r\n/g, '\n').trim() : '';
   const hasFile = Boolean(file && file.size > 0) || uploaded !== null;
   // The step waits on its own payment, or on an earlier step's (DESIGN-PROCESS-PLAN.md Decision 5).
@@ -238,7 +248,8 @@ export async function tickDesignStep(
   // On hold (owner, 12 Nov 2026): nothing is late; the hold moves the dates when it is taken off.
   // A re-tick after an untick asks again: the untick undid what the first tick did (owner, 12 Nov 2026).
   const held = await projectOnHold(prisma, projectId);
-  const late = held ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  const cal = await projectCalendar(prisma, projectId);
+  const late = held ? ({ ok: true, delay: null } as const) : lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, doneOn, input.reason, cal);
   if (!late.ok) return late;
   const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
   if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
@@ -285,23 +296,23 @@ export async function tickDesignStep(
       }
       const { count } = await tx.homeChecklistItem.updateMany({
         where: { id: step.id, doneAt: null, inScope: true },
-        data: { doneAt: now, doneById: check.member.userId, doneSource: 'TICK', doneNote: note || null, doneDocumentId: docId },
+        data: { doneAt, doneById: check.member.userId, doneSource: 'TICK', doneNote: note || null, doneDocumentId: docId },
       });
       if (count !== 1) throw new Refused('Already ticked.');
       if (late.delay && plannedDay) {
         const delay = await tx.homeStepDelay.create({
-          data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(istDay(now)), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
+          data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(doneOn), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
           select: { id: true },
         });
-        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today: istDay(now), byId: check.member.userId, actor, now });
+        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today, doneDay: doneOn, byId: check.member.userId, actor, now });
         // What it moved, so an untick can put it back (owner, 12 Nov 2026).
         undo = { lateDays: late.delay.days, side: late.delay.side, delayId: delay.id, shift: { ...shift } };
-      } else if (!held && plannedDay && plannedDay > istDay(now)) {
+      } else if (!held && plannedDay && plannedDay > doneOn) {
         // Done before its day (owner, 12 Nov 2026): the later steps, the design's end and handover come forward.
-        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'EARLY', today: istDay(now), byId: check.member.userId, actor, now });
+        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'EARLY', today, doneDay: doneOn, byId: check.member.userId, actor, now });
         if (shift.days !== 0) undo = { side: 'EARLY', shift: { ...shift } };
       }
-      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: docId !== null, ...undo } as EventPayload });
+      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: docId !== null, ...(doneOn !== today ? { doneOn } : {}), ...undo } as EventPayload });
       const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
       await settleDesignPhase(tx, projectId, actor, now);
       return settled;
@@ -312,7 +323,8 @@ export async function tickDesignStep(
       ? ` ${shift?.movedSteps.length ? 'The steps after it, the' : 'The'} design's end and handover moved ${late.delay.days} day${late.delay.days === 1 ? '' : 's'} later${late.delay.side === 'CLIENT' ? ": the client's delay, not counted as ours" : ''}.`
       : '';
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
-    return { ok: true, message: `Ticked: ${step.label}.${movedWords}${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
+    const onWords = doneOn !== today ? ` Done on ${doneOn.slice(8)}/${doneOn.slice(5, 7)}.` : '';
+    return { ok: true, message: `Ticked: ${step.label}.${onWords}${movedWords}${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
   } catch (e) {
     if (e instanceof Refused) return { ok: false, error: e.message };
     throw e;
@@ -353,11 +365,12 @@ export async function untickDesignStep(projectId: string, stepId: string, rawRea
     if (count !== 1) throw new Refused('Someone unticked it already. Reload the page.');
     if (undo && undo.days !== 0) {
       const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== step.id }));
-      for (const m of untickStepMoves(steps, undo)) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
+      const cal = await projectCalendar(tx, projectId);
+      for (const m of untickStepMoves(steps, undo, cal)) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
       if (undo.planMoved) {
         const rows = await tx.homeProjectStage.findMany({ where: { projectId }, orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true } });
         const stages: RuleStage[] = rows.map((r) => ({ id: r.id, kind: r.kind as StageKind, name: r.name, plannedStart: istDay(r.plannedStart), plannedEnd: istDay(r.plannedEnd), actualEnd: r.actualEnd ? istDay(r.actualEnd) : null }));
-        const plan = lateTickPlanUndo(stages, undo.days, undo.side);
+        const plan = lateTickPlanUndo(stages, undo.days, undo.side, cal);
         if (plan) {
           for (const sMove of plan.stages) {
             await tx.homeProjectStage.update({ where: { id: sMove.stageId }, data: { plannedStart: dayToDb(sMove.plannedStart), plannedEnd: dayToDb(sMove.plannedEnd) } });
@@ -417,7 +430,7 @@ export async function moveDesignStep(projectId: string, stepId: string, input: {
   });
   if (!stage) return { ok: false, error: GONE };
   const steps = stage.items.filter((i) => i.inScope || i.id === stepId).map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null }));
-  const plan = planStepMove(steps, stepId, typeof input.to === 'string' ? input.to : '');
+  const plan = planStepMove(steps, stepId, typeof input.to === 'string' ? input.to : '', await projectCalendar(prisma, projectId));
   if (!plan.ok) return plan;
   const moved = plan.moves[0]!;
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
@@ -431,6 +444,76 @@ export async function moveDesignStep(projectId: string, stepId: string, input: {
   const label = stage.items.find((i) => i.id === stepId)?.label ?? 'The step';
   const later = plan.moves.length - 1;
   return { ok: true, message: `${label} moved ${Math.abs(plan.days)} day${Math.abs(plan.days) === 1 ? '' : 's'} ${plan.days > 0 ? 'later' : 'earlier'}${later ? `, with the ${later} open step${later === 1 ? '' : 's'} after it` : ''}. The client sees the new day and the reason, never your note.` };
+}
+
+/**
+ * Sets the design's final date (owner, 13 Nov 2026: "ek upar sirf final
+ * design date … if we put a date there, it should just take the date and
+ * calibrate everything as per that date"; the owner or the design head
+ * only). The open design steps spread from today (or the last step done,
+ * if later) to that day by their own days, in working days; the design's
+ * end is that day and every later stage, handover included, moves with it.
+ * Filed as rescheduled (never anyone's delay); each moved step keeps its
+ * first planned day, so the team sees planned and now side by side.
+ */
+export async function setDesignEnd(projectId: string, rawTo: unknown, now = new Date()): Promise<DesignResult> {
+  const check = await memberOnProject(projectId);
+  if (!check.ok) return check;
+  const { member } = check;
+  if (member.viewOnly || !mayApproveHold(member)) return { ok: false, error: 'Only the owner or the design head sets the final design date.' };
+  const today = istDay(now);
+  if (typeof rawTo !== 'string' || !isDay(rawTo)) return { ok: false, error: 'Pick the final design date.' };
+  if (rawTo < today) return { ok: false, error: 'The final design date cannot be before today.' };
+  if (await projectOnHold(prisma, projectId)) return { ok: false, error: 'This project is on hold. Take it off hold first.' };
+  const cal = await projectCalendar(prisma, projectId);
+  const to = onWorkingDay(rawTo, cal);
+  const rows = await prisma.homeProjectStage.findMany({
+    where: { projectId },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true, items: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, plannedOn: true, doneAt: true, inScope: true, gapDays: true } } },
+  });
+  const designRow = rows.find((r) => r.kind === 'DESIGN');
+  if (!designRow) return { ok: false, error: 'This project has no design stage.' };
+  if (designRow.actualEnd) return { ok: false, error: 'Design is done already.' };
+  const open = designRow.items.filter((i) => i.inScope && !i.doneAt);
+  if (open.length === 0) return { ok: false, error: 'Every design step is done already.' };
+  const lastDone = designRow.items.filter((i) => i.inScope && i.doneAt).map((i) => istDay(i.doneAt!)).sort().at(-1) ?? null;
+  const from = lastDone && lastDone > today ? lastDone : today;
+  if (to < from) return { ok: false, error: 'Pick a day after the last step done.' };
+  // Each open step's share of the time by its own days (a step with none shares the day before it).
+  const gaps = open.map((i, k) => (k === 0 ? Math.max(1, i.gapDays ?? 1) : Math.max(0, i.gapDays ?? 1)));
+  const days = linkedDays(gaps, from, workingDaysBetween(from, to, cal), cal).map((d) => (d > to ? to : d));
+  const stages: RuleStage[] = rows.map((s) => ({ id: s.id, kind: s.kind as StageKind, name: s.name, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd), actualEnd: s.actualEnd ? istDay(s.actualEnd) : null }));
+  const design = stages.find((s) => s.id === designRow.id)!;
+  const moved = design.plannedEnd === to ? null : planMove(stages, { stageId: design.id, field: 'PLANNED_END', to, reason: 'OTHER', shiftLater: true }, cal);
+  if (moved && !moved.ok) return moved;
+  const plan = moved?.ok ? moved.plan : null;
+  const actor: ProjectActor = { type: 'STUDIO', id: member.userId };
+  const note = `Final design date set to ${to}.`;
+  await prisma.$transaction(async (tx) => {
+    for (const [k, i] of open.entries()) {
+      const day = days[k]!;
+      if (!i.plannedOn || dayFromDb(i.plannedOn) !== day) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { plannedOn: dayToDb(day) } });
+    }
+    if (!plan) return;
+    for (const sMove of plan.stages) {
+      await tx.homeProjectStage.update({ where: { id: sMove.stageId }, data: { plannedStart: dayToDb(sMove.plannedStart), plannedEnd: dayToDb(sMove.plannedEnd) } });
+      const was = stages.find((x) => x.id === sMove.stageId)!;
+      if (was.kind !== 'DESIGN') await shiftStepsWithStage(tx, sMove.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: sMove.plannedStart, end: sMove.plannedEnd });
+    }
+    let leadId: string | null = null;
+    for (const r of plan.rows) {
+      const row = await tx.homeProjectDateChange.create({
+        data: { projectId, stageId: r.stageId, field: r.field, fromDate: dayToDb(r.from), toDate: dayToDb(r.to), reason: 'OTHER', note, byId: member.userId, at: now },
+        select: { id: true },
+      });
+      leadId ??= row.id;
+    }
+    await recordEvent(tx, { projectId, type: 'date.moved', actor, refId: leadId, payload: { stageId: plan.rows[0]!.stageId, field: plan.rows[0]!.field, days: plan.days, rows: plan.rows.length, reason: 'OTHER', customer: false, designEnd: true }, at: now });
+  });
+  const shift = plan ? daysBetween(design.plannedEnd, to) : 0;
+  const words = shift === 0 ? '' : ` Handover and the stages after design moved ${Math.abs(shift)} day${Math.abs(shift) === 1 ? '' : 's'} ${shift > 0 ? 'later' : 'earlier'}.`;
+  return { ok: true, message: `Design now ends ${to.slice(8)}/${to.slice(5, 7)}: the ${open.length} open step${open.length === 1 ? '' : 's'} are spread to fit.${words}` };
 }
 
 /** A step's who, file-needed and payment gate (owner, PM). */
@@ -467,10 +550,11 @@ async function designItems(projectId: string) {
 }
 
 /** The days, re-linked from a step on; inside the caller's transaction. */
-async function writeRechain(tx: Prisma.TransactionClient, items: readonly { id: string; plannedOn: Date | null; doneAt: Date | null; gapDays: number | null }[], from: number) {
+async function writeRechain(tx: Prisma.TransactionClient, items: readonly { id: string; plannedOn: Date | null; doneAt: Date | null; gapDays: number | null }[], from: number, cal: StudioCalendar) {
   const moves = rechainDays(
     items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null, gapDays: i.gapDays })),
     from,
+    cal,
   );
   for (const m of moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
   return moves.length;
@@ -530,7 +614,7 @@ export async function moveDesignStepOrder(projectId: string, stepId: string, dir
   [order[at], order[to]] = [order[to]!, order[at]!];
   await prisma.$transaction(async (tx) => {
     for (const [k, i] of order.entries()) if (i.sortOrder !== k) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: k } });
-    await writeRechain(tx, order, Math.min(at, to));
+    await writeRechain(tx, order, Math.min(at, to), await projectCalendar(tx, projectId));
     await recordEvent(tx, { projectId, type: 'design.step_reordered', actor: { type: 'STUDIO', id: check.member.userId }, refId: stepId, payload: { dir } });
   });
   return { ok: true, message: `${items[at]!.label} moved ${dir}.` };
@@ -553,6 +637,7 @@ export async function addDesignStepBelow(projectId: string, afterId: string, inp
   if (!stage || at < 0) return { ok: false, error: GONE };
   const after = items[at]!;
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  const cal = await projectCalendar(prisma, projectId);
   await prisma.$transaction(async (tx) => {
     for (const i of items.slice(at + 1)) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: i.sortOrder + 1 } });
     const made = await tx.homeChecklistItem.create({
@@ -563,7 +648,8 @@ export async function addDesignStepBelow(projectId: string, afterId: string, inp
         sortOrder: after.sortOrder + 1,
         weightBp: 0,
         inScope: true,
-        plannedOn: after.plannedOn ? dayToDb(addDays(dayFromDb(after.plannedOn), days)) : null,
+        plannedOn: after.plannedOn ? dayToDb(onWorkingDay(shiftWorkingDays(dayFromDb(after.plannedOn), days, cal), cal)) : null,
+        firstPlannedOn: after.plannedOn ? dayToDb(onWorkingDay(shiftWorkingDays(dayFromDb(after.plannedOn), days, cal), cal)) : null,
         responsible: input.responsible as string,
         gapDays: days,
         effortMin: Math.round(hours * 60),
@@ -571,7 +657,7 @@ export async function addDesignStepBelow(projectId: string, afterId: string, inp
       select: { id: true, plannedOn: true, doneAt: true, gapDays: true },
     });
     const order = [...items.slice(0, at + 1), made, ...items.slice(at + 1)];
-    await writeRechain(tx, order, at + 2);
+    await writeRechain(tx, order, at + 2, cal);
     await writeEffortWeights(tx, stage.id);
     await recordEvent(tx, { projectId, type: 'step.added', actor, refId: made.id, payload: { after: after.id, days } });
   });
@@ -591,7 +677,8 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
     where: { id: projectId },
     select: {
       paymentPhases: true,
-      introduction: { select: { studio: { select: { designTemplate: true } }, brief: { select: { propertyType: true } } } },
+      category: true,
+      introduction: { select: { studio: { select: { designTemplate: true, workingDays: true, holidays: { select: { day: true } } } }, brief: { select: { propertyType: true } } } },
       stages: { where: { kind: 'DESIGN' }, take: 1, select: { id: true, plannedStart: true, plannedEnd: true, items: { select: { id: true, doneAt: true, responsible: true } } } },
     },
   });
@@ -599,7 +686,8 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
   if (!p || !stage) return { ok: false, error: 'This project has no design stage.' };
   const refusal = applyRefusal(stage.items);
   if (refusal) return { ok: false, error: refusal };
-  const steps = designStepsFor(stage.plannedStart, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? [], bhkOf(p.introduction.brief.propertyType));
+  const cal = calendarOf({ workingDays: p.introduction.studio.workingDays, holidays: p.introduction.studio.holidays });
+  const steps = designStepsFor(stage.plannedStart, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? [], bhkOf(p.introduction.brief.propertyType), null, cal, p.category);
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
   try {
     await prisma.$transaction(async (tx) => {

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { addDays, calendarOf, workingDaysBetween } from '@/modules/project/working-days';
 import type { DesignStepView, DesignTab, FinalView } from '@/modules/studio-design/store';
 import type { DocType } from '@/modules/studio-design/documents';
 import { UploadDocument } from './UploadDocument';
@@ -29,6 +30,7 @@ import {
   shareMoodBoardAction,
   tickDesignStepAction,
   untickDesignStepAction,
+  setDesignEndAction,
 } from './design-actions';
 import { RequirementCard } from './RequirementCard';
 import type { StudioRequirementForm } from '@/modules/project/requirement-form';
@@ -110,7 +112,9 @@ function Overview({ tab }: { tab: DesignTab }) {
           {tab.stage.done ? 'Design is done.' : `Planned ${dayWords(tab.stage.plannedStart)} to ${dayWords(tab.stage.plannedEnd)}`}
           {tab.bhk ? ` · ${tab.bhk} BHK` : ''}
         </p>
-      ) : (
+      ) : null}
+      {tab.stage && !tab.stage.done && tab.canSetEnd ? <DesignEndForm tab={tab} /> : null}
+      {tab.stage ? null : (
         <p className={`m-0 ${muted}`}>This project has no design stage in its plan.</p>
       )}
       {next ? (
@@ -258,9 +262,10 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
   const meta = !st.inScope
     ? `Not in scope · ${tab.customerFirst} does not see it`
     : st.done
-      ? `Done ${dayWords(st.doneOn)}`
+      ? `Done ${dayWords(st.doneOn)}${st.firstPlannedOn ? ` · planned ${dayWords(st.firstPlannedOn)}` : ''}`
       : st.plannedOn
-        ? `Planned ${dayWords(st.plannedOn)}${st.lateDays ? ` · ${st.lateDays} day${st.lateDays === 1 ? '' : 's'} late` : ''}`
+        ? /* Planned and current side by side, whoever's delay (owner, 13 Nov 2026). The client never sees dates. */
+          `${st.firstPlannedOn ? `Planned ${dayWords(st.firstPlannedOn)} · now ${dayWords(st.plannedOn)}` : `Planned ${dayWords(st.plannedOn)}`}${st.lateDays ? ` · ${st.lateDays} working day${st.lateDays === 1 ? '' : 's'} late` : ''}`
         : 'Open';
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -454,6 +459,12 @@ function AddBelowForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView;
 function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
   const { pending, message, run } = useRun();
   const [busy, setBusy] = useState<string | null>(null);
+  /* The day it was really done (owner, 13 Nov 2026): late or early is counted from it, in working days. */
+  const [doneOn, setDoneOn] = useState(tab.today);
+  const cal = useMemo(() => calendarOf(tab.calendar), [tab.calendar]);
+  const counted = !tab.onHold && st.plannedOn && /^\d{4}-\d{2}-\d{2}$/.test(doneOn) ? workingDaysBetween(st.plannedOn, doneOn, cal) : 0;
+  const late = Math.max(0, counted);
+  const early = Math.max(0, -counted);
   return (
     <form
       className="mt-2 flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
@@ -494,18 +505,22 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
     >
       {busy ? <p className="m-0 text-[12.5px] text-[var(--muted)]" role="status">{busy}</p> : null}
       <label className="flex flex-col gap-1 text-[13px]">
+        Done on
+        <input type="date" name="doneOn" value={doneOn} min={addDays(tab.today, -60)} max={tab.today} required onChange={(e) => setDoneOn(e.target.value)} className="fld w-auto" />
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
         {st.needsDocument ? 'The file (required): PDF or image' : 'A file, if there is one'}
         <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required={st.needsDocument} className="text-[13px]" />
       </label>
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
       </label>
-      {st.lateDays > 0 ? (
+      {late > 0 ? (
         // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
         <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
           {/* Whose delay, nothing more (owner, 27 Oct 2026): the client's shows in their app as days waiting on them; ours never does. */}
           <fieldset className="m-0 flex flex-col gap-1 border-0 p-0 text-[13px]">
-            <legend className="mb-1">{st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: whose delay?</legend>
+            <legend className="mb-1">{late === 1 ? '1 working day late' : `${late} working days late`}: whose delay?</legend>
             <label className="flex items-center gap-2">
               <input type="radio" name="reason" value="CLIENT_DELAY" required={st.responsible !== 'CLIENT'} defaultChecked={st.responsible === 'CLIENT'} /> The client&rsquo;s ({tab.customerFirst} sees the days; not counted as ours)
             </label>
@@ -514,7 +529,7 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
             </label>
           </fieldset>
           <p className={`m-0 ${muted}`}>
-            Every step after it, the design&rsquo;s end and handover move {st.lateDays === 1 ? '1 day' : `${st.lateDays} days`} later.
+            Every step after it, the design&rsquo;s end and handover move {late === 1 ? '1 working day' : `${late} working days`} later.
           </p>
           <OnlyYourTeam>
             <label className="flex flex-col gap-1 text-[13px]">
@@ -523,6 +538,11 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
             </label>
           </OnlyYourTeam>
         </div>
+      ) : null}
+      {early > 0 ? (
+        <p className={`m-0 ${muted}`}>
+          {early === 1 ? '1 working day' : `${early} working days`} early: the steps after it, the design&rsquo;s end and handover come forward (never before today).
+        </p>
       ) : null}
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
@@ -1068,5 +1088,46 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
       ) : null}
       <Message m={message} />
     </section>
+  );
+}
+
+/** The final design date (owner, 13 Nov 2026): optional; set, the open steps spread to end on it. Owner and design head. */
+function DesignEndForm({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const [open, setOpen] = useState(false);
+  const [to, setTo] = useState(tab.stage?.plannedEnd ?? tab.today);
+  if (!open) {
+    return (
+      <p className="m-0">
+        <button type="button" className="btn ghost sm" onClick={() => setOpen(true)}>
+          Set final design date
+        </button>
+        <Message m={message} />
+      </p>
+    );
+  }
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => setDesignEndAction(tab.projectId, to), () => setOpen(false));
+      }}
+    >
+      <label className="flex flex-col gap-1 text-[13px]">
+        Final design date
+        <input type="date" value={to} min={tab.today} required onChange={(e) => setTo(e.target.value)} className="fld w-auto" />
+      </label>
+      <p className={`m-0 ${muted}`}>The open steps spread to end on this day by their own days, skipping days off. Handover moves with it. Not counted as anyone&rsquo;s delay.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="btn pri sm" disabled={pending}>
+          Set the date
+        </button>
+        <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      <Message m={message} />
+    </form>
   );
 }
