@@ -317,6 +317,8 @@ export const STUDIO_REASONS = {
   DESIGNER_LEAVE: 'Designer on leave',
   STUDIO_WORKLOAD: 'Too much work at the studio',
   STUDIO_OTHER: 'Our own delay',
+  /* Owner, 13 Nov 2026 (Diwali): "Holidays na, leaves kyun?" A step moved for a holiday: the studio's side, never counted as anyone's delay. */
+  HOLIDAY: 'Holiday',
 } as const;
 
 export type DelayReasonKey = keyof typeof CLIENT_REASONS | keyof typeof STUDIO_REASONS;
@@ -324,6 +326,9 @@ export type DelaySideName = 'CLIENT' | 'STUDIO';
 
 export const isDelayReasonKey = (v: unknown): v is DelayReasonKey => typeof v === 'string' && (v in CLIENT_REASONS || v in STUDIO_REASONS);
 export const sideOfReason = (r: DelayReasonKey): DelaySideName => (r in CLIENT_REASONS ? 'CLIENT' : 'STUDIO');
+/** Reasons filed on the studio's side that are nobody's delay (owner, 13 Nov 2026: a holiday). Left out of "our delay" counts. */
+export const NOT_A_DELAY: ReadonlySet<string> = new Set<DelayReasonKey>(['HOLIDAY']);
+export const countsAsDelay = (r: string): boolean => !NOT_A_DELAY.has(r);
 export const reasonLabel = (r: string): string => (CLIENT_REASONS as Record<string, string>)[r] ?? (STUDIO_REASONS as Record<string, string>)[r] ?? 'Other';
 
 /** What the customer reads for a moved step: plain words, never the studio's note. */
@@ -338,6 +343,7 @@ export const CUSTOMER_REASON: Record<DelayReasonKey, string> = {
   DESIGNER_LEAVE: "The studio's own delay.",
   STUDIO_WORKLOAD: "The studio's own delay.",
   STUDIO_OTHER: "The studio's own delay.",
+  HOLIDAY: 'Holidays.',
 };
 
 export const DELAY_NOTE_MAX = 500;

@@ -86,6 +86,10 @@ export const LABOUR_PATH = '/studio/vendors/labour';
 export const CREW_SETTINGS_PATH = '/studio/settings/trades';
 /** Settings → Crew: the faces site mode taps (`crew.manage`). */
 export const SITE_CREW_PATH = '/studio/settings/crew';
+/** Settings → Holidays (owner, 13 Nov 2026: "One holiday calendar as well"): the owner and the design head. */
+export const HOLIDAYS_PATH = '/studio/settings/holidays';
+/** The team's leave (owner, 13 Nov 2026): under the calendar, so every role opens it. */
+export const LEAVE_PATH = '/studio/calendar/leave';
 /** "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): owner, PM and designer, Max only (under /studio/projects). */
 export const BRING_IN_PATH = '/studio/projects/bring-in';
 /** The owner's "Set up your studio" quiz (studio/setup-quiz.ts). Owner only. */
@@ -104,6 +108,8 @@ export const FULL_SOFTWARE_PATHS: readonly string[] = [
   '/studio/updates',
   DESIGN_HOME,
   DESIGN_STEPS_PATH,
+  /* Holidays move design plans (owner, 13 Nov 2026). */
+  HOLIDAYS_PATH,
   DOCUMENTS_HOME,
   SITE_HOME,
   SITE_CREW_PATH,
@@ -242,6 +248,8 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   if (under(path, CHATS_HOME)) return member.role !== 'SALES' && member.role !== 'ACCOUNTS';
   /* The setup quiz sets the studio's settings up: the owner's alone. */
   if (under(path, SETUP_PATH)) return member.role === 'OWNER';
+  /* Holidays (owner, 13 Nov 2026): the owner and the design head, as for approving a hold (studio-hold/rules.ts `mayApproveHold`). */
+  if (under(path, HOLIDAYS_PATH)) return member.role === 'OWNER' || (member.role === 'DESIGNER' && member.designHead === true);
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME) || calendarForAll(path);
   /* Every other role's home: the launcher, which shows only the apps below. */
   if (path === STUDIO_HOME) return true;

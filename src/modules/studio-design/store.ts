@@ -43,6 +43,7 @@ import {
   lateDays,
   nextStep,
   reasonLabel,
+  countsAsDelay,
   reminderText,
   waitingDays,
   type DesignKind,
@@ -116,7 +117,7 @@ export interface DesignStepView {
   /** Unticked before (owner, 12 Nov 2026): what was ticked, and who unticked it and why. Team only. Oldest first. */
   history: { tickedOn: string; tickedBy: string; note: string | null; file: string | null; untickedOn: string; untickedBy: string; reason: string }[];
   /** Its moves, oldest first. */
-  moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
+  moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string; /** False for a holiday (nobody's delay). */ counted: boolean }[];
   /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
   milestone: boolean;
   /* The design process (owner and design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md). */
@@ -397,6 +398,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
         reason: reasonLabel(d.reason),
         note: d.note,
         at: d.at.toISOString(),
+        counted: countsAsDelay(d.reason),
       })),
       milestone: i.customerMilestone,
       group: i.room,

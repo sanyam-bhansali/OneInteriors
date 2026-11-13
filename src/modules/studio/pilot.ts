@@ -30,6 +30,7 @@ import {
   CREW_SETTINGS_PATH,
   DESIGN_HOME,
   DESIGN_STEPS_PATH,
+  HOLIDAYS_PATH,
   DOCUMENTS_HOME,
   PAYMENTS_HOME,
   SITE_CREW_PATH,
@@ -95,6 +96,8 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   ['/studio/updates', 'projects'],
   [DESIGN_HOME, 'design'],
   [DESIGN_STEPS_PATH, 'design'],
+  /* Holidays move design plans (owner, 13 Nov 2026). */
+  [HOLIDAYS_PATH, 'design'],
   [DOCUMENTS_HOME, 'design'],
   [SITE_HOME, 'site'],
   [SITE_CREW_PATH, 'site'],
