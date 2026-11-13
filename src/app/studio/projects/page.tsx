@@ -13,6 +13,7 @@ import { KpiRow } from '../ui/KpiRow';
 import { projectKpis } from '@/modules/studio/app-kpis';
 import { byDesigner, designerChoices, pickDesigner } from '@/modules/studio/designer-filter';
 import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
+import { maySeeClosing } from '@/modules/studio/expected-closing';
 import './projects.css';
 
 export const metadata: Metadata = {
@@ -97,6 +98,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
       </Link>
     ) : null;
   const lanes = lanesOf(rows);
+  /* Expected closing (owner, 13 Nov 2026: "I have to close 35 projects by December end"): owner, design head, PM. */
+  const closingLink =
+    member && maySeeClosing(member) ? (
+      <Link href="/studio/projects/closing" className="btn ghost" data-testid="expected-closing-link">
+        Expected closing
+      </Link>
+    ) : null;
   /* Delete and restore (owner, 27 Oct 2026; studio/project-delete.ts). */
   const deletedLink = mayDeleteProjects(member) ? (
     <Link href="/studio/projects/deleted" className="btn ghost">
@@ -124,8 +132,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
               : ''}
           </p>
         </div>
-        {startButton || bringInButton || deletedLink ? (
+        {startButton || bringInButton || deletedLink || closingLink ? (
           <div className="hstack">
+            {closingLink}
             {deletedLink}
             {bringInButton}
             {startButton}

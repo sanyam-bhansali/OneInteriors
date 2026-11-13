@@ -134,6 +134,12 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
         </span>
         <span className="flex flex-col items-end gap-1">
           <span className={`chip ${tone}`}>{c.phaseLabel}</span>
+          {/* On-site carcass (owner, 13 Nov 2026): carcass built on site, only shutters from the factory. */}
+          {c.onSiteCarcass ? (
+            <span className="chip warn" title="Carcass built on site, only shutters from the factory" data-testid="life-card-carcass">
+              On-site carcass
+            </span>
+          ) : null}
           {c.lateDays > 0 ? (
             <span className="chip bad">
               <span className="dot" />

@@ -1804,6 +1804,11 @@ model HomeProject {
   /// = not set); and its category, copied from the quotation it was booked on.
   priority           Int?
   category           BudgetTier?
+  /// On-site carcass (owner, 13 Nov 2026: "which projects can we take
+  /// manual?"): the carcass is built on site and only the shutters come from
+  /// the factory, to ease the factory's load. Studio-only; never in a
+  /// customer projection.
+  onSiteCarcass      Boolean            @default(false)
   designChanges      Json?
   siteVisits         HomeSiteVisit[]
   measurements       HomeMeasurement[]

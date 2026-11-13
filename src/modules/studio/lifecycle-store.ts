@@ -66,6 +66,8 @@ export interface BoardCard {
   finalDuePaise: number | null;
   /** Change orders (15 Oct 2026): extra work with the client, approved and not paid, paid and ready to release. */
   extras: { withClient: number; toPay: number; toRelease: number };
+  /** On-site carcass, shutters from the factory (owner, 13 Nov 2026; studio/expected-closing.ts). */
+  onSiteCarcass: boolean;
 }
 
 export interface LifecycleBoard {
@@ -88,6 +90,7 @@ const SELECT = {
   holds: { where: { status: 'ON' }, take: 1, select: { reason: true } },
   priority: true,
   category: true,
+  onSiteCarcass: true,
   id: true,
   phase: true,
   warrantyEndsOn: true,
@@ -202,6 +205,7 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
       toPay: p.changeOrders.filter((c) => c.status === 'APPROVED').length,
       toRelease: p.changeOrders.filter((c) => c.status === 'PAID').length,
     },
+    onSiteCarcass: p.onSiteCarcass,
   };
 }
 
