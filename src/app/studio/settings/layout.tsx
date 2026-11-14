@@ -4,7 +4,7 @@ import { can } from '@/modules/studio/roles';
 import { mayOpen } from '@/modules/studio/surfaces';
 
 /** Every settings tab's address (Tabs.tsx); the door (`mayOpen`) decides which this member gets. */
-const SETTINGS_TAB_HREFS: readonly string[] = ['/studio/settings/team', '/studio/settings', '/studio/settings/pipeline', '/studio/settings/fields', '/studio/settings/crew', '/studio/settings/sources', '/studio/settings/payments', '/studio/settings/design', '/studio/settings/trades'];
+const SETTINGS_TAB_HREFS: readonly string[] = ['/studio/settings/team', '/studio/settings', '/studio/settings/pipeline', '/studio/settings/fields', '/studio/settings/crew', '/studio/settings/sources', '/studio/settings/payments', '/studio/settings/design', '/studio/settings/trades', '/studio/settings/holidays'];
 import '../office-ui.css';
 import './settings.css';
 

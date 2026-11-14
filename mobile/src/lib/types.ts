@@ -201,6 +201,10 @@ export interface Extra {
   /** Additional scope (12 Nov 2026): extra days and the day its payment is due. Older servers omit them. */
   daysRequired?: number | null;
   dueOn?: string | null;
+  /** Additional scope (13 Nov 2026): what it does to the timeline. Older servers omit it. */
+  impact?: { kind: 'MOVES_PROJECT'; days: number } | { kind: 'WITHIN_TIMELINE' } | { kind: 'ITEM_ONLY'; on: string } | null;
+  /** The amounts are what you pay, GST included (no GST line). */
+  inclGst?: boolean;
 }
 
 /** A quotation to sign, or signed. Read and signed on the website's /app/signoff/:id, opened inside the app. */

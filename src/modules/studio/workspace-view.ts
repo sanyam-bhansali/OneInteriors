@@ -71,7 +71,10 @@ export interface WorkspaceInput {
 }
 
 /** Planned vs forecast handover, and the customer's share of the delay (project-rules.ts `overallDelay`); null without a plan. */
-export function overallOf(p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar'>, now: Date): { lateDays: number; customerDays: number } | null {
+export function overallOf(
+  p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar'>,
+  now: Date,
+): { lateDays: number; customerDays: number; plannedHandover: string | null; forecastHandover: string | null; handedOver: boolean } | null {
   if (!p.planStages || p.planStages.length === 0 || p.planStages.some((s) => !s.id || !s.plannedEnd)) return null;
   const o = overallDelay(
     p.planStages.map((s) => ({
@@ -94,7 +97,7 @@ export function overallOf(p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' |
     istDayOf(now),
     calendarOf({ workingDays: p.calendar?.workingDays, holidays: p.calendar?.holidays ?? [] }),
   );
-  return { lateDays: o.lateDays, customerDays: o.customerDays };
+  return { lateDays: o.lateDays, customerDays: o.customerDays, plannedHandover: o.plannedHandover, forecastHandover: o.forecastHandover, handedOver: o.handedOver };
 }
 
 export interface WorkspaceRow {

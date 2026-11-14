@@ -56,7 +56,7 @@ describe('steps from the template', () => {
   it('a dry run says what it would change and writes nothing', async () => {
     const f = fakeDb();
     const lines = await stepsFromTemplate(f.db, { apply: false });
-    expect(lines).toEqual([{ projectId: 'old', oldItems: 3, tickedFromPosts: 1, steps: 44, tickedSteps: 1, written: false }]);
+    expect(lines).toEqual([{ projectId: 'old', oldItems: 3, tickedFromPosts: 1, steps: 45, tickedSteps: 1, written: false }]);
     expect(f.created).toEqual([]);
     expect(f.deleted).toEqual([]);
   });

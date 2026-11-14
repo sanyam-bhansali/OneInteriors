@@ -28,7 +28,7 @@ import 'server-only';
 
 import type { ChangeOrderStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { fromDb, toDb } from '@/lib/money';
+import { formatINR, fromDb, toDb } from '@/lib/money';
 import { notify, notifyStudio } from '@/modules/notify/service';
 import { readSignedStages } from '@/modules/portal/payments';
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
@@ -45,8 +45,14 @@ import {
   extraTotals,
   extrasOpen,
   releaseRefusal,
-  scopePaidDays,
+  checkScopeImpact,
+  checkScopeLines,
+  scopeImpactOf,
+  scopeImpactWords,
+  scopeMoveDays,
+  scopeTitle,
   sizeLabel,
+  type ScopeImpactView,
   STATUS_LABEL,
   TEXT_MAX,
   type ChangeOrderStatusName,
@@ -106,6 +112,8 @@ const ORDER_SELECT = {
   scopeQuoteId: true,
   daysRequired: true,
   dueOn: true,
+  scopeImpact: true,
+  itemDueOn: true,
   lines: { orderBy: { sortOrder: 'asc' }, select: LINE_SELECT },
   events: { orderBy: { at: 'asc' }, select: { fromStatus: true, toStatus: true, actorType: true, text: true, at: true } },
   quoteChanges: { select: { stageIndex: true } },
@@ -387,7 +395,20 @@ export async function releaseExtra(id: string, now = new Date()): Promise<ExtraR
 export async function recordExtraPayment(id: string, input: Omit<RecordInput, 'stageIndex'>, receipt: File | null = null, now = new Date()): Promise<ExtraResult> {
   const o = await prisma.homeChangeOrder.findUnique({
     where: { id: id.slice(0, 64) },
-    select: { id: true, projectId: true, status: true, number: true, title: true, totalPaise: true, scopeQuoteId: true, daysRequired: true, quoteChanges: { select: { stageIndex: true } }, project: { select: { paymentPhases: true } } },
+    select: {
+      id: true,
+      projectId: true,
+      status: true,
+      number: true,
+      title: true,
+      totalPaise: true,
+      scopeQuoteId: true,
+      daysRequired: true,
+      scopeImpact: true,
+      itemDueOn: true,
+      quoteChanges: { select: { stageIndex: true } },
+      project: { select: { paymentPhases: true } },
+    },
   });
   if (!o) return { ok: false, error: 'That extra work is gone.' };
   const staff = await staffOn(o.projectId, 'payment.record');
@@ -402,28 +423,31 @@ export async function recordExtraPayment(id: string, input: Omit<RecordInput, 's
   const paid = extraPaid(fromDb(o.totalPaise), paymentsByOrder(rows).get(o.id) ?? []);
   if (paid.covered && o.status === 'APPROVED') {
     let moved = 0;
+    const impact = scopeImpactOf({ scopeImpact: o.scopeImpact, daysRequired: o.daysRequired, itemDueOn: o.itemDueOn ? dayFromDb(o.itemDueOn) : null, builderScope: o.scopeQuoteId !== null });
     await prisma.$transaction(async (tx) => {
       const ok = await moveOrder(tx, o, 'PAID', staff.actor, now, { paidAt: now });
-      if (ok && o.scopeQuoteId) moved = await scopePaid(tx, { projectId: o.projectId, orderId: o.id, daysRequired: o.daysRequired, label: o.title, byId: staff.userId, actor: staff.actor, now });
+      if (ok && impact) moved = await scopePaid(tx, { projectId: o.projectId, orderId: o.id, impact, label: o.title, byId: staff.userId, actor: staff.actor, now });
     });
-    if (o.scopeQuoteId) return { ok: true, id: r.id, message: `Recorded. The additional scope is paid: the project is off hold${moved > 0 ? ` and the plan moved ${moved} day${moved === 1 ? '' : 's'} later, on the client's side` : ''}.` };
+    if (impact) return { ok: true, id: r.id, message: `Recorded. The additional scope is paid: the project is off hold${moved > 0 ? ` and the plan moved ${moved} day${moved === 1 ? '' : 's'} later, on the client's side` : ''}.` };
     return { ok: true, id: r.id, message: 'Recorded. The extra work is paid: it can be released.' };
   }
   return { ok: true, id: r.id, message: `Recorded. ${paid.openPaise > 0 ? 'Part paid so far.' : ''}`.trim() };
 }
 
 /**
- * Additional scope paid (owner, 12 Nov 2026): its hold ends today and the
- * plan moves later by the days on hold plus the days the work needs, on the
- * client's side. The days moved.
+ * Additional scope paid (owner, 12 Nov 2026; 13 Nov: the whole project holds
+ * for every kind): its hold ends today and the plan moves later by the days
+ * on hold, plus the days the work needs only when it "moves the project", on
+ * the client's side. The days moved.
  */
-async function scopePaid(tx: Tx, input: { projectId: string; orderId: string; daysRequired: number | null; label: string; byId: string; actor: ProjectActor; now: Date }): Promise<number> {
+async function scopePaid(tx: Tx, input: { projectId: string; orderId: string; impact: ScopeImpactView; label: string; byId: string; actor: ProjectActor; now: Date }): Promise<number> {
   const today = istDay(input.now);
   const hold = await tx.homeProjectHold.findFirst({ where: { projectId: input.projectId, changeOrderId: input.orderId, status: 'ON' }, select: { id: true, startedOn: true } });
   const held = hold ? holdDays(hold.startedOn ? dayFromDb(hold.startedOn) : null, today, today) : 0;
-  const days = scopePaidDays(held, input.daysRequired);
+  const days = scopeMoveDays(held, input.impact);
   if (hold) await tx.homeProjectHold.updateMany({ where: { id: hold.id, status: 'ON' }, data: { status: 'ENDED', endedOn: dayToDb(today), endedById: input.byId, shiftedDays: days } });
-  const note = `${input.label}: paid after ${held} day${held === 1 ? '' : 's'} on hold, and ${input.daysRequired ?? 0} day${input.daysRequired === 1 ? '' : 's'} for the work.`;
+  const workDays = input.impact.kind === 'MOVES_PROJECT' ? input.impact.days : 0;
+  const note = `${input.label}: paid after ${held} day${held === 1 ? '' : 's'} on hold${workDays > 0 ? `, and ${workDays} day${workDays === 1 ? '' : 's'} for the work` : ''}.`;
   await shiftPlanForClient(tx, { projectId: input.projectId, days, note, byId: input.byId, actor: input.actor, now: input.now, ref: { changeOrderId: input.orderId } });
   if (hold) await recordEvent(tx, { projectId: input.projectId, type: 'project.hold_ended', actor: input.actor, refId: hold.id, at: input.now, payload: { days, changeOrderId: input.orderId } });
   return days;
@@ -497,6 +521,103 @@ export async function sendAdditionalScope(projectId: string, quoteId: string, ra
   }
 }
 
+export interface SimpleScopeInput {
+  /** `{ item, details?, amount }` rows, 1 to 10: amounts in rupees, GST included. */
+  lines: unknown;
+  /** MOVES_PROJECT | WITHIN_TIMELINE | ITEM_ONLY. */
+  impact: unknown;
+  /** Days the project moves (MOVES_PROJECT). */
+  days?: unknown;
+  /** The day the item comes by, YYYY-MM-DD (ITEM_ONLY). */
+  date?: unknown;
+}
+
+/**
+ * Simple additional scope (owner, 13 Nov 2026): "Just a click: write the
+ * element, write the cost, write the days, send for approval. That's all."
+ * No quotation, no PDF, no discount: each line's amount is what the client
+ * pays, GST included. It goes straight to the client (the studio sees it on
+ * the project page as waiting for them); on their approval it lands on the
+ * project total, is due that day and the whole project holds until it is
+ * paid (`answerExtra`, `recordExtraPayment`). The designer on the project,
+ * the design head, the PM or the owner sends it (`extras.write`).
+ */
+export async function sendSimpleScope(projectId: string, input: SimpleScopeInput, now = new Date()): Promise<ExtraResult> {
+  const staff = await staffOn(projectId, 'extras.write');
+  if (!staff.ok) return staff;
+  const checked = checkScopeLines(input.lines);
+  if (!checked.ok) return checked;
+  const today = istDay(now);
+  const impact = checkScopeImpact({ impact: input.impact, days: input.days, date: input.date }, today);
+  if (!impact.ok) return impact;
+  const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { phase: true, closedOutAt: true, paymentPhases: true, designFinalQuoteId: true } });
+  if (!project) return { ok: false, error: 'That project is gone.' };
+  if (!project.designFinalQuoteId) return { ok: false, error: 'Additional scope opens once the design final quotation is made.' };
+  const open = extrasOpen(project.phase, project.closedOutAt !== null, true);
+  if (!open.ok) return open;
+  if (!readSignedStages(project.paymentPhases)) return { ok: false, error: 'This project has no signed payment plan for the additional scope to land on.' };
+  const i = impact.impact;
+  const totalPaise = checked.totalPaise;
+  try {
+    const sent = await prisma.$transaction(async (tx) => {
+      await lockProject(tx, projectId);
+      const [last, scopes] = await Promise.all([
+        tx.homeChangeOrder.findFirst({ where: { projectId }, orderBy: { number: 'desc' }, select: { number: true } }),
+        tx.homeChangeOrder.count({ where: { projectId, OR: [{ scopeImpact: { not: null } }, { scopeQuoteId: { not: null } }] } }),
+      ]);
+      const title = scopeTitle(scopes);
+      const row = await tx.homeChangeOrder.create({
+        data: {
+          projectId,
+          number: (last?.number ?? 0) + 1,
+          title,
+          // Never a reason text (owner, 13 Nov 2026): the client sees item, details, cost and the impact.
+          reason: null,
+          quoteId: null,
+          scopeImpact: i.kind,
+          daysRequired: i.kind === 'MOVES_PROJECT' ? i.days : 0,
+          itemDueOn: i.kind === 'ITEM_ONLY' ? dayToDb(i.on) : null,
+          dueOn: dayToDb(today),
+          // "No discount on these. One line item costing, take it or leave it." Amounts include GST.
+          discountBps: 0,
+          gstBps: 0,
+          workPaise: toDb(totalPaise),
+          discountPaise: toDb(0),
+          gstPaise: toDb(0),
+          totalPaise: toDb(totalPaise),
+          createdById: staff.userId,
+          lines: {
+            create: checked.lines.map((l, n) => ({
+              productId: null,
+              room: null,
+              product: l.item,
+              details: l.details,
+              code: 'ONSITE' as const,
+              unit: 'UNIT' as const,
+              widthMm: null,
+              heightMm: null,
+              qtyMilli: 1000,
+              ratePaise: toDb(l.amountPaise),
+              amountPaise: toDb(l.amountPaise),
+              sortOrder: n,
+            })),
+          },
+        },
+        select: { id: true, projectId: true, status: true },
+      });
+      await tx.homeChangeOrderEvent.create({ data: { changeOrderId: row.id, fromStatus: null, toStatus: 'DRAFT', actorType: staff.actor.type, actorId: staff.userId, at: now } });
+      await recordEvent(tx, { projectId, type: 'extra.created', actor: staff.actor, refId: row.id, at: now, payload: { lines: checked.lines.length, totalPaise, scope: true, impact: i.kind } });
+      await moveOrder(tx, row, 'SENT_TO_CLIENT', staff.actor, now, { sentAt: now });
+      return { id: row.id, title };
+    });
+    if (staff.customerId) void notify(staff.customerId, { kind: 'extra-work', studio: staff.studioName, title: sent.title, totalPaise });
+    return { ok: true, id: sent.id, message: `Sent for approval: ${sent.title}, ${formatINR(totalPaise)} with GST (“${scopeImpactWords(i)}”). Once approved, it is due that day and the project is on hold until it is paid.` };
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
 // ── The client answers ────────────────────────────────────────
 
 /** The owner of the brief approves or declines an order sent to them. Approving puts its price on the final payment stage. */
@@ -512,6 +633,7 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
       totalPaise: true,
       createdById: true,
       scopeQuoteId: true,
+      scopeImpact: true,
       project: { select: { paymentPhases: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } } } },
     },
   });
@@ -531,9 +653,13 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
   const stages = readSignedStages(o.project.paymentPhases);
   const actor: ProjectActor = { type: 'CUSTOMER', id: userId };
   const totalPaise = fromDb(o.totalPaise);
+  /* Additional scope: the 12 Nov builder-made kind or the 13 Nov simple kind. */
+  const scope = o.scopeQuoteId !== null || o.scopeImpact !== null;
   const moved = await prisma.$transaction(async (tx) => {
     await lockProject(tx, o.projectId);
-    const ok = await moveOrder(tx, o, to, actor, now, { decidedAt: now, decidedById: userId, declineReason: reason }, reason);
+    // Simple scope (owner, 13 Nov 2026): "once the client approves, it shows in Payments as due today".
+    const due = approve && o.scopeImpact !== null ? { dueOn: dayToDb(istDay(now)) } : {};
+    const ok = await moveOrder(tx, o, to, actor, now, { decidedAt: now, decidedById: userId, declineReason: reason, ...due }, reason);
     if (!ok) return false;
     if (approve && stages) {
       const change = await tx.homeQuoteChange.create({
@@ -542,9 +668,9 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
       });
       await recordEvent(tx, { projectId: o.projectId, type: 'quote.changed', actor, refId: change.id, at: now, payload: { changeOrderId: o.id, deltaPaise: totalPaise, stageIndex: stages.length - 1 } });
     }
-    if (o.scopeQuoteId) {
-      await tx.studioQuote.updateMany({ where: { id: o.scopeQuoteId }, data: { status: approve ? 'ACCEPTED' : 'DECLINED' } });
-      // Additional scope (owner, 12 Nov 2026): on hold from the approval until the payment is recorded. Not when a hold is on already.
+    if (scope) {
+      if (o.scopeQuoteId) await tx.studioQuote.updateMany({ where: { id: o.scopeQuoteId }, data: { status: approve ? 'ACCEPTED' : 'DECLINED' } });
+      // Additional scope (owner, 12 Nov 2026; 13 Nov: "yes the whole project on hold", every kind): on hold from the approval until the payment is recorded. Not when a hold is on already.
       if (approve && (await tx.homeProjectHold.count({ where: { projectId: o.projectId, status: { in: ['ASKED', 'ON'] } } })) === 0) {
         const hold = await tx.homeProjectHold.create({
           data: { projectId: o.projectId, status: 'ON', reason: 'ADDITIONAL_SCOPE', askedById: o.createdById, askedAt: now, decidedById: userId, decidedAt: now, startedOn: dayToDb(istDay(now)), changeOrderId: o.id },
@@ -559,7 +685,7 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
   const event = { kind: 'extra-answered', projectId: o.projectId, title: `Extra work ${o.number}: ${o.title}`, approved: approve, totalPaise } as const;
   void notifyStudio(o.project.introduction.studioId, event);
   void notify(o.createdById, event, { email: false });
-  return { ok: true, id: o.id, message: approve ? (o.scopeQuoteId ? 'Approved. The payment is due now; the project restarts once it is paid.' : 'Approved. Pay the studio for it; they start once it is paid.') : 'Declined. The studio has your reason.' };
+  return { ok: true, id: o.id, message: approve ? (scope ? 'Approved. The payment is due now; the project restarts once it is paid.' : 'Approved. Pay the studio for it; they start once it is paid.') : 'Declined. The studio has your reason.' };
 }
 
 // ── What the studio reads ─────────────────────────────────────
@@ -597,8 +723,13 @@ export interface StudioExtra {
   releasedOn: string | null;
   photoUrl: string | null;
   history: { from: string | null; to: string; by: string; text: string | null; on: string }[];
-  /** Additional scope (owner, 12 Nov 2026): its quotation, the extra days, the day its payment is due. Null on ordinary extra work. */
-  scope: { quoteId: string; daysRequired: number; dueOn: string | null } | null;
+  /**
+   * Additional scope (owner, 12 Nov 2026): its quotation (the 12 Nov builder
+   * kind; null for the 13 Nov simple kind), the extra days, the day its
+   * payment is due, and what it does to the timeline. Null on ordinary extra
+   * work. `inclGst`: the simple kind's amounts include GST (no GST line).
+   */
+  scope: { quoteId: string | null; daysRequired: number; dueOn: string | null; impact: ScopeImpactView; inclGst: boolean } | null;
   /** For the lines editor: the raw lines of a draft. */
   draftLines: { productId: string | null; room: string | null; description: string; widthMm: number | null; heightMm: number | null; qty: string | null; amount: string | null; code: WorkCodeName }[];
 }
@@ -622,6 +753,7 @@ const ACTOR_WORD: Record<string, string> = { CUSTOMER: 'Client', STUDIO: 'Studio
 
 function toStudioExtra(o: OrderRow, rows: Map<string, { amountPaise: number; status: 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced'; receivedOn: string }[]>, photoUrl: string | null): StudioExtra {
   const totalPaise = fromDb(o.totalPaise);
+  const impact = scopeImpactOf({ scopeImpact: o.scopeImpact, daysRequired: o.daysRequired, itemDueOn: o.itemDueOn ? dayFromDb(o.itemDueOn) : null, builderScope: o.scopeQuoteId !== null });
   return {
     id: o.id,
     number: o.number,
@@ -649,7 +781,7 @@ function toStudioExtra(o: OrderRow, rows: Map<string, { amountPaise: number; sta
     sentOn: o.sentAt ? istDay(o.sentAt) : null,
     decidedOn: o.decidedAt ? istDay(o.decidedAt) : null,
     declineReason: o.declineReason,
-    scope: o.scopeQuoteId ? { quoteId: o.scopeQuoteId, daysRequired: o.daysRequired ?? 0, dueOn: o.dueOn ? dayFromDb(o.dueOn) : null } : null,
+    scope: impact ? { quoteId: o.scopeQuoteId, daysRequired: o.daysRequired ?? 0, dueOn: o.dueOn ? dayFromDb(o.dueOn) : null, impact, inclGst: o.scopeImpact !== null } : null,
     paidOn: o.paidAt ? istDay(o.paidAt) : null,
     releasedOn: o.releasedAt ? istDay(o.releasedAt) : null,
     photoUrl,
@@ -746,6 +878,8 @@ export interface ExtraToCollect {
   status: ChangeOrderStatusName;
   totalPaise: number;
   paid: ExtraPaid;
+  /** Additional scope (owner, 13 Nov 2026): "shows in Payments as due today". Null on ordinary extra work. */
+  scopeDueOn: string | null;
 }
 
 /**
@@ -760,7 +894,7 @@ export async function extrasToCollect(projectIds: readonly string[]): Promise<Ma
   const orders = await prisma.homeChangeOrder.findMany({
     where: { projectId: { in: [...projectIds] }, status: { in: ['APPROVED', 'PAID'] } },
     orderBy: { number: 'asc' },
-    select: { id: true, projectId: true, number: true, title: true, status: true, totalPaise: true },
+    select: { id: true, projectId: true, number: true, title: true, status: true, totalPaise: true, dueOn: true, scopeQuoteId: true, scopeImpact: true },
   });
   if (!orders.length) return out;
   const rows = await prisma.homeProjectPayment.findMany({ where: { projectId: { in: [...new Set(orders.map((o) => o.projectId))] } }, select: { ...PAY_SELECT, projectId: true } });
@@ -771,7 +905,7 @@ export async function extrasToCollect(projectIds: readonly string[]): Promise<Ma
   for (const o of orders) {
     const paid = extraPaid(fromDb(o.totalPaise), paidBy.get(o.projectId)?.get(o.id) ?? []);
     if (o.status === 'PAID' && paid.covered) continue;
-    out.set(o.projectId, [...(out.get(o.projectId) ?? []), { id: o.id, projectId: o.projectId, number: o.number, title: o.title, status: o.status, totalPaise: fromDb(o.totalPaise), paid }]);
+    out.set(o.projectId, [...(out.get(o.projectId) ?? []), { id: o.id, projectId: o.projectId, number: o.number, title: o.title, status: o.status, totalPaise: fromDb(o.totalPaise), paid, scopeDueOn: (o.scopeQuoteId !== null || o.scopeImpact !== null) && o.dueOn ? dayFromDb(o.dueOn) : null }]);
   }
   return out;
 }

@@ -106,7 +106,7 @@ describe('the plan backfill', () => {
 
     const signed = f.stages.filter((s) => s.projectId === 'signed');
     expect(signed.map((s) => s.kind)).toEqual(['DESIGN', 'CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER']);
-    expect(signed.find((s) => s.kind === 'CARPENTRY')!.items.create).toHaveLength(22); // Hauspire's steps, not the quote's lines
+    expect(signed.find((s) => s.kind === 'CARPENTRY')!.items.create).toHaveLength(23); // Hauspire's steps, not the quote's lines
     expect(signed.map((s) => s.actualEnd !== null)).toEqual([true, false, false, false, false]);
     expect(f.materials.map((m) => [m.projectId, m.item])).toEqual([
       ['signed', 'Base cabinets'],
@@ -115,7 +115,7 @@ describe('the plan backfill', () => {
 
     const byOps = f.stages.filter((s) => s.projectId === 'by-ops');
     expect(byOps.map((s) => s.actualEnd !== null)).toEqual([true, true, false, false, false]);
-    expect(byOps.map((s) => s.items.create.length)).toEqual([1, 8, 22, 6, 7]);
+    expect(byOps.map((s) => s.items.create.length)).toEqual([1, 8, 23, 6, 7]);
     expect(byOps[1]!.items.create.every((i) => i.doneAt?.getTime() === byOps[1]!.actualEnd!.getTime())).toBe(true);
     expect(byOps[2]!.items.create.every((i) => !i.doneAt)).toBe(true);
   });

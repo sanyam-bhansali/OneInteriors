@@ -98,7 +98,7 @@ import { effectivePhase, isPhase } from '@/modules/project/lifecycle-rules';
 import { windowFromLedger } from '@/modules/project/snag-window';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { customerLifecycle, type CustomerLifecycle } from './lifecycle-view';
-import { toCustomerExtra, type CustomerExtra, type ChangeOrderStatusName } from '@/modules/project/change-order-rules';
+import { scopeImpactOf, toCustomerExtra, type CustomerExtra, type ChangeOrderStatusName } from '@/modules/project/change-order-rules';
 import { toCustomerSignoff, type CustomerSignoff } from '@/modules/project/signoff-rules';
 import { fromDb } from '@/lib/money';
 
@@ -344,6 +344,9 @@ export const CUSTOMER_PROJECT_SELECT = {
       declineReason: true,
       daysRequired: true,
       dueOn: true,
+      /* Simple additional scope (owner, 13 Nov 2026): what it does to the timeline. */
+      scopeImpact: true,
+      itemDueOn: true,
       photoDocumentId: true,
       lines: { orderBy: { sortOrder: 'asc' }, select: { product: true, room: true, details: true, unit: true, widthMm: true, heightMm: true, qtyMilli: true, productId: true, amountPaise: true } },
     },
@@ -451,6 +454,9 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
           declineReason: c.declineReason,
           daysRequired: c.daysRequired,
           dueOn: c.dueOn ? dayFromDb(c.dueOn) : null,
+          /* The 12 Nov builder-made scope has a due day and no impact stored: it moved the plan by its days. */
+          impact: scopeImpactOf({ scopeImpact: c.scopeImpact, daysRequired: c.daysRequired, itemDueOn: c.itemDueOn ? dayFromDb(c.itemDueOn) : null, builderScope: c.dueOn !== null }),
+          inclGst: c.scopeImpact !== null,
           lines: c.lines.map((l) => ({ ...l, amountPaise: fromDb(l.amountPaise) })),
           payments: (p.payments ?? [])
             .filter((r) => r.changeOrderId === c.id)

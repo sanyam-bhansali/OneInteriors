@@ -43,8 +43,16 @@ export const isDocType = (v: unknown): v is DocType => typeof v === 'string' && 
 /** The types offered when uploading, in the order of the work. */
 export const OFFERED_TYPES: readonly DocType[] = (Object.keys(DOC_TYPES) as DocType[]).filter((k) => DOC_TYPES[k].offered);
 
-/** The handover pack needs a final of each of these (DESIGN-PROCESS-PLAN.md §3.5). */
-export const HANDOVER_REQUIRED: readonly DocType[] = ['WORKING', 'ELECTRICAL', 'MATERIAL_LIST', 'CUT_LIST'];
+/**
+ * The handover pack needs a final of each of these (DESIGN-PROCESS-PLAN.md §3.5). Owner, 13 Nov 2026: only the
+ * material list and the cut list are needed there, not site photos (working and electrical drawings were required
+ * until then; they are still uploaded, approved and marked final as before, and go in the pack when marked).
+ */
+export const HANDOVER_REQUIRED: readonly DocType[] = ['MATERIAL_LIST', 'CUT_LIST'];
+/** Uploadable, but not part of the handover pack (owner, 13 Nov 2026): site photos. */
+export const NOT_IN_HANDOVER: readonly DocType[] = ['SITE_PHOTO'];
+/** Does a marked final go in the handover pack? */
+export const inHandoverPack = (type: DocType): boolean => !NOT_IN_HANDOVER.includes(type);
 
 // ── Version numbers ───────────────────────────────────────────
 

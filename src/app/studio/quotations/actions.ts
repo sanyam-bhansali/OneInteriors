@@ -26,6 +26,7 @@ import type { PlanJobStatus, PlanJobView } from '@/modules/studio-quote/from-pla
 import { addProduct } from '@/modules/studio-quote/store';
 import { rupeesToPaise } from '@/lib/money';
 import { addClient } from '@/modules/studio-practice/clients';
+import { asQuoteCategory, CATEGORY_ERRORS } from '@/modules/studio-quote/category-rules';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -66,6 +67,10 @@ function refresh(quoteId?: string) {
 export async function createQuoteAction(_prev: State, form: FormData): Promise<State> {
   const carpet = Number(str(form, 'carpetSqft'));
   const config = str(form, 'config');
+  /* Essential, Premium or Luxe first (owner, 13 Nov 2026: "If it is not there, you cannot make a quotation"),
+     before a lead is added, so a refused form adds nothing. */
+  const category = asQuoteCategory(str(form, 'category'));
+  if (!category) return { ok: false, error: CATEGORY_ERRORS.pick };
 
   /* The lead it is for (Studio OS Phase 1): one picked on the screen, or —
      when "add them to my leads" is ticked — a new one made now. A phone
@@ -96,6 +101,8 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
     config,
     carpetSqft: Number.isFinite(carpet) && carpet > 0 ? Math.round(carpet) : undefined,
     clientId,
+    category,
+    categoryRequired: true,
   });
 
   if (!result.ok) return result;

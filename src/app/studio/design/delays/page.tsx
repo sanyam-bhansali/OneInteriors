@@ -27,10 +27,11 @@ export default async function DelaysPage() {
     );
   }
   /* The client's delays are not ours (owner, 12 Nov 2026): our delays are the list; the client's sit apart, uncounted, still there to check. */
+  /* A holiday's move (owner, 13 Nov 2026) is nobody's delay: listed with ours, never counted. */
   const ours = view.rows.filter((r) => r.side === 'STUDIO');
   const theirs = view.rows.filter((r) => r.side === 'CLIENT');
   const client = theirs.reduce((a, r) => a + r.days, 0);
-  const studio = ours.reduce((a, r) => a + r.days, 0);
+  const studio = ours.filter((r) => r.counted).reduce((a, r) => a + r.days, 0);
   return (
     <div className="content oi-proj">
       <div className="phead">
@@ -120,7 +121,7 @@ function DelayTable({ rows, canCheck, label }: { rows: DelayRow[]; canCheck: boo
                     </div>
                   </td>
                   <td className="px-2 py-2">
-                    <span className={`chip ${r.side === 'CLIENT' ? 'warn' : 'bad'}`}>{r.side === 'CLIENT' ? 'Client' : 'Ours'}</span>
+                    <span className={`chip ${r.side === 'CLIENT' ? 'warn' : r.counted ? 'bad' : ''}`}>{r.side === 'CLIENT' ? 'Client' : r.counted ? 'Ours' : 'Nobody'}</span>
                   </td>
                   <td className="px-2 py-2">
                     {r.reason}

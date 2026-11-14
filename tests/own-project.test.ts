@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CATEGORY_ERRORS } from '@/modules/studio-quote/category-rules';
 
 /**
  * "Start a project" for a studio's OWN client (owner, 11 Oct 2026;
@@ -154,6 +155,8 @@ function ownQuote(over: Record<string, unknown> = {}) {
     id: 'q1',
     number: 'TL-2026-031',
     status: 'ACCEPTED',
+    category: 'PREMIUM',
+    scopeForProjectId: null,
     introductionId: null,
     briefId: null,
     clientName: 'Meera Joshi',
@@ -333,6 +336,12 @@ describe('startOwnProject: the quotation', () => {
     db.state.quote = ownQuote();
     db.state.started = { id: 'hp0' };
     expect(await startOwnProject(member('OWNER'), input(), NOW)).toEqual({ ok: false, error: OWN_QUOTE_ERRORS.started });
+    expect(db.client.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('needs Essential, Premium or Luxe on the quotation (owner, 13 Nov 2026)', async () => {
+    db.state.quote = ownQuote({ category: null });
+    expect(await startOwnProject(member('OWNER'), input(), NOW)).toEqual({ ok: false, error: CATEGORY_ERRORS.missing });
     expect(db.client.$transaction).not.toHaveBeenCalled();
   });
 });

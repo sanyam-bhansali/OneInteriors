@@ -36,6 +36,7 @@ import { leadFileExists, leadUploadTicket, signedLeadFileLinks } from '@/modules
 import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
 import { checkSalesNotes, voiceExtOf } from './revision-rules';
 import { photoGate } from '@/modules/items/server';
+import { categoryRefusal } from '@/modules/studio-quote/category-rules';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -274,9 +275,12 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   const studioId = scope.studioId;
   const q = await prisma.studioQuote.findFirst({
     where: { ...scope.quotes, id: quoteId, studioId },
-    select: { id: true, status: true, clientId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
+    select: { id: true, status: true, clientId: true, category: true, scopeForProjectId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  /* No new revision without Essential, Premium or Luxe (owner, 13 Nov 2026). */
+  const noCategory = categoryRefusal(q);
+  if (noCategory) return { ok: false, error: noCategory };
   /* Quotation requests (owner, 22 Oct 2026): the builder a request on this lead was handed to sends it too. */
   const requestedOfMe = scope.requested !== null && q.clientId !== null && (await prisma.studioClient.findFirst({ where: { AND: [scope.requested], id: q.clientId }, select: { id: true } })) !== null;
   if (!mayOnLead(scope, 'quote.write', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null, requestedOfMe })) return { ok: false, error: 'That quotation is not yours.' };
@@ -361,6 +365,8 @@ export async function markSalesFinal(
       id: true,
       number: true,
       stage: true,
+      category: true,
+      scopeForProjectId: true,
       clientId: true,
       briefId: true,
       introductionId: true,
@@ -385,6 +391,9 @@ export async function markSalesFinal(
     alreadyMarked: q.salesFinalRevision?.n === n,
   });
   if (refusal || !revision) return { ok: false, error: refusal ?? 'That revision is not on this quotation.' };
+  /* The sales final sets the design length through its category (owner, 13 Nov 2026). */
+  const noCategory = categoryRefusal(q);
+  if (noCategory) return { ok: false, error: noCategory };
   /* The revision the client signs against: every line on it needs a photo (owner, 10 Nov 2026). */
   const noPhoto = await photoGate({ studioId, lines: readRevisionLines(revision.lines) }, 'final');
   if (noPhoto) return { ok: false, error: noPhoto };

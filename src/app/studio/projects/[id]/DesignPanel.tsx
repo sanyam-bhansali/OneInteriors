@@ -294,7 +294,11 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         {st.moves.map((m, k) => (
           <span key={`mv-${k}`} className={`block ${muted}`} data-testid="step-delay">
             {st.done && k === st.moves.length - 1 && st.doneOn === m.to ? 'Ticked late' : 'Moved'} {dayWords(m.from)} → {dayWords(m.to)} ·{' '}
-            <span className={m.side === 'CLIENT' ? 'text-[var(--warn)]' : 'text-[var(--bad)]'}>{m.side === 'CLIENT' ? "client's delay" : 'our delay'}</span>
+            {m.counted ? (
+              <span className={m.side === 'CLIENT' ? 'text-[var(--warn)]' : 'text-[var(--bad)]'}>{m.side === 'CLIENT' ? "client's delay" : 'our delay'}</span>
+            ) : (
+              <span>nobody&rsquo;s delay</span>
+            )}
             {m.reason && !/^(client delay|our delay)$/i.test(m.reason) ? ` · ${m.reason.toLowerCase()}` : ''}
             {m.note ? ` · note: “${m.note}”` : ''}
           </span>
@@ -620,6 +624,10 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name="moveReason" value="STUDIO_DELAY" checked={reason === 'STUDIO_DELAY'} onChange={() => setReason('STUDIO_DELAY')} /> Ours
+          </label>
+          {/* Owner, 13 Nov 2026 (Diwali): "Holidays na, leaves kyun?" A holiday is nobody's delay. */}
+          <label className="flex items-center gap-2">
+            <input type="radio" name="moveReason" value="HOLIDAY" checked={reason === 'HOLIDAY'} onChange={() => setReason('HOLIDAY')} /> A holiday (nobody&rsquo;s delay)
           </label>
         </fieldset>
       </div>

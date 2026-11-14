@@ -203,7 +203,7 @@ describe('quoteToPlan', () => {
 
   it('builds the same steps from an empty quote', () => {
     const p = quoteToPlan({ lines: [], startOn: START, totalDays: 30, contractPaise: 0, stages: [] });
-    expect(p.stages.map((s) => s.items.length)).toEqual([HAUSPIRE_DESIGN.length, 8, 22, 6, 7]);
+    expect(p.stages.map((s) => s.items.length)).toEqual([HAUSPIRE_DESIGN.length, 8, 23, 6, 7]);
     expect(p.materials).toEqual([]);
     expect(p.payments).toEqual([]);
   });

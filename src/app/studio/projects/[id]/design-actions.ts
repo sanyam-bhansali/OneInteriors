@@ -172,16 +172,20 @@ export async function addDesignStepBelowAction(input: { projectId: string; after
 }
 
 /** Records a project document the browser put straight into storage (DESIGN-PROCESS-PLAN.md §3.6); its version follows the type and room. */
-export async function uploadDocumentAction(input: { projectId: string; kind: string; room: string; share: boolean; path: string; name: string; bytes: number }): Promise<DesignResult> {
+export async function uploadDocumentAction(input: { projectId: string; kind: string; room: string; share: boolean; final?: boolean; path: string; name: string; bytes: number }): Promise<DesignResult> {
   const projectId = id(input.projectId);
-  return done(
-    projectId,
-    await uploadDrawing(projectId, { kind: text(input.kind, 30), room: text(input.room, 80), share: input.share === true }, null, new Date(), {
-      path: text(input.path, 200),
-      name: text(input.name, 200),
-      bytes: Number(input.bytes),
-    }),
-  );
+  const now = new Date();
+  const r = await uploadDrawing(projectId, { kind: text(input.kind, 30), room: text(input.room, 80), share: input.share === true }, null, now, {
+    path: text(input.path, 200),
+    name: text(input.name, 200),
+    bytes: Number(input.bytes),
+  });
+  /* "Mark it final" on upload (owner, 13 Nov 2026: every file had to be marked final one by one): the same mark as the button. */
+  if (r.ok && input.final === true && r.id) {
+    const marked = await markDocumentFinal(projectId, r.id, true, now);
+    return done(projectId, marked.ok ? { ok: true, id: r.id, message: `${r.message} ${marked.message}` } : { ok: true, id: r.id, message: `${r.message} It is not marked final: ${marked.error}` });
+  }
+  return done(projectId, r);
 }
 
 export async function setProjectPriorityAction(projectId: string, stars: number | null): Promise<DesignResult> {

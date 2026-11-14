@@ -898,6 +898,8 @@ model Studio {
   /// days off that are not reminder days.
   crew     StudioCrewMember[]
   holidays StudioHoliday[]
+  /// The team's leave (owner, 13 Nov 2026: "a calendar-based leave approval system").
+  leaves   StudioLeave[]
 
   /// Past quotations the studio sent us, for deriving their rate card.
   quotationArchives QuotationArchive[]
@@ -998,6 +1000,9 @@ model StudioMember {
 
   /// Snags the PM gave this person to fix (Phase 4).
   assignedSnags HomeSnag[]
+
+  /// Their leave (owner, 13 Nov 2026). Cascade with the member.
+  leaves StudioLeave[]
 
   /// Everything this person is working. See `StudioClient.assignedTo`.
   clients StudioClient[] @relation("StudioClientAssignee")
@@ -1159,6 +1164,44 @@ model StudioHoliday {
 
   @@unique([studioId, day])
   @@map("studio_holidays")
+}
+
+
+/// A team member's leave (owner, 13 Nov 2026: "a calendar-based leave
+/// approval system, where people put their planned or unplanned leaves,
+/// based on approval. It should impact the projects on which they are
+/// working. Only in design; execution won't be hampered."). Anyone at the
+/// studio asks for their own; the owner or the design head approves or
+/// declines (studio-hold/rules.ts `mayApproveHold`). On approval the open
+/// design steps of the projects the member is the designer on move later
+/// by the studio's working days inside the leave (studio-leave/).
+model StudioLeave {
+  id          String       @id @default(cuid())
+  studioId    String
+  studio      Studio       @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// IST days, both inside the leave.
+  fromDay     DateTime     @db.Date
+  toDay       DateTime     @db.Date
+  /// PLANNED | UNPLANNED (studio-leave/rules.ts).
+  kind        String
+  /// Short, the team's words. Seen by the member and the approvers only.
+  reason      String
+  /// ASKED | APPROVED | DECLINED | WITHDRAWN.
+  status      String       @default("ASKED")
+  /// The user who asked (the member, or an approver entering it for them).
+  askedById   String
+  askedAt     DateTime     @default(now())
+  decidedById String?
+  decidedAt   DateTime?
+  /// On approval: working days the plans moved, and how many projects.
+  shiftedDays     Int?
+  shiftedProjects Int?
+
+  @@index([studioId, fromDay])
+  @@index([memberId, fromDay])
+  @@map("studio_leaves")
 }
 
 // Every verification item is a row with a source and a date, because the
@@ -1804,6 +1847,11 @@ model HomeProject {
   /// = not set); and its category, copied from the quotation it was booked on.
   priority           Int?
   category           BudgetTier?
+  /// On-site carcass (owner, 13 Nov 2026: "which projects can we take
+  /// manual?"): the carcass is built on site and only the shutters come from
+  /// the factory, to ease the factory's load. Studio-only; never in a
+  /// customer projection.
+  onSiteCarcass      Boolean            @default(false)
   designChanges      Json?
   siteVisits         HomeSiteVisit[]
   measurements       HomeMeasurement[]
@@ -1968,6 +2016,15 @@ model HomeChangeOrder {
   scopeQuoteId    String?
   daysRequired    Int?
   dueOn           DateTime?         @db.Date
+  /// Simple additional scope (owner, 13 Nov 2026): "just a click: write the
+  /// element, write the cost, write the days, send for approval". Set on
+  /// scope sent from the project page (no quotation behind it); null on
+  /// ordinary extra work and on the 12 Nov builder-made scope (read as
+  /// MOVES_PROJECT by its daysRequired). MOVES_PROJECT moves the plan by
+  /// daysRequired once paid; WITHIN_TIMELINE moves nothing; ITEM_ONLY gives
+  /// the item its own date (itemDueOn) and moves nothing.
+  scopeImpact     ScopeImpact?
+  itemDueOn       DateTime?         @db.Date
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -1989,6 +2046,13 @@ enum ChangeOrderStatus {
   PAID
   RELEASED
   CANCELLED
+}
+
+/// What an additional scope does to the timeline (owner, 13 Nov 2026).
+enum ScopeImpact {
+  MOVES_PROJECT
+  WITHIN_TIMELINE
+  ITEM_ONLY
 }
 
 /// One line of a change order: from the product master (sized like the
