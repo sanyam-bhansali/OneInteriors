@@ -71,8 +71,9 @@ export default async function ComparePage({
     const pair = await quotesToCompare(id, withId);
     if (!pair) notFound();
     const { base, current } = pair;
-    left = base.number;
-    right = current.number;
+    /* Sales Final and Design Final, not the quotation numbers (owner, 14 Nov 2026); the numbers when both are one stage. */
+    left = base.stage !== current.stage ? STAGE_LABELS[base.stage] : base.number;
+    right = base.stage !== current.stage ? STAGE_LABELS[current.stage] : current.number;
     title = `${current.clientName} — ${STAGE_LABELS[base.stage]} vs ${STAGE_LABELS[current.stage]}`;
     wasLines = base.lines;
     nowLines = current.lines;
@@ -80,14 +81,6 @@ export default async function ComparePage({
     now = totalsFor(current);
   }
 
-  const money = (paise: number) => (paise < 0 ? `− ${formatINR(-paise)}` : formatINR(paise));
-  const rows: [string, number, number][] = [
-    ['Work, all lines', was.workPaise, now.workPaise],
-    ['Professional fee', was.feePaise, now.feePaise],
-    ['Discounts', -(was.discountPaise + was.onSpotPaise), -(now.discountPaise + now.onSpotPaise)],
-    ...(was.gstPaise > 0 || now.gstPaise > 0 ? ([['GST', was.gstPaise, now.gstPaise]] as [string, number, number][]) : []),
-    ['Total', was.totalPaise, now.totalPaise],
-  ];
 
   /* The same opening pages and styling as the quotation PDF (owner, 13 Oct
      2026): the studio's brand pages, or the drawn cover, then this page's
@@ -141,38 +134,6 @@ export default async function ComparePage({
               </div>
             </div>
           ) : null}
-
-          <table className="qd-tbl qd-keep">
-            <colgroup>
-              <col style={{ width: '34%' }} />
-              <col />
-              <col />
-              <col />
-            </colgroup>
-            <thead>
-              <tr className="qd-band">
-                <th colSpan={4}>
-                  Final (Original vs Revised) · {left} → {right}
-                </th>
-              </tr>
-              <tr className="qd-cols">
-                <th style={{ width: '34%' }}>Figure</th>
-                <th className="r">{left}</th>
-                <th className="r">{right}</th>
-                <th className="r">Difference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([label, a, b]) => (
-                <tr key={label} className={label === 'Total' ? 'qd-sub' : undefined}>
-                  <td>{label}</td>
-                  <td className="r">{money(a)}</td>
-                  <td className="r">{money(b)}</td>
-                  <td className="r">{b - a === 0 ? '—' : `${b - a > 0 ? '+' : '−'} ${formatINR(Math.abs(b - a))}`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
           <p className="qd-note">
             {counts.added + counts.changed + counts.removed === 0
@@ -293,6 +254,7 @@ export default async function ComparePage({
               onSpotLabel={current.onSpotLabel}
               schedule={ctx.schedule}
               spec={ctx.spec}
+              compare={{ initialLabel: left, initialPaise: was.totalPaise, finalLabel: right, finalPaise: now.totalPaise }}
             />
           ) : null}
 
