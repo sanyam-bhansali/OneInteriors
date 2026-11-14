@@ -17,11 +17,12 @@ import { assignNewProjectAction } from './new-project-actions';
 export function NewProjects({ data }: { data: NewProjectsData }) {
   if (data.projects.length === 0) return null;
   return (
-    <section className="card" aria-label="New projects" data-testid="new-projects" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderColor: 'var(--warn)' }}>
+    <section className="card" aria-label="Waiting for your approval" data-testid="new-projects" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderColor: 'var(--warn)' }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 17 }}>New projects</h2>
+        {/* Owner, 14 Nov 2026: "on top of admin and design heads page as an approval: they approve and assign the designer". */}
+        <h2 style={{ margin: 0, fontSize: 17 }}>Waiting for your approval</h2>
         <p className="muted sm" style={{ margin: '4px 0 0' }}>
-          {newProjectsLine(data.projects.length)}. Pick who designs each one; they can open it straight away.
+          {newProjectsLine(data.projects.length)}, converted by sales. Check the quotation and the handover, then approve by picking who designs it.
         </p>
       </div>
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' }}>
@@ -92,7 +93,7 @@ function Row({ p, designers }: { p: NewProjectCard; designers: NewProjectsData['
               })
             }
           >
-            {pending ? 'Assigning…' : 'Assign designer'}
+            {pending ? 'Approving…' : 'Approve & assign'}
           </button>
         </div>
       )}

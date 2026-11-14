@@ -86,10 +86,10 @@ export const SALES_NOTES_MAX = 3000;
  * wants, the budget, what was promised. Empty keeps the notes already there
  * (changing the payment stages of the same sales final).
  */
-export function checkSalesNotes(raw: unknown, existing: string | null): { ok: true; notes: string } | { ok: false; error: string } {
+export function checkSalesNotes(raw: unknown, existing: string | null, min: number = SALES_NOTES_MIN): { ok: true; notes: string } | { ok: false; error: string } {
   const text = typeof raw === 'string' ? raw.replace(/\r\n/g, '\n').trim() : '';
   const notes = text || (existing ?? '').trim();
-  if (notes.length < SALES_NOTES_MIN) return { ok: false, error: 'Write the notes for the design team: what the client wants, the budget, what was promised.' };
+  if (notes.length < Math.max(1, min)) return { ok: false, error: 'Write the notes for the design team: what the client wants, the budget, what was promised.' };
   if (notes.length > SALES_NOTES_MAX) return { ok: false, error: `Keep the notes under ${SALES_NOTES_MAX} characters.` };
   return { ok: true, notes };
 }

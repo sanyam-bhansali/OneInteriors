@@ -93,10 +93,11 @@ describe('the photo rule', () => {
     expect(msg).toMatch(/Vanity/);
     expect(photoRefusal([{ product: 'X', item: null }], 'final')).toMatch(/sales final/);
   });
-  it('is on unless switched off on purpose', () => {
-    expect(photosRequired({})).toBe(true);
-    expect(photosRequired({ ITEM_PHOTOS_OPTIONAL: '0' })).toBe(true);
-    expect(photosRequired({ ITEM_PHOTOS_OPTIONAL: '1' })).toBe(false);
+  it('is off unless switched on (owner, 14 Nov 2026: studios send without photos; One Interiors adds them)', () => {
+    expect(photosRequired({})).toBe(false);
+    expect(photosRequired({ ITEM_PHOTOS_OPTIONAL: '0' })).toBe(false);
+    expect(photosRequired({ ITEM_PHOTOS_REQUIRED: '0' })).toBe(false);
+    expect(photosRequired({ ITEM_PHOTOS_REQUIRED: '1' })).toBe(true);
   });
 });
 

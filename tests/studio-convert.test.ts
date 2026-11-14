@@ -67,6 +67,12 @@ describe('source guards', () => {
     expect(src).toMatch(/leadChecked: true/);
     expect(read('src/modules/project/own-project.ts')).toMatch(/if \(!opts\.leadChecked && !can\(/);
   });
+  it('any revision can be picked: put back, then marked sales final with the handover as notes (owner, 14 Nov 2026)', () => {
+    const src = read('src/modules/studio-sales/convert.ts');
+    expect(src).toMatch(/restoreRevision\(tx/);
+    expect(src).toMatch(/markSalesFinal\(first\.id, n, stages, \{ notes: handover\.value, fromConvert: true \}\)/);
+    expect(src.indexOf('restoreRevision(tx')).toBeLessThan(src.indexOf('markSalesFinal(first.id'));
+  });
   it('convert writes no payment (accounts records the advance later)', () => {
     expect(read('src/modules/studio-sales/convert.ts')).not.toMatch(/homeProjectPayment\.create/);
   });

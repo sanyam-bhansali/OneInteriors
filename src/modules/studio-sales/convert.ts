@@ -30,28 +30,40 @@ import { startOwnProject, istToday } from '@/modules/project/own-project';
 import { recordEvent } from '@/modules/project/events';
 import { record } from '@/modules/studio-practice/events';
 import { notify, notifyStudio } from '@/modules/notify/service';
-import { revisionLabel } from './revision-rules';
+import { readRevisionLines, readRevisionTerms, revisionLabel } from './revision-rules';
+import { QUOTE_FOR_REVISION, markSalesFinal, restoreRevision, sameAsRevision } from './revisions';
 import { readStages, scheduleAmounts, templateOrDefault } from './payment-template';
 import { queueConversions } from './conversions';
 import { bookingRefusal } from './booking-rules';
 import { BOOKING_QUOTE, factsFor, firstWonStage } from './booking';
 import { checkHandover } from './convert-rules';
 
-export interface ConvertChoice {
+export interface ConvertRevision {
+  n: number;
+  label: string;
+  totalPaise: number;
+  /** "12 Nov", when it was sent. */
+  sentLabel: string;
+  isSalesFinal: boolean;
+}
+
+export interface ConvertQuote {
   quoteId: string;
   number: string;
-  revision: string;
-  totalPaise: number;
-  /** Why this quotation cannot be converted on, if it cannot. */
+  /** Every revision sent, oldest first, with its final value. */
+  revisions: ConvertRevision[];
+  /** Why no revision of this quotation can be picked, if none can. */
   blocked: string | null;
 }
 
 export interface ConvertScreen {
   name: string;
-  quotes: ConvertChoice[];
-  /** The notes written with the sales final, to start the handover from. */
+  quotes: ConvertQuote[];
+  /** What is picked when the dialog opens: the sales final if there is one, else the newest revision. */
+  picked: { quoteId: string; n: number } | null;
+  /** The notes written with a sales final, to start the handover from. */
   notes: string;
-  /** Why the lead cannot be converted at all (no sales final yet, no mobile). */
+  /** Why the lead cannot be converted at all (no quotation sent, no mobile). */
   blocked: string | null;
 }
 
@@ -75,44 +87,71 @@ async function leadFor(clientId: unknown) {
   return { scope, lead };
 }
 
+const day = (d: Date) => d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+
+/**
+ * Why a quotation cannot be converted on, whatever revision is picked
+ * (owner, 14 Nov 2026: any revision may be picked; the sales final is set
+ * from it, so "no sales final" and "changed since" no longer apply).
+ */
+function quoteRefusal(facts: Awaited<ReturnType<typeof factsFor>>, stage: string): string | null {
+  if (stage === 'DESIGN') return 'This is a design quotation; convert on a sales quotation.';
+  return bookingRefusal({ ...facts, hasSalesFinal: true, changedSinceFinal: false, amountPaise: 0 });
+}
+
 /** What the Convert dialog shows for one lead, or null when this member may not convert it. */
 export async function convertScreen(clientId: unknown): Promise<ConvertScreen | null> {
   const found = await leadFor(clientId);
   if (!found) return null;
   const { scope, lead } = found;
-  const quotes = await prisma.studioQuote.findMany({
-    where: { studioId: scope.studioId, clientId: lead.id, salesFinalRevisionId: { not: null } },
-    orderBy: { salesFinalAt: 'desc' },
-    select: BOOKING_QUOTE,
+  const rows = await prisma.studioQuote.findMany({
+    where: { studioId: scope.studioId, clientId: lead.id, scopeForProjectId: null },
+    orderBy: { createdAt: 'desc' },
+    select: { ...BOOKING_QUOTE, salesFinalRevisionId: true, salesFinalAt: true, salesFinalNotes: true, revisions: { orderBy: { n: 'asc' }, select: { id: true, n: true, totalPaise: true, sentAt: true } } },
   });
-  const choices: ConvertChoice[] = [];
-  for (const q of quotes) {
-    const facts = await factsFor(q, 0);
-    choices.push({
+  const quotes: ConvertQuote[] = [];
+  let picked: ConvertScreen['picked'] = null;
+  let notes = '';
+  for (const q of rows) {
+    const blocked = q.revisions.length === 0 ? 'Not sent yet: send it to the client first, then it can be picked.' : quoteRefusal(await factsFor(q, 0), q.stage);
+    quotes.push({
       quoteId: q.id,
       number: q.number,
-      revision: revisionLabel(q.salesFinalRevision!.n),
-      totalPaise: fromDb(q.salesFinalRevision!.totalPaise),
-      blocked: bookingRefusal({ ...facts, amountPaise: 0 }),
+      blocked,
+      revisions: q.revisions.map((r) => ({ n: r.n, label: revisionLabel(r.n), totalPaise: fromDb(r.totalPaise), sentLabel: day(r.sentAt), isSalesFinal: r.id === q.salesFinalRevisionId })),
     });
+    if (!blocked) {
+      const final = q.revisions.find((r) => r.id === q.salesFinalRevisionId);
+      if (final && (!picked || !notes)) {
+        picked = { quoteId: q.id, n: final.n };
+        notes = q.salesFinalNotes ?? '';
+      }
+    }
   }
-  const notes = (
-    await prisma.studioQuote.findFirst({ where: { studioId: scope.studioId, clientId: lead.id, salesFinalRevisionId: { not: null } }, orderBy: { salesFinalAt: 'desc' }, select: { salesFinalNotes: true } })
-  )?.salesFinalNotes;
+  if (!picked) {
+    const open = quotes.find((q) => !q.blocked && q.revisions.length > 0);
+    if (open) picked = { quoteId: open.quoteId, n: open.revisions[open.revisions.length - 1]!.n };
+  }
   const blocked = lead.bookedAt
     ? 'This lead is already converted.'
-    : choices.length === 0
-      ? 'Mark a sales final on one of this lead’s quotations first (open the quotation → Revisions → Mark as sales final).'
+    : !quotes.some((q) => !q.blocked)
+      ? 'Send one of this lead’s quotations to the client first; then pick its revision here.'
       : !lead.phone
         ? 'Add the client’s mobile number to the lead first: the project and the client’s app need it.'
         : null;
-  return { name: lead.name, quotes: choices, notes: notes ?? '', blocked };
+  return { name: lead.name, quotes, picked, notes, blocked };
 }
 
 export type ConvertResult = { ok: true; projectId: string; stage: string | null } | { ok: false; error: string };
 
-/** Convert one lead: pick the sales-final quotation, write the handover, and the project starts. */
-export async function convertLead(input: { clientId: unknown; quoteId: unknown; handover: unknown; stageId?: unknown }, now = new Date()): Promise<ConvertResult> {
+/**
+ * Convert one lead: pick any revision of any of its quotations, write the
+ * handover, and the project starts. The picked revision becomes the sales
+ * final there and then (owner, 14 Nov 2026); when the quotation has moved on
+ * since that revision, it is first put back to what that revision said, so
+ * the project is built from exactly what the client was sent.
+ */
+export async function convertLead(input: { clientId: unknown; quoteId: unknown; n: unknown; handover: unknown; stageId?: unknown }, now = new Date()): Promise<ConvertResult> {
   const found = await leadFor(input.clientId);
   if (!found) return { ok: false, error: ACCESS_ERRORS.notYourRole };
   const { scope, lead } = found;
@@ -125,8 +164,27 @@ export async function convertLead(input: { clientId: unknown; quoteId: unknown; 
   if (!handover.ok) return handover;
 
   const quoteId = typeof input.quoteId === 'string' ? input.quoteId.slice(0, 64) : '';
-  if (!quoteId) return { ok: false, error: 'Pick the sales-final quotation.' };
-  const q = await prisma.studioQuote.findFirst({ where: { id: quoteId, studioId, clientId: lead.id }, select: BOOKING_QUOTE });
+  const n = typeof input.n === 'number' && Number.isInteger(input.n) && input.n > 0 ? input.n : null;
+  if (!quoteId || n === null) return { ok: false, error: 'Pick the quotation revision that is the sales final.' };
+  const first = await prisma.studioQuote.findFirst({ where: { id: quoteId, studioId, clientId: lead.id }, select: { ...BOOKING_QUOTE, salesFinalNotes: true } });
+  if (!first) return { ok: false, error: 'That quotation is not this lead’s.' };
+  const before = quoteRefusal(await factsFor(first, 0), first.stage);
+  if (before) return { ok: false, error: before };
+  const rev = await prisma.studioQuoteRevision.findFirst({ where: { quoteId: first.id, studioId, n }, select: { n: true, lines: true, terms: true } });
+  if (!rev) return { ok: false, error: 'That revision is not on this quotation.' };
+
+  /* The quotation says what the picked revision said, then that revision is the sales final. */
+  const current = await prisma.studioQuote.findFirst({ where: { id: first.id, studioId }, select: QUOTE_FOR_REVISION });
+  if (current && !sameAsRevision(current, rev)) {
+    await prisma.$transaction((tx) => restoreRevision(tx, { quoteId: first.id, studioId, lines: readRevisionLines(rev.lines), terms: readRevisionTerms(rev.terms) }));
+  }
+  if (first.salesFinalRevision?.n !== n) {
+    const stages = readStages(first.salesFinalSchedule) ?? templateOrDefault(first.studio.paymentTemplate);
+    const marked = await markSalesFinal(first.id, n, stages, { notes: handover.value, fromConvert: true });
+    if (!marked.ok) return marked;
+  }
+
+  const q = await prisma.studioQuote.findFirst({ where: { id: first.id, studioId }, select: BOOKING_QUOTE });
   if (!q) return { ok: false, error: 'That quotation is not this lead’s.' };
   const refusal = bookingRefusal({ ...(await factsFor(q, 0)), amountPaise: 0 });
   if (refusal) return { ok: false, error: refusal };

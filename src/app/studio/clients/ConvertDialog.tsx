@@ -10,7 +10,9 @@ import { convertLeadAction, convertScreenAction } from './convert-actions';
 
 /**
  * Convert (owner, 13 Nov 2026): pick the lead's sales-final quotation and
- * write the handover to design. The project starts on Convert; the design
+ * write the handover to design. Every quotation of the lead is listed with
+ * every revision sent and its final value (owner, 14 Nov 2026); the one
+ * picked becomes the sales final as the lead converts. The project starts on Convert; the design
  * head is told to assign a designer; accounts records the booking advance
  * later. Opened when a lead is dropped on, or picked into, a won column, and
  * from the lead's Converted button.
@@ -30,7 +32,7 @@ export function ConvertDialog({
   onDone: (r: { projectId: string; stage: string | null }) => void;
 }) {
   const [screen, setScreen] = useState<ConvertScreen | null | 'loading'>('loading');
-  const [quoteId, setQuoteId] = useState('');
+  const [pick, setPick] = useState<{ quoteId: string; n: number } | null>(null);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +45,7 @@ export function ConvertDialog({
         setScreen(s);
         if (s) {
           setNotes(s.notes);
-          const first = s.quotes.find((q) => !q.blocked);
-          if (first) setQuoteId(first.quoteId);
+          setPick(s.picked);
         }
       })
       .catch(() => live && setScreen(null));
@@ -54,13 +55,14 @@ export function ConvertDialog({
   }, [clientId]);
 
   const length = notes.trim().length;
-  const ready = screen !== 'loading' && screen !== null && !screen.blocked && quoteId !== '' && length >= HANDOVER_MIN && length <= HANDOVER_MAX;
+  const ready = screen !== 'loading' && screen !== null && !screen.blocked && pick !== null && length >= HANDOVER_MIN && length <= HANDOVER_MAX;
 
   async function go() {
     setBusy(true);
     setError(null);
     try {
-      const r = await convertLeadAction(clientId, quoteId, notes, stageId);
+      if (!pick) return;
+      const r = await convertLeadAction(clientId, pick.quoteId, pick.n, notes, stageId);
       if (!r.ok) setError(r.error);
       else onDone({ projectId: r.projectId, stage: r.stage });
     } catch {
@@ -78,7 +80,7 @@ export function ConvertDialog({
             Convert {name}
           </h2>
           <p className="cl-sub" style={{ margin: '4px 0 0' }}>
-            Pick the sales-final quotation and write the handover to design. The project starts now, the design head is asked to assign a designer, and accounts records the booking advance.
+            Pick the quotation revision the client agreed to (it becomes the sales final) and write the handover to design. The project starts now, the design head is asked to assign a designer, and accounts records the booking advance.
           </p>
         </div>
 
@@ -90,23 +92,40 @@ export function ConvertDialog({
             {screen.blocked ? <p className="cl-err">{screen.blocked}</p> : null}
 
             {screen.quotes.length > 0 ? (
-              <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Sales-final quotation</legend>
+              <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Sales final: pick a quotation revision</legend>
                 {screen.quotes.map((q) => (
-                  <label key={q.quoteId} className="hstack" style={{ gap: 8, alignItems: 'baseline', opacity: q.blocked ? 0.6 : 1 }}>
-                    <input type="radio" name="convert-quote" value={q.quoteId} checked={quoteId === q.quoteId} disabled={Boolean(q.blocked)} onChange={() => setQuoteId(q.quoteId)} />
-                    <span>
-                      <b>{q.number}</b> · {q.revision} · {formatINR(q.totalPaise)}
-                      {q.blocked ? <span className="muted"> · {q.blocked}</span> : null}{' '}
+                  <div key={q.quoteId} style={{ display: 'flex', flexDirection: 'column', gap: 4, opacity: q.blocked ? 0.6 : 1 }}>
+                    <div className="hstack" style={{ gap: 8, alignItems: 'baseline' }}>
+                      <b>{q.number}</b>
                       <Link href={`/studio/quotations/${q.quoteId}`} className="underline sm">
                         Open
                       </Link>
-                    </span>
-                  </label>
+                      {q.blocked ? <span className="muted sm">{q.blocked}</span> : null}
+                    </div>
+                    {q.revisions.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 4 }}>
+                        {q.revisions.map((r) => (
+                          <label key={r.n} className="hstack" style={{ gap: 8, alignItems: 'baseline' }}>
+                            <input
+                              type="radio"
+                              name="convert-revision"
+                              checked={pick?.quoteId === q.quoteId && pick.n === r.n}
+                              disabled={Boolean(q.blocked)}
+                              onChange={() => setPick({ quoteId: q.quoteId, n: r.n })}
+                            />
+                            <span>
+                              {r.label} · <b>{formatINR(r.totalPaise)}</b> <span className="muted sm">· sent {r.sentLabel}</span>
+                              {r.isSalesFinal ? <span className="chip xs" style={{ marginLeft: 6 }}>Sales final now</span> : null}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
-                {/* Owner, 13 Nov 2026: "if none fits, they revise and mark final". */}
                 <p className="muted" style={{ fontSize: 12.5, margin: '2px 0 0' }}>
-                  None of these is the one? Open the quotation, revise and send it, mark the new revision as sales final, then convert.
+                  An older revision is fine: the quotation is put back to what it said, and that revision becomes the sales final.
                 </p>
               </fieldset>
             ) : null}
@@ -137,7 +156,7 @@ export function ConvertDialog({
                 <Link href={`/studio/clients/${clientId}`} className="underline">
                   Open the lead
                 </Link>{' '}
-                to mark a sales final on one of its quotations.
+                to make and send a quotation first.
               </p>
             ) : null}
           </>

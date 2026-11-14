@@ -142,6 +142,57 @@ export async function issueRevision(input: { quoteId: string; studioId: string; 
   }
 }
 
+/**
+ * Put the quotation back to what revision `n` said (owner, 14 Nov 2026:
+ * Convert picks any revision as the sales final, and the project is built
+ * from the quotation's lines, so they must be that revision's). Lines and
+ * terms exactly as frozen; a revision keeps every column a line has, so
+ * nothing is lost. Inside the caller's transaction. The caller has checked
+ * the quotation is theirs.
+ */
+export async function restoreRevision(tx: Prisma.TransactionClient, input: { quoteId: string; studioId: string; lines: RevisionLine[]; terms: RevisionTerms }): Promise<void> {
+  await tx.studioQuoteLine.deleteMany({ where: { quoteId: input.quoteId, quote: { studioId: input.studioId } } });
+  if (input.lines.length > 0) {
+    await tx.studioQuoteLine.createMany({
+      data: input.lines.map((l, i) => ({
+        quoteId: input.quoteId,
+        room: l.room,
+        product: l.product,
+        code: l.code as Prisma.StudioQuoteLineCreateManyInput['code'],
+        unit: l.unit as Prisma.StudioQuoteLineCreateManyInput['unit'],
+        details: l.details,
+        widthMm: l.widthMm,
+        heightMm: l.heightMm,
+        qtyMilli: l.qtyMilli,
+        ratePaise: toDb(l.ratePaise),
+        amountPaise: toDb(l.amountPaise),
+        note: l.note ?? null,
+        sortOrder: i,
+      })),
+    });
+  }
+  const t = input.terms;
+  await tx.studioQuote.updateMany({
+    where: { id: input.quoteId, studioId: input.studioId },
+    data: {
+      feeBps: t.feeBps,
+      discountBps: t.discountBps,
+      onSpotPaise: toDb(t.onSpotPaise),
+      onSpotLabel: t.onSpotLabel,
+      bookingAdvancePaise: toDb(t.bookingAdvancePaise),
+      gstBps: t.gstBps,
+      ...(t.phases ? { phases: t.phases as unknown as Prisma.InputJsonValue } : {}),
+    },
+  });
+}
+
+/** Whether the quotation today says exactly what revision `n` said. */
+export function sameAsRevision(q: QuoteForRevision, revision: { lines: unknown; terms: unknown }): boolean {
+  return !needsNewRevision({ lines: readRevisionLines(revision.lines), terms: readRevisionTerms(revision.terms) }, snapshotOf(q));
+}
+
+export { QUOTE_FOR_REVISION };
+
 export interface RevisionView {
   id: string;
   n: number;
@@ -354,7 +405,7 @@ export async function markSalesFinal(
   quoteId: string,
   n: number,
   stages: PaymentStage[],
-  extra: { notes?: unknown; voicePath?: unknown } = {},
+  extra: { notes?: unknown; voicePath?: unknown; fromConvert?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
@@ -402,7 +453,8 @@ export async function markSalesFinal(
   const fits = scheduleAmounts(cleaned.stages, fromDb(revision.totalPaise));
   if (!fits.ok) return { ok: false, error: fits.error };
   /* Notes for the design team, required (DESIGN-PROCESS-PLAN.md §4.2); a voice note kept as audio, optional. */
-  const notes = checkSalesNotes(extra.notes, q.salesFinalNotes);
+  /* Convert (owner, 14 Nov 2026): the handover written there is the notes, at any length. */
+  const notes = checkSalesNotes(extra.notes, q.salesFinalNotes, extra.fromConvert ? 1 : undefined);
   if (!notes.ok) return notes;
   let voicePath = q.salesFinalVoicePath;
   if (extra.voicePath !== undefined && extra.voicePath !== null && extra.voicePath !== '') {

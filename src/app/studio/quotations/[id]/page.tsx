@@ -75,7 +75,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const photoStudioId = await quotingStudioId();
   /* "Back to project" (owner, 13 Nov 2026): a quotation that belongs to a project leads back to it. */
   const backProjectId = quote.scopeForProjectId ?? project.projectId ?? (photoStudioId ? await projectIdOfQuote(quote, photoStudioId).catch(() => null) : null);
-  const noPhotos = photoStudioId && quote.lines.length > 0 ? await missingPhotosOnQuote(quote.id, photoStudioId) : [];
+  const noPhotos = photoStudioId && quote.lines.length > 0 && photosRequired() ? await missingPhotosOnQuote(quote.id, photoStudioId) : [];
   const signatures = await quotingStudioId()
     .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
     .catch(() => new Map<number, string>());
@@ -190,7 +190,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         </div>
       ) : null}
 
-      {noPhotos.length > 0 && !locked ? <PhotoCheck missing={noPhotos} required={photosRequired()} canLink={mayAddProducts} /> : null}
+      {/* Photos are One Interiors' to add (owner, 14 Nov 2026): the studio sees no warning unless the rule is switched back on. */}
+      {noPhotos.length > 0 && !locked && photosRequired() ? <PhotoCheck missing={noPhotos} required canLink={mayAddProducts} /> : null}
 
         <QuoteBuilder
           quote={quote}
