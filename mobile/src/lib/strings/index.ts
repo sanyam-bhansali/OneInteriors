@@ -6,6 +6,7 @@ import { lifecycleWords } from './lifecycle';
 import { geio } from './geio';
 import { home } from './home';
 import { homeProfileWords } from './home-profile';
+import { designDnaWords } from './design-dna';
 import { journey } from './journey';
 import { kit } from './kit';
 import { locker } from './locker';
@@ -35,6 +36,7 @@ export const NATIVE = {
   ...signin,
   ...home,
   ...homeProfileWords,
+  ...designDnaWords,
   ...project,
   ...decision,
   ...snags,

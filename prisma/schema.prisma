@@ -375,6 +375,7 @@ model Brief {
   projects      Project[]
   consultations Consultation[]
   prepRooms     PrepRoom[]
+  designMockups DesignMockup[]
   introductions Introduction[]
 
   /// What the brief actually led to. See "THE CUSTOMER JOURNEY, KEPT".
@@ -3389,6 +3390,49 @@ model PrepRoom {
   @@unique([briefId, roomKey])
   @@index([briefId])
   @@map("prep_rooms")
+}
+
+/// A room mock-up drawn by an image AI from the customer's Design DNA, and
+/// their yes / no on it (owner, 4 Nov 2026). The DNA itself is never stored:
+/// it is computed from the Home Profile, the prep boards and these answers
+/// (src/modules/design-dna/dna.ts). We keep what was drawn and how they
+/// answered, never a cached DNA.
+model DesignMockup {
+  id      String @id @default(cuid())
+  briefId String
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  /// LIVING | KITCHEN | BEDROOM_MAIN (MOCKUP_ROOMS in design-dna/prompt.ts).
+  roomKey String
+  /// Which "Show me new ideas" this belongs to, from 1.
+  round   Int
+  /// A | B | C within the round.
+  variant String
+
+  /// What it was drawn as: a StyleTag, an optional blend, light and density.
+  style   String
+  blend   String?
+  light   String
+  density String
+  caption String
+  prompt  String  @db.Text
+
+  /// Storage path in the private `design-mockups` bucket (a data: URL off
+  /// production with no storage keys).
+  imagePath String @db.Text
+  /// The image model id, or "placeholder" in local development.
+  model     String
+
+  /// "up" | "down", null until answered.
+  verdict    String?
+  /// One of NO_REASONS in design-dna/dna.ts, only with "down".
+  reason     String?
+  answeredAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([briefId, createdAt])
+  @@map("design_mockups")
 }
 
 model Notification {
