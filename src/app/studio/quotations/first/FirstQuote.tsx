@@ -12,7 +12,8 @@ import type { FoundClient } from '@/modules/studio-practice/clients';
 import { checkLeadFile, LEAD_FILE_ACCEPT } from '@/modules/studio-sales/lead-rules';
 import { formatINR } from '@/lib/money';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
-import { leadPlansAction, readLeadPlanAction, saveFirstQuoteAction } from '../actions';
+import { addPlanLeadAction, leadPlansAction, readLeadPlanAction, saveFirstQuoteAction } from '../actions';
+import { CLIENT_TITLES, withTitle } from '@/modules/studio-quote/client-title';
 import { attachFileAction } from '../../sales-actions';
 import { searchAction } from '../../search-actions';
 import type { State } from '../../form-state';
@@ -49,6 +50,8 @@ export function FirstQuote({
   // 2 · Project
   const [lead, setLead] = useState<Lead | null>(null);
   const [name, setName] = useState('');
+  /* Mr / Mrs / Miss on the quotation (owner, 14 Nov 2026). */
+  const [title, setTitle] = useState('');
   const [found, setFound] = useState<FoundClient[]>([]);
   const [mobile, setMobile] = useState('');
   const [location, setLocation] = useState('Pune');
@@ -88,6 +91,7 @@ export function FirstQuote({
       lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise, note: l.note ?? null })),
       onSpotPaise: rupeesToPaiseText(onSpot) ?? 0,
       onSpotLabel: onSpotLabel || null,
+      clientTitle: title || null,
     });
     return r ?? { ok: true };
   }, { ok: true } as State);
@@ -128,12 +132,12 @@ export function FirstQuote({
     setStatus(`Read the plan: ${summary}. Check 4 and Build.${r.confidence ? ` Confidence: ${r.confidence}.` : ''}`);
     build({ config: bhk, run: r.kitchenRunMm, baths: r.bathrooms, balcony: r.dryBalcony ?? balcony, study: r.hasStudy, rooms: r.rooms, ceiling: r.rooms.length > 0 });
   }
-  function readPlan(ref: { fileId?: string; path?: string }) {
-    if (!lead) return;
+  function readPlan(ref: { fileId?: string; path?: string }, clientId = lead?.id) {
+    if (!clientId) return;
     setStatus('Reading the floor plan…');
     startPlan(async () => {
       try {
-        const r = await readLeadPlanAction(lead.id, ref);
+        const r = await readLeadPlanAction(clientId, ref);
         if (r.ok) apply(r.reading, r.fileId, r.summary);
         else setStatus(`${r.error} Set the BHK and the counts in 2 and 4, then Build — it builds from the BHK template.`);
       } catch {
@@ -141,14 +145,28 @@ export function FirstQuote({
       }
     });
   }
+  /* A plan for somebody new (owner, 14 Nov 2026: "not able to upload floor plan"): they are added to the leads first, so the plan has a lead to live on. */
+  const newClientReady = !lead && name.trim().length >= 2 && mobile.replace(/\D/g, '').length >= 10;
   async function upload(file: File) {
-    if (!lead) return;
+    let target = lead;
+    if (!target) {
+      if (!newClientReady) return setStatus('Type the client’s name and mobile in 2 · Project (or pick their lead) first.');
+      setStatus('Adding them to your leads…');
+      const added = await addPlanLeadAction(name, mobile, config);
+      if (!added.ok) {
+        if (picker.current) picker.current.value = '';
+        return setStatus(added.error);
+      }
+      target = added.lead;
+      setLead(added.lead);
+      setFound([]);
+    }
     const type = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '');
     const check = checkLeadFile(type, file.size);
     if (!check.ok) return setStatus(check.error);
     setStatus('Uploading the floor plan…');
     try {
-      const res = await fetch('/api/studio/leads/upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: lead.id, contentType: type, bytes: file.size }) });
+      const res = await fetch('/api/studio/leads/upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: target.id, contentType: type, bytes: file.size }) });
       const ticket = (await res.json().catch(() => null)) as { ok: boolean; path?: string; url?: string | null; error?: string } | null;
       if (!ticket?.ok || !ticket.path) return setStatus(ticket?.error ?? 'We could not start the upload. Try again.');
       if (ticket.url) {
@@ -156,11 +174,11 @@ export function FirstQuote({
         if (!put.ok) return setStatus('The upload did not finish. Check your connection and try again.');
       }
       const path = ticket.path;
-      const attached = await attachFileAction({ clientId: lead.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false });
+      const attached = await attachFileAction({ clientId: target.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false });
       if (!attached.ok) return setStatus('error' in attached ? String(attached.error) : 'That did not attach.');
-      leadPlansAction(lead.id).then(setPlans).catch(() => undefined);
-      if (canRead) readPlan({ path });
-      else setStatus(`Floor plan kept on ${lead.name}'s lead. Reading plans isn't switched on yet: set the BHK and the counts in 2 and 4, then Build — it builds from the BHK template.`);
+      leadPlansAction(target.id).then(setPlans).catch(() => undefined);
+      if (canRead) readPlan({ path }, target.id);
+      else setStatus(`Floor plan kept on ${target.name}'s lead. Reading plans isn't switched on yet: set the BHK and the counts in 2 and 4, then Build — it builds from the BHK template.`);
     } catch {
       setStatus('The upload did not finish. Check your connection and try again.');
     } finally {
@@ -200,15 +218,15 @@ export function FirstQuote({
   const rooms = orderedRooms([], lines);
   const update = (key: string, patch: Partial<EditableLine>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const nothing = () => undefined;
-  const preview = previewQuote({ name, mobile, location, config, quoteDate, terms, onSpotPaise, onSpotLabel });
+  const preview = previewQuote({ name: withTitle(title, name), mobile, location, config, quoteDate, terms, onSpotPaise, onSpotLabel });
 
   return (
     <div className="hb">
       <aside className="hside" aria-label="First quote">
         <Sec first>1 · Floor plan</Sec>
-        <label className={`hdrop ${lead ? '' : 'off'}`}>
-          {lead ? (planBusy ? 'Reading…' : 'Upload floor plan (image or PDF)') : 'Pick the client in 2 · Project first — the plan is kept on their lead'}
-          <input ref={picker} type="file" accept={LEAD_FILE_ACCEPT} disabled={!lead || planBusy} className="sr-only" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+        <label className={`hdrop ${lead || newClientReady ? '' : 'off'}`}>
+          {lead || newClientReady ? (planBusy ? 'Reading…' : 'Upload floor plan (image or PDF)') : 'Type the client’s name and mobile in 2 · Project, or pick their lead — the plan is kept on their lead'}
+          <input ref={picker} type="file" accept={LEAD_FILE_ACCEPT} disabled={!(lead || newClientReady) || planBusy} className="sr-only" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
         </label>
         {plans.length > 0 ? (
           <>
@@ -228,7 +246,17 @@ export function FirstQuote({
 
         <Sec>2 · Project</Sec>
         <div style={{ position: 'relative' }}>
-          <input className="fld hfld" placeholder="Client name" aria-label="Client name — a lead's name or phone, or someone new" value={name} autoComplete="off" onChange={(e) => void look(e.target.value)} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select className="fld hfld" aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: '0 0 auto', width: 'auto' }}>
+              <option value="">—</option>
+              {CLIENT_TITLES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input className="fld hfld" placeholder="Client name" aria-label="Client name — a lead's name or phone, or someone new" value={name} autoComplete="off" onChange={(e) => void look(e.target.value)} style={{ flex: '1 1 auto', minWidth: 0 }} />
+          </div>
           {lead ? (
             <p className="qok" style={{ margin: '4px 0 0' }}>
               For the lead {lead.name}.{' '}

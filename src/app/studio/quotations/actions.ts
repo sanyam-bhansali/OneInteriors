@@ -33,6 +33,7 @@ import { asQuoteCategory, CATEGORY_ERRORS } from '@/modules/studio-quote/categor
 // type-only re-export here, so this import is for local use and
 // callers take the type from form-state directly.
 import type { State } from '../form-state';
+import { withTitle } from '@/modules/studio-quote/client-title';
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 
@@ -95,7 +96,8 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
   }
 
   const result = await createQuote({
-    clientName: str(form, 'clientName'),
+    /* Mr / Mrs / Miss (owner, 14 Nov 2026): on the quotation only; the lead keeps the plain name. */
+    clientName: withTitle(str(form, 'clientTitle'), str(form, 'clientName')),
     clientPhone: str(form, 'clientPhone'),
     society: str(form, 'society'),
     config,
@@ -333,6 +335,25 @@ export async function proposeProductAction(
 // ── First quote (Hauspire's First Quote page, 13 Oct 2026) ──────────
 
 /** The lead's floor plans, for "1 · Floor plan" on the First quote page. */
+/**
+ * First quote, somebody new (owner, 14 Nov 2026: "not able to upload floor
+ * plan"): add them to the leads when their floor plan is uploaded, so the
+ * plan has a lead to live on. The same lead the save would have made.
+ */
+export async function addPlanLeadAction(
+  name: string,
+  phone: string,
+  config: string,
+): Promise<{ ok: true; lead: { id: string; name: string; phone: string | null; society: string | null } } | { ok: false; error: string }> {
+  const added = await addClient({ name: String(name ?? ''), phone: String(phone ?? ''), society: '', config: String(config ?? ''), source: 'OTHER' });
+  if (!added.ok) {
+    if ('duplicate' in added) return { ok: false, error: `${added.duplicate.name} already has that number. Search for them in Client name and pick them, then upload.` };
+    return { ok: false, error: added.error };
+  }
+  revalidatePath('/studio/clients');
+  return { ok: true, lead: { id: added.id, name: String(name).trim().replace(/\s+/g, ' '), phone: String(phone).trim() || null, society: null } };
+}
+
 export async function leadPlansAction(clientId: string): Promise<LeadPlan[]> {
   return leadPlans(String(clientId ?? ''));
 }
