@@ -46,6 +46,8 @@ import { cleanNote } from './line-note';
 import { readRevisionLines, readRevisionTerms, type RevisionLine, type RevisionTerms } from '@/modules/studio-sales/revision-rules';
 import { currentMember } from '@/modules/studio/access';
 import { asQuoteCategory, categoryRefusal, CATEGORY_ERRORS } from './category-rules';
+import { readSignedStages } from '@/modules/portal/payments';
+import { restageOnTotal } from '@/modules/studio-design/restage';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -1026,7 +1028,12 @@ export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<A
   if (raw !== null && raw !== '' && raw !== undefined && !category) return { ok: false, error: 'Pick Essential, Premium or Luxe.' };
   /* Mandatory (owner, 13 Nov 2026; category-rules.ts): it can be changed, not removed. */
   if (!category) return { ok: false, error: CATEGORY_ERRORS.clear };
-  const q = await prisma.studioQuote.findFirst({ where: { ...qs.write, id: quoteId, studioId }, select: { id: true, basedOnId: true } });
+  /* A designer on the project may set a missing category on its sales final (owner, 14 Nov 2026: projects brought in
+     from the Hauspire app had none, so no Design Final could be made, and the designer got "That quotation is not
+     yours"). Set once only; changing one stays with sales and the owner. */
+  const q =
+    (await prisma.studioQuote.findFirst({ where: { ...qs.write, id: quoteId, studioId }, select: { id: true, basedOnId: true } })) ??
+    (qs.lead === null ? await prisma.studioQuote.findFirst({ where: { ...qs.where, id: quoteId, studioId, category: null }, select: { id: true, basedOnId: true } }) : null);
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
   try {
     await prisma.$transaction([
@@ -1039,6 +1046,40 @@ export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<A
   } catch (error) {
     console.error('[studio-quote] setQuoteCategory failed', error);
     return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * A Design Final marked final (owner, 14 Nov 2026: "after marking the design quotation as final it still doesn't
+ * change the payment stages total"): the project signed on its sales final gets its payment stages re-split on the
+ * Design Final's total (studio-design/restage.ts: the booking advance keeps its amount, the percentage stages share
+ * the rest), and its total with them. Additional scope is not a Design Final and never does this. Never fails the
+ * mark: a failure is logged and the stages stay as they were.
+ */
+/** A quotation's total in its studio, for scripts (scripts/restage-design-finals.ts). Null when it is not there. */
+export async function quoteTotalInStudio(quoteId: string, studioId: string): Promise<number | null> {
+  const q = await loadQuote(quoteId, studioId, {});
+  return q ? totalsFor(q).totalPaise : null;
+}
+
+async function restageProjectOnDesignFinal(quoteId: string, studioId: string): Promise<void> {
+  try {
+    const q = await loadQuote(quoteId, studioId, {});
+    if (!q || q.stage !== 'DESIGN' || !q.basedOnId || q.scopeForProjectId) return;
+    const project = await prisma.homeProject.findFirst({
+      where: { introduction: { studioId }, cancelledAt: null, signedQuoteId: q.basedOnId },
+      select: { id: true, paymentPhases: true },
+    });
+    const stages = project ? readSignedStages(project.paymentPhases) : null;
+    if (!project || !stages) return;
+    const r = restageOnTotal(stages, totalsFor(q).totalPaise);
+    if (!r.ok || !r.changed) return;
+    await prisma.homeProject.update({
+      where: { id: project.id },
+      data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(r.stages.reduce((a, x) => a + x.amountPaise, 0)) },
+    });
+  } catch (error) {
+    console.error('[studio-quote] restageProjectOnDesignFinal failed', error);
   }
 }
 
@@ -1129,6 +1170,8 @@ export async function setQuoteStatus(
            Sending exactly what was sent last time does not make a new one,
            so Reopen on a won quotation does not add an R. */
         await issueRevision({ quoteId, studioId });
+        /* Marked as design final: the project's payment stages move to its total (owner, 14 Nov 2026). */
+        await restageProjectOnDesignFinal(quoteId, studioId);
         /* Sent: the lead's quotation request is done (docs/studio-os/QUOTE-REQUESTS.md). */
         await completeRequestForQuote(studioId, quoteId, await actingMember());
         void tellCustomer(quoteId, studioId);
