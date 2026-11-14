@@ -138,9 +138,14 @@ export function missingPhotos<T extends ItemLite>(
   return out;
 }
 
-/** Is the rule on? Always, unless the owner switches it off for an emergency. */
+/**
+ * Is the rule on? Off (owner, 14 Nov 2026: "Photo is not mandatory for studio
+ * to add; it will be added through us, and they can send quotation without
+ * it"). One Interiors adds the item photos; a studio is never stopped for a
+ * missing one. `ITEM_PHOTOS_REQUIRED=1` switches the rule back on.
+ */
 export function photosRequired(env: Record<string, string | undefined> = process.env): boolean {
-  return env.ITEM_PHOTOS_OPTIONAL?.trim() !== '1';
+  return env.ITEM_PHOTOS_REQUIRED?.trim() === '1';
 }
 
 /** The refusal a studio reads when it presses Send. Names up to five products. */

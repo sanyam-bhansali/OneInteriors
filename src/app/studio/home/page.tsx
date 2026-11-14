@@ -167,6 +167,10 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
       </header>
 
       <main className="homemain" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 32px 64px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {/* Waiting for approval (owner, 13–14 Nov 2026): every converted lead's new project, at the very top for
+            the owner and the design head (whoever assigns designers), on the phone and the desk alike. */}
+        {fresh ? <NewProjects data={fresh} /> : null}
+
         <div className="hm-phone" style={{ flexDirection: 'column', gap: 16 }}>
           <HomeSearch label={member?.role === 'SALES' ? 'Find a lead' : 'Search anything'} />
           <div className="ph-grid">
@@ -225,8 +229,6 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
           ) : null}
         </div>
 
-        {/* New projects (owner, 13 Nov 2026): "On Renuka's dashboard there should be 'New project'". For whoever assigns designers. */}
-        {fresh ? <NewProjects data={fresh} /> : null}
         {work ? <MyWork work={work} /> : null}
 
         <section aria-labelledby="h-apps" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

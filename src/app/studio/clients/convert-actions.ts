@@ -9,9 +9,11 @@ export async function convertScreenAction(clientId: string): Promise<ConvertScre
   return convertScreen(clientId);
 }
 
-export async function convertLeadAction(clientId: string, quoteId: string, handover: string, stageId: string | null): Promise<ConvertResult> {
-  const r = await convertLead({ clientId, quoteId, handover, stageId });
+export async function convertLeadAction(clientId: string, quoteId: string, n: number, handover: string, stageId: string | null): Promise<ConvertResult> {
+  const r = await convertLead({ clientId, quoteId, n, handover, stageId });
   if (r.ok) {
+    revalidatePath(`/studio/quotations/${quoteId}`);
+    revalidatePath('/studio/quotations');
     revalidatePath('/studio/clients');
     revalidatePath(`/studio/clients/${clientId}`);
     revalidatePath('/studio/projects');
