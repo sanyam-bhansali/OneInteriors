@@ -316,6 +316,7 @@ export function DocSummary({
   onSpotLabel,
   schedule,
   spec,
+  compare = null,
 }: {
   rooms: DocRoom[];
   studio: DocStudio | null;
@@ -326,6 +327,8 @@ export function DocSummary({
   onSpotLabel: string | null;
   schedule: PaymentStage[] | null;
   spec: DocSpecRow[];
+  /** The Final (Original vs Revised): the initial and final value under the totals (owner, 14 Nov 2026). */
+  compare?: { initialLabel: string; initialPaise: number; finalLabel: string; finalPaise: number } | null;
 }) {
   const shares = roomShares(rooms);
   const palette = donutPalette(studio?.accentHex ?? null, shares.length);
@@ -389,6 +392,17 @@ export function DocSummary({
                 <td className="r">{r(totals.totalPaise)}</td>
               </tr>
             )}
+            {/* Initial and final value only (owner, 14 Nov 2026: "this total comparison at the end, not at the start"). */}
+            {compare ? (
+              <>
+                <Row k={`Initial value (${compare.initialLabel})`} v={r(compare.initialPaise)} />
+                <Row k={`Final value (${compare.finalLabel})`} v={r(compare.finalPaise)} bold />
+                <Row
+                  k="Difference"
+                  v={compare.finalPaise === compare.initialPaise ? '—' : `${compare.finalPaise > compare.initialPaise ? '+' : '−'} ${r(Math.abs(compare.finalPaise - compare.initialPaise))}`}
+                />
+              </>
+            ) : null}
           </tbody>
         </table>
       </div>
