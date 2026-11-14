@@ -40,6 +40,8 @@ import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { calendarOf, dayFromDb, dayToDb, daysBetween, isDay, istDay, istTime, onWorkingDay, shiftWorkingDays, workingDaysBetween, type StudioCalendar } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
+import { formatINR } from '@/lib/money';
+import { restageOnTotal } from './restage';
 import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
 import { elementBySlug } from '@/modules/prepare/catalogue';
@@ -1152,19 +1154,30 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
   };
   const facts = await projectFacts(projectId);
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  /* The payment stages move to the Design Final's total (owner, 14 Nov 2026). */
+  const money = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { paymentPhases: true } });
+  const stages = readSignedStages(money?.paymentPhases);
+  const restaged = stages ? restageOnTotal(stages, summary.designTotalPaise) : null;
+  const newStages = restaged?.ok && restaged.changed ? restaged.stages : null;
   await prisma.$transaction(async (tx) => {
     await tx.homeProject.update({
       where: { id: projectId },
-      data: { designClosedAt: now, designFinalQuoteId: df.id, designChanges: summary as unknown as Prisma.InputJsonValue },
+      data: {
+        designClosedAt: now,
+        designFinalQuoteId: df.id,
+        designChanges: summary as unknown as Prisma.InputJsonValue,
+        ...(newStages ? { paymentPhases: newStages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(summary.designTotalPaise) } : {}),
+      },
     });
-    await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length } });
+    await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length, ...(newStages ? { fromPaise: summary.salesTotalPaise, toPaise: summary.designTotalPaise } : {}) } });
     // The project lifecycle: design sign-off moves an older plan (no pre-execution steps) to execution. A plan with the
     // design process moves on its own ticks instead: design done, then pre-execution done (DESIGN-PROCESS-PLAN.md Decision 10).
     const pre = await tx.homeChecklistItem.count({ where: { stage: { projectId, kind: 'DESIGN' }, room: PRE_EXECUTION_GROUP } });
     if (pre === 0) await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
   });
   if (facts) tell(facts.introduction.brief.userId, facts.introduction.studio.tradeName, 'Your design is final. See what changed against your first quotation.');
-  return { ok: true, message: `Design signed off on ${df.number}. The client sees what changed against the sales final.` };
+  const moneyWords = newStages ? ` The payment stages now add up to the Design Final's ${formatINR(summary.designTotalPaise)}.` : restaged && !restaged.ok ? ` The payment stages were left as they were: ${restaged.error}` : '';
+  return { ok: true, message: `Design signed off on ${df.number}. The client sees what changed against the sales final.${moneyWords}` };
 }
 
 // ── The studio's design steps (Settings) ──────────────────────
