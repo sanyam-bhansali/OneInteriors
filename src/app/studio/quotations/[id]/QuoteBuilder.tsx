@@ -21,6 +21,8 @@ import { QuoteTable } from './QuoteTable';
 import { TotalsTable } from './HTotals';
 import { AddLine, DiscountPicker, FinalCompare, ProposeForm, Sec } from './HPanels';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
+import { CLIENT_TITLES, titleOf, withTitle, withoutTitle } from '@/modules/studio-quote/client-title';
+import { QuotePlanUpload } from './QuotePlanUpload';
 
 /**
  * The quotation builder, in the layout of Hauspire's own builder
@@ -497,7 +499,24 @@ export function QuoteBuilder({
       <aside className="hside" aria-label="Quotation details">
         <fieldset disabled={locked} className="hfs">
           <Sec first>Project</Sec>
-          <input className="fld hfld" placeholder="Client name" aria-label="Client name" maxLength={120} value={client.clientName} onChange={(e) => setClient({ ...client, clientName: e.target.value })} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {/* Mr / Mrs / Miss (owner, 14 Nov 2026): kept as the start of the client name on the quotation. */}
+            <select
+              className="fld hfld"
+              aria-label="Title"
+              value={titleOf(client.clientName)}
+              onChange={(e) => setClient({ ...client, clientName: e.target.value ? withTitle(e.target.value, client.clientName) : withoutTitle(client.clientName) })}
+              style={{ flex: '0 0 auto', width: 'auto' }}
+            >
+              <option value="">—</option>
+              {CLIENT_TITLES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input className="fld hfld" placeholder="Client name" aria-label="Client name" maxLength={120} value={client.clientName} onChange={(e) => setClient({ ...client, clientName: e.target.value })} style={{ flex: '1 1 auto', minWidth: 0 }} />
+          </div>
           <div className="hgrid2">
             <input className="fld hfld" placeholder="Mobile" aria-label="Mobile" inputMode="tel" maxLength={20} value={client.clientPhone} onChange={(e) => setClient({ ...client, clientPhone: e.target.value })} />
             <input className="fld hfld" placeholder="Location" aria-label="Location" maxLength={80} value={client.locality} onChange={(e) => setClient({ ...client, locality: e.target.value })} />
@@ -781,6 +800,8 @@ export function QuoteBuilder({
                 readOnly={locked}
               />
             </fieldset>
+            {/* Upload a floor plan from the builder (owner, 14 Nov 2026); it is kept on the lead. */}
+            <QuotePlanUpload clientId={quote.clientId ?? null} leadName={quote.clientName} />
             {quote.planRooms.length > 0 ? (
               <section className="card" aria-label="Their floor plan" style={{ marginTop: 16 }}>
                 <div className="chead">

@@ -28,6 +28,7 @@ import { checkPlanFile, planReadMessage, STALE_READ_MS } from '@/modules/floorpl
 import { readPlanOnce } from '@/modules/floorplan/plan-reads';
 import { applyConfiguration, createQuote, saveQuoteLines, saveQuoteTerms, type SaveLineInput } from './quotes';
 import { isConfigName } from './configure';
+import { withTitle } from './client-title';
 import { readRoomsRefusal } from './write-rules';
 import {
   fileReadingOf,
@@ -387,6 +388,8 @@ export interface FirstQuoteInput {
   lines: SaveLineInput[];
   onSpotPaise: number;
   onSpotLabel: string | null;
+  /** Mr / Mrs / Miss before the name on the quotation (owner, 14 Nov 2026). */
+  clientTitle?: string | null;
 }
 
 /**
@@ -415,7 +418,7 @@ export async function saveFirstQuote(input: FirstQuoteInput): Promise<{ ok: true
 
   const config = isConfigName(input.config) ? input.config : undefined;
   const created = await createQuote({
-    clientName: lead.name,
+    clientName: withTitle(input.clientTitle, lead.name),
     clientPhone: lead.phone ?? undefined,
     society: lead.society ?? undefined,
     config,

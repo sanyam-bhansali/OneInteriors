@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { CONFIGS, standardRunFor, type ConfigName } from '@/modules/studio-quote/configure';
 import { createQuoteAction } from './actions';
+import { CLIENT_TITLES } from '@/modules/studio-quote/client-title';
 import { searchAction } from '../search-actions';
 import type { FoundClient } from '@/modules/studio-practice/clients';
 import { IDLE } from '../form-state';
@@ -115,17 +116,29 @@ export function StartQuote({
           <label htmlFor="nq-name" className="lbl">
             Who is it for — a lead&apos;s name or phone, or someone new
           </label>
-          <input
-            id="nq-name"
-            name="clientName"
-            required
-            autoFocus
-            autoComplete="off"
-            value={name}
-            onChange={(e) => void look(e.target.value)}
-            placeholder="Mrs Kothari"
-            className="fld"
-          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {/* Mr / Mrs / Miss (owner, 14 Nov 2026): goes before the name on the quotation, not on the lead. */}
+            <select name="clientTitle" aria-label="Title" defaultValue="" className="fld" style={{ flex: '0 0 auto', width: 'auto' }}>
+              <option value="">—</option>
+              {CLIENT_TITLES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              id="nq-name"
+              name="clientName"
+              required
+              autoFocus
+              autoComplete="off"
+              value={name}
+              onChange={(e) => void look(e.target.value)}
+              placeholder="Kothari"
+              className="fld"
+              style={{ flex: '1 1 auto', minWidth: 0 }}
+            />
+          </div>
           {lead ? (
             <p className="qok">
               For the lead {lead.name}
