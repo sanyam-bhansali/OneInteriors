@@ -64,14 +64,17 @@ const studioTree = cache(async (studioId: string): Promise<TreeMember[]> =>
  * The membership of this user, or null when they belong to no studio. `userId` is unique: one person, one studio.
  * Carries the studio's pilot switch (`fullSoftware`), so `can()` and `mayOpen` narrow a studio without the full software (studio/pilot.ts).
  */
-export async function memberFor(userId: string): Promise<StudioMemberRef | null> {
-  return refFor(await prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT }));
-}
+/* Read once per page render (React `cache`, speed, 14 Nov 2026), like
+   `getCurrentUser`: the layout, the page and the modules each asked again.
+   Server actions are not memoised, so a write always sees a fresh read. */
+export const memberFor = cache(async (userId: string): Promise<StudioMemberRef | null> =>
+  refFor(await prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT })),
+);
 
 /** The same membership, found by its own id: the member a staff view is looking as (VIEW-AS.md). */
-export async function memberById(memberId: string): Promise<StudioMemberRef | null> {
-  return refFor(await prisma.studioMember.findUnique({ where: { id: memberId }, select: MEMBER_SELECT }));
-}
+export const memberById = cache(async (memberId: string): Promise<StudioMemberRef | null> =>
+  refFor(await prisma.studioMember.findUnique({ where: { id: memberId }, select: MEMBER_SELECT })),
+);
 
 type MemberRow = Prisma.StudioMemberGetPayload<{ select: typeof MEMBER_SELECT }>;
 
@@ -99,7 +102,9 @@ async function refFor(row: MemberRow | null): Promise<StudioMemberRef | null> {
  * STUDIO role. Null otherwise, including when the database is not there —
  * same render-path rule as `myStudioId()`: never throws.
  */
-export async function currentMember(): Promise<StudioMemberRef | null> {
+export const currentMember = cache(readCurrentMember);
+
+async function readCurrentMember(): Promise<StudioMemberRef | null> {
   const user = await getCurrentUser();
   if (!user || !hasRole(user, 'STUDIO') || !hasDatabase()) return null;
   try {

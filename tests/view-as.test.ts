@@ -317,7 +317,7 @@ describe('every layer is wired', () => {
 
   it('currentMember and myStudioId resolve the view and refuse on a write request', () => {
     const access = read('src/modules/studio/access.ts');
-    expect(access).toMatch(/currentMember\(\)[\s\S]*?viewAsFor\(user\)/);
+    expect(access).toMatch(/readCurrentMember\(\)[\s\S]*?viewAsFor\(user\)/);
     expect(access).toMatch(/viewAsFor[\s\S]*?isWriteRequest\(\)\) return null/);
     expect(access).toContain('viewOnly: true');
     expect(access).toMatch(/assertCan[\s\S]*?viewOnly === true && !isReadAction\(action\)/);

@@ -8,6 +8,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { poolSize, withPoolSize } from './db-url';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -17,11 +18,15 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
    production. */
 const sampleOnly = process.env.SAMPLE_DATA_ONLY?.trim() === '1';
 
+/* More than one connection per server, so queries asked for together run
+   together (db-url.ts). Null leaves DATABASE_URL exactly as configured. */
+const pooled = sampleOnly ? null : withPoolSize(process.env.DATABASE_URL, poolSize());
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-    ...(sampleOnly ? { datasourceUrl: 'postgresql://sample-data-only.invalid:5432/none' } : {}),
+    ...(sampleOnly ? { datasourceUrl: 'postgresql://sample-data-only.invalid:5432/none' } : pooled ? { datasourceUrl: pooled } : {}),
   });
 
 if (process.env.NODE_ENV !== 'production') {
