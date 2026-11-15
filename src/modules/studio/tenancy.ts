@@ -32,13 +32,19 @@ import { opensFullSoftware, planOf } from './software-plan';
  * enforces that, because — see its header — row-level security is not.
  */
 
+import { cache } from 'react';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { OFFICE_MEMBER } from './surfaces';
 import { isWriteRequest, staffViewFor } from './view-as';
 
-export async function myStudioId(): Promise<string | null> {
+/* Once per page render (React `cache`, speed, 14 Nov 2026): every office
+   module starts here, so one page asked it many times. Server actions are not
+   memoised by `cache`, so a write always reads it fresh. */
+export const myStudioId = cache(readMyStudioId);
+
+async function readMyStudioId(): Promise<string | null> {
   const user = await getCurrentUser();
   if (!user || !hasRole(user, 'STUDIO') || !hasDatabase()) return null;
 

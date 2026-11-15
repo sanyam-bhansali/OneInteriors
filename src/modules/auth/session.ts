@@ -21,6 +21,7 @@ import 'server-only';
  *     signed claims, precisely so we can kill one.
  */
 
+import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
@@ -156,8 +157,15 @@ async function requestToken(): Promise<string | null> {
 
 /**
  * The current user, or null. Reads the role fresh from the database — see (3).
+ *
+ * Read once per page render (React `cache`, speed, 14 Nov 2026): the layout,
+ * the page and every module they call each asked again, a database round
+ * trip every time. Still fresh on every request; server actions and route
+ * handlers are not memoised by `cache`, so they read it as before.
  */
-export async function getCurrentUser(): Promise<AuthUser | null> {
+export const getCurrentUser = cache(readCurrentUser);
+
+async function readCurrentUser(): Promise<AuthUser | null> {
   const token = await requestToken();
   if (!token) return null;
 
