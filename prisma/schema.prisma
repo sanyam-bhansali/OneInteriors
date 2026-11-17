@@ -6486,6 +6486,12 @@ model StudioSociety {
   sourceSheet      String?
   sourceImportedAt DateTime?
 
+  /// Done (owner, 17 Nov 2026): possession was long ago, nothing more to work
+  /// here. Marking it done sends its New and Calling leads back to the pool;
+  /// Effective Lead and later stay with their salesperson.
+  doneAt     DateTime?
+  doneByName String?
+
   wings   StudioSocietyWing[]
   notes   StudioSocietyNote[]
   clients StudioClient[]

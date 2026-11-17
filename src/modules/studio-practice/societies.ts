@@ -25,6 +25,7 @@ import { normalisePhone } from './csv';
 import { parseSociety, societyTargets } from './society-match';
 import { recordMany } from './events';
 import { intakeStageId } from './stages';
+import { LIVE } from './demo-lead';
 import type { SocietyImportPayload } from './society-import';
 import {
   compareSocieties,
@@ -85,6 +86,8 @@ export interface SocietyRow {
   assignedTo: string | null;
   leads: number;
   lastNote: { body: string; at: Date } | null;
+  /** Marked done (owner, 17 Nov 2026), or null. */
+  done: { at: Date; by: string | null } | null;
 }
 
 const nameOf = (u: { name: string | null; email: string | null; phone: string | null } | null | undefined) =>
@@ -115,6 +118,8 @@ export interface SocietyFilters {
   heat?: Heat | 'NONE' | null;
   owner?: string | null;
   locality?: string | null;
+  /** '' or undefined: still being worked (the default); 'done': done only; 'all': both. */
+  status?: '' | 'done' | 'all';
 }
 
 /** Every society this member sees, worked out and sorted (P1 first). */
@@ -128,6 +133,7 @@ export async function listSocieties(access: SocietyAccess, filters: SocietyFilte
         q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { locality: { contains: q, mode: 'insensitive' } }] } : {},
         filters.owner === 'none' ? { assignedToId: null } : filters.owner ? { assignedToId: filters.owner } : {},
         filters.locality ? { locality: { equals: filters.locality, mode: 'insensitive' } } : {},
+        filters.status === 'all' ? {} : filters.status === 'done' ? { doneAt: { not: null } } : { doneAt: null },
       ],
     },
     select: {
@@ -140,6 +146,8 @@ export async function listSocieties(access: SocietyAccess, filters: SocietyFilte
       priorityOverride: true,
       heatOverride: true,
       heatOverrideAt: true,
+      doneAt: true,
+      doneByName: true,
       wings: { select: { possessionOn: true } },
       notes: { select: { body: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 1 },
       _count: { select: { clients: { where: { deletedAt: null } } } },
@@ -169,12 +177,13 @@ export async function listSocieties(access: SocietyAccess, filters: SocietyFilte
       assignedTo: r.assignedTo ? nameOf(r.assignedTo.user) : null,
       leads: r._count.clients,
       lastNote: r.notes[0] ? { body: r.notes[0].body, at: r.notes[0].createdAt } : null,
+      done: r.doneAt ? { at: r.doneAt, by: r.doneByName } : null,
     };
   });
   return out
     .filter((r) => !filters.priority || r.priority === filters.priority)
     .filter((r) => !filters.heat || (filters.heat === 'NONE' ? r.heat === null : r.heat === filters.heat))
-    .sort((a, b) => compareSocieties(a, b, now));
+    .sort((a, b) => Number(a.done !== null) - Number(b.done !== null) || compareSocieties(a, b, now));
 }
 
 /** The people a society can be given to: active members who work leads. */
@@ -240,6 +249,8 @@ export async function getSociety(access: SocietyAccess, id: string, now = new Da
     heatReason: eh.byHand ? s.heatReason : null,
     calls: h,
     mayChange: mayChange(access, s),
+    done: s.doneAt ? { at: s.doneAt, by: s.doneByName } : null,
+    doneCounts: access.mayManage ? await doneCounts(access.scope.studioId, s.id) : null,
     wings: s.wings.map((w) => ({ id: w.id, name: w.name, flats: w.flats, possessionOn: w.possessionOn, leads: w._count.clients })),
     notes: s.notes.map((n) => ({ id: n.id, body: n.body, at: n.createdAt, by: n.authorName ?? 'Someone' })),
     leads: leads.map((l) => ({
@@ -450,6 +461,23 @@ export async function saveWing(
   return { ok: true };
 }
 
+/**
+ * One possession month for every wing (owner, 17 Nov 2026: "there is no
+ * option to change possession date"). Each wing can still differ by editing
+ * it in the Wings table. Like a wing's date, it puts a hand-set priority back
+ * to automatic.
+ */
+export async function setSocietyPossession(access: SocietyAccess, societyId: string, possession: Date | null): Promise<Result> {
+  if (access.scope.member.viewOnly) return { ok: false, error: 'You are viewing as someone else.' };
+  const found = await loadForChange(access, societyId);
+  if (!found) return { ok: false, error: NOT_YOURS };
+  const wings = await prisma.studioSocietyWing.count({ where: { societyId } });
+  if (wings === 0) await prisma.studioSocietyWing.create({ data: { societyId, name: 'Main', possessionOn: possession } });
+  else await prisma.studioSocietyWing.updateMany({ where: { societyId }, data: { possessionOn: possession } });
+  await prisma.studioSociety.updateMany({ where: { id: societyId, studioId: access.scope.studioId }, data: { priorityOverride: null, priorityReason: null } });
+  return { ok: true };
+}
+
 /** Put a lead (one this member may edit) in a wing of this society, or no wing. */
 export async function setLeadWing(access: SocietyAccess, societyId: string, clientId: string, wingId: string | null): Promise<Result> {
   if (access.scope.member.viewOnly || !can(access.scope.member, 'lead.edit', { assigned: true })) return { ok: false, error: 'You can’t change this lead.' };
@@ -530,6 +558,64 @@ export async function assignSocietyLeads(
     await prisma.studioSociety.updateMany({ where: { id: societyId, studioId: access.scope.studioId }, data: { assignedToId: people[0]! } });
   }
   return { ok: true, message: r.message };
+}
+
+/**
+ * The leads marking a society done sends back to the pool: given to someone,
+ * in an open New or Calling column. The `where` form of
+ * `returnsToPoolWhenDone` (society-rules.ts); the two are tested together.
+ */
+export const BACK_TO_POOL_STAGE: Prisma.StudioStageWhereInput = { kind: 'OPEN', OR: [{ isIntake: true }, { isCallStep: true }] };
+
+function doneLeadsWhere(studioId: string, societyId: string): Prisma.StudioClientWhereInput {
+  return { studioId, societyId, deletedAt: null, assignedToId: { not: null }, stage: BACK_TO_POOL_STAGE };
+}
+
+/** How many leads a done would send back, and how many stay with their salesperson. */
+export async function doneCounts(studioId: string, societyId: string): Promise<{ back: number; stay: number }> {
+  const [back, assigned] = await Promise.all([
+    prisma.studioClient.count({ where: { ...doneLeadsWhere(studioId, societyId), ...LIVE } }),
+    prisma.studioClient.count({ where: { studioId, societyId, assignedToId: { not: null }, ...LIVE } }),
+  ]);
+  return { back, stay: assigned - back };
+}
+
+/**
+ * Mark a society done (owner, 17 Nov 2026): possession was long ago. Its New
+ * and Calling 1–4 leads go back to the pool, whoever had them; Effective Lead
+ * and later stay with their salesperson. Goes through the Leads app's own bulk
+ * "back to the pool", so each lead's history says so. A note on the society
+ * records it. Admins and sales heads only, as giving leads out is.
+ */
+export async function markSocietyDone(access: SocietyAccess, id: string): Promise<Result<{ message: string }>> {
+  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can mark a society done.' };
+  const found = await loadForChange(access, id);
+  if (!found) return { ok: false, error: NOT_YOURS };
+  const studioId = access.scope.studioId;
+  const rows = await prisma.studioClient.findMany({ where: doneLeadsWhere(studioId, id), select: { id: true }, take: 30000 });
+  let back = 0;
+  if (rows.length > 0) {
+    const r = await bulkAssign({ ids: rows.map((x) => x.id) }, null);
+    if (!r.ok) return r;
+    back = await prisma.studioClient.count({ where: { studioId, id: { in: rows.map((x) => x.id) }, assignedToId: null, ...LIVE } });
+  }
+  const me = access.scope.member.id;
+  const by = await authorName(me);
+  await prisma.studioSociety.updateMany({ where: { id, studioId }, data: { doneAt: new Date(), doneByName: by } });
+  const what = back === 0 ? 'No New or Calling leads to send back.' : `${back.toLocaleString('en-IN')} New and Calling lead${back === 1 ? '' : 's'} back in the pool.`;
+  await prisma.studioSocietyNote.create({ data: { societyId: id, authorId: me, authorName: by, body: `Marked done: possession is long over. ${what} Effective Lead and later stay with their salesperson.` } });
+  return { ok: true, message: `Marked done. ${what}` };
+}
+
+/** Undo a done. Leads already sent back stay in the pool. */
+export async function markSocietyNotDone(access: SocietyAccess, id: string): Promise<Result> {
+  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change this.' };
+  const found = await loadForChange(access, id);
+  if (!found) return { ok: false, error: NOT_YOURS };
+  const me = access.scope.member.id;
+  await prisma.studioSociety.updateMany({ where: { id, studioId: access.scope.studioId }, data: { doneAt: null, doneByName: null } });
+  await prisma.studioSocietyNote.create({ data: { societyId: id, authorId: me, authorName: await authorName(me), body: 'Back on the list (no longer done). Leads sent to the pool stay there.' } });
+  return { ok: true };
 }
 
 export interface SocietyImportResult {

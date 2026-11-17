@@ -41,6 +41,7 @@ export default async function SocietiesPage({ searchParams }: { searchParams: Pr
     heat: one('heat') === 'NONE' || (HEATS as readonly string[]).includes(one('heat')) ? (one('heat') as Heat | 'NONE') : null,
     owner: one('owner') || null,
     locality: one('locality') || null,
+    status: one('status') === 'done' || one('status') === 'all' ? (one('status') as 'done' | 'all') : '',
   };
   const [rows, people, localities] = await Promise.all([listSocieties(access, filters), societyPeople(access.scope.studioId), societyLocalities(access)]);
   const counts = { P1: 0, P2: 0, P3: 0 } as Record<Priority, number>;
@@ -108,6 +109,11 @@ export default async function SocietiesPage({ searchParams }: { searchParams: Pr
             ))}
           </select>
         ) : null}
+        <select name="status" defaultValue={filters.status ?? ''} aria-label="Done or not">
+          <option value="">Still being worked</option>
+          <option value="done">Done</option>
+          <option value="all">All, done included</option>
+        </select>
         <button type="submit" className="btn sec sm">
           Show
         </button>
@@ -136,7 +142,7 @@ export default async function SocietiesPage({ searchParams }: { searchParams: Pr
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <PriorityChip p={r.priority} byHand={r.priorityByHand} />
+                    {r.done ? <span className="chip xs">Done</span> : <PriorityChip p={r.priority} byHand={r.priorityByHand} />}
                   </td>
                   <td>
                     <Link href={`/studio/clients/societies/${r.id}`} className="soc-name">

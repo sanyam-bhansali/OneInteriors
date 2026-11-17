@@ -193,6 +193,20 @@ export function compareSocieties(
   return a.name.localeCompare(b.name);
 }
 
+/**
+ * Marking a society done (owner, 17 Nov 2026): "whoever this society is
+ * assigned, the leads from New to Calling 4 should return to pool … only the
+ * leads who are in Effective Lead and further should remain with the
+ * salesperson". So: an open column that is the intake (New) or a calling
+ * column (Calling 1–4) goes back; every other column stays as it is (Effective
+ * Lead onwards stays with its salesperson; Junk, Lost and Converted are not
+ * touched). Read from the columns' own flags, so a studio that renames them
+ * keeps the rule.
+ */
+export function returnsToPoolWhenDone(stage: { kind: string | null; isIntake: boolean; isCallStep: boolean }): boolean {
+  return stage.kind === 'OPEN' && (stage.isIntake || stage.isCallStep);
+}
+
 /** "Mar 2027", for a possession month. */
 export function monthLabel(d: Date): string {
   return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
