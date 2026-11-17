@@ -25,6 +25,7 @@ import { normalisePhone } from './csv';
 import { parseSociety, societyTargets } from './society-match';
 import { recordMany } from './events';
 import { intakeStageId } from './stages';
+import { LIVE } from './demo-lead';
 import type { SocietyImportPayload } from './society-import';
 import {
   compareSocieties,
@@ -573,8 +574,8 @@ function doneLeadsWhere(studioId: string, societyId: string): Prisma.StudioClien
 /** How many leads a done would send back, and how many stay with their salesperson. */
 export async function doneCounts(studioId: string, societyId: string): Promise<{ back: number; stay: number }> {
   const [back, assigned] = await Promise.all([
-    prisma.studioClient.count({ where: doneLeadsWhere(studioId, societyId) }),
-    prisma.studioClient.count({ where: { studioId, societyId, deletedAt: null, assignedToId: { not: null } } }),
+    prisma.studioClient.count({ where: { ...doneLeadsWhere(studioId, societyId), ...LIVE } }),
+    prisma.studioClient.count({ where: { studioId, societyId, assignedToId: { not: null }, ...LIVE } }),
   ]);
   return { back, stay: assigned - back };
 }
@@ -596,7 +597,7 @@ export async function markSocietyDone(access: SocietyAccess, id: string): Promis
   if (rows.length > 0) {
     const r = await bulkAssign({ ids: rows.map((x) => x.id) }, null);
     if (!r.ok) return r;
-    back = await prisma.studioClient.count({ where: { studioId, id: { in: rows.map((x) => x.id) }, assignedToId: null } });
+    back = await prisma.studioClient.count({ where: { studioId, id: { in: rows.map((x) => x.id) }, assignedToId: null, ...LIVE } });
   }
   const me = access.scope.member.id;
   const by = await authorName(me);
