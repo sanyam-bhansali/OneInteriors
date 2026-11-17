@@ -5,11 +5,14 @@ import {
   addSocietyNote,
   assignSocietyLeads,
   createSociety,
+  markSocietyDone,
+  markSocietyNotDone,
   mySocietyAccess,
   saveWing,
   setLeadWing,
   setSocietyHeat,
   setSocietyOwner,
+  setSocietyPossession,
   setSocietyPriority,
   updateSociety,
 } from '@/modules/studio-practice/societies';
@@ -127,4 +130,36 @@ export async function leadWingAction(societyId: string, clientId: string, wingId
   if (!r.ok) return { error: r.error };
   done(societyId);
   return {};
+}
+
+/** Mark a society done, or (undo) back on the list (owner, 17 Nov 2026). */
+export async function doneAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  const access = await mySocietyAccess();
+  if (!access) return NO_ACCESS;
+  const id = str(f, 'id');
+  if (str(f, 'undo') === '1') {
+    const r = await markSocietyNotDone(access, id);
+    if (!r.ok) return { error: r.error };
+    done(id);
+    return { ok: true, message: 'Back on the list.' };
+  }
+  const r = await markSocietyDone(access, id);
+  if (!r.ok) return { error: r.error };
+  done(id);
+  revalidatePath('/studio/clients');
+  return { ok: true, message: r.message };
+}
+
+/** One possession month for every wing (owner, 17 Nov 2026). Empty clears it. */
+export async function possessionAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  const access = await mySocietyAccess();
+  if (!access) return NO_ACCESS;
+  const id = str(f, 'id');
+  const raw = str(f, 'possession');
+  const possession = raw ? parsePossession(raw) : null;
+  if (raw && !possession) return { error: 'Possession should be a month, e.g. 2027-03.' };
+  const r = await setSocietyPossession(access, id, possession);
+  if (!r.ok) return { error: r.error };
+  done(id);
+  return { ok: true, message: possession ? 'Possession changed for every wing.' : 'Possession cleared.' };
 }

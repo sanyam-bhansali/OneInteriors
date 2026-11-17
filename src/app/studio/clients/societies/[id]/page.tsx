@@ -6,7 +6,7 @@ import '../societies.css';
 import { getSociety, mySocietyAccess, societyPeople } from '@/modules/studio-practice/societies';
 import { PRIORITY_LABEL, HEAT_LABEL, monthLabel } from '@/modules/studio-practice/society-rules';
 import { HeatChip, PriorityChip } from '../Chips';
-import { AssignLeads, EditSociety, LeadWing, NoteForm, OverrideForm, OwnerForm, WingForm } from '../SocietyForms';
+import { AssignLeads, DoneSociety, EditSociety, PossessionForm, LeadWing, NoteForm, OverrideForm, OwnerForm, WingForm } from '../SocietyForms';
 
 export const metadata: Metadata = {
   title: 'Society',
@@ -59,6 +59,9 @@ export default async function SocietyPage({ params }: { params: Promise<{ id: st
                 ? 'No wing has a possession date yet. Add one below.'
                 : `From possession in ${monthLabel(s.autoPriority.possessionOn!)}.`}
           </p>
+          {!access.scope.member.viewOnly ? (
+            <PossessionForm id={s.id} wings={s.wings.length} current={s.autoPriority.possessionOn ? s.autoPriority.possessionOn.toISOString().slice(0, 7) : ''} />
+          ) : null}
           {s.mayChange ? <OverrideForm id={s.id} kind="priority" current={s.priorityByHand ? s.priority : null} /> : null}
         </section>
         <section className="card">
@@ -113,6 +116,14 @@ export default async function SocietyPage({ params }: { params: Promise<{ id: st
           </tbody>
         </table>
       </section>
+
+      {access.mayManage && !access.scope.member.viewOnly && s.doneCounts ? (
+        <DoneSociety id={s.id} done={s.done ? { at: when(s.done.at), by: s.done.by } : null} counts={s.doneCounts} />
+      ) : s.done ? (
+        <p className="muted soc-small" style={{ margin: 0 }}>
+          <span className="chip xs">Done</span> Marked done on {when(s.done.at)}: possession is long over.
+        </p>
+      ) : null}
 
       {access.mayManage && !access.scope.member.viewOnly ? (
         <AssignLeads id={s.id} people={people} total={s.leads.length} unassigned={s.leads.filter((l) => !l.owner).length} />
