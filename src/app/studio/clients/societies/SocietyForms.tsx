@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import {
   addSocietyAction,
   assignLeadsAction,
+  doneAction,
   editSocietyAction,
   heatAction,
   leadWingAction,
   noteAction,
   ownerAction,
+  possessionAction,
   priorityAction,
   wingAction,
   type SocietyFormState,
@@ -108,7 +110,7 @@ export function WingForm({ id, wing }: { id: string; wing?: { id: string; name: 
   if (!open)
     return (
       <button type="button" className="linkbtn" onClick={() => setOpen(true)}>
-        {wing ? 'Edit' : '+ Add a wing'}
+        {wing ? 'Change possession / flats' : '+ Add a wing'}
       </button>
     );
   return (
@@ -356,6 +358,87 @@ export function AssignLeads({ id, people, total, unassigned }: { id: string; peo
         <button type="submit" className="btn pri" disabled={pending || pool === 0 || (mode === 'split' && picked.length < 2)}>
           {pending ? 'Giving out…' : 'Give out'}
         </button>
+        <Said state={state} />
+      </div>
+    </form>
+  );
+}
+
+/** Change possession for every wing at once (owner, 17 Nov 2026). */
+export function PossessionForm({ id, current, wings }: { id: string; current: string; wings: number }) {
+  const [state, run, pending] = useActionState(possessionAction, null);
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <button type="button" className="linkbtn" onClick={() => setOpen(true)}>
+        Change possession
+      </button>
+    );
+  return (
+    <form action={run} className="soc-override" aria-label="Change possession">
+      <input type="hidden" name="id" value={id} />
+      <input name="possession" type="month" defaultValue={current} aria-label="Possession month" />
+      <button type="submit" className="btn pri sm" disabled={pending}>
+        {pending ? 'Saving…' : wings > 1 ? 'Save for all wings' : 'Save'}
+      </button>
+      <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
+        Close
+      </button>
+      <Said state={state} />
+    </form>
+  );
+}
+
+/**
+ * Mark the society done (owner, 17 Nov 2026): possession was long ago. Says
+ * first what will happen to the leads, then asks once more before doing it.
+ */
+export function DoneSociety({ id, done, counts }: { id: string; done: { at: string; by: string | null } | null; counts: { back: number; stay: number } }) {
+  const [state, run, pending] = useActionState(doneAction, null);
+  const [sure, setSure] = useState(false);
+  if (done)
+    return (
+      <form action={run} className="card soc-done" aria-label="Society done">
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="undo" value="1" />
+        <h2 className="soc-h2">
+          <span className="chip xs">Done</span> Possession is long over
+        </h2>
+        <p className="muted soc-small">
+          Marked done on {done.at}
+          {done.by ? ` by ${done.by}` : ''}. It sits at the bottom of the list, under Done.
+        </p>
+        <div className="hstack" style={{ gap: 8 }}>
+          <button type="submit" className="btn ghost sm" disabled={pending}>
+            {pending ? 'Saving…' : 'Not done after all'}
+          </button>
+          <Said state={state} />
+        </div>
+      </form>
+    );
+  return (
+    <form action={run} className="card soc-done" aria-label="Mark society done">
+      <input type="hidden" name="id" value={id} />
+      <h2 className="soc-h2">Possession done long ago?</h2>
+      <p className="muted soc-small">
+        Marking it done sends {counts.back.toLocaleString('en-IN')} lead{counts.back === 1 ? '' : 's'} in New and Calling 1–4 back to the pool, whoever has them. {counts.stay.toLocaleString('en-IN')} lead
+        {counts.stay === 1 ? '' : 's'} in Effective Lead and later (and Junk, Lost, Converted) stay as they are.
+      </p>
+      <div className="hstack" style={{ gap: 8 }}>
+        {sure ? (
+          <>
+            <button type="submit" className="btn pri sm" disabled={pending}>
+              {pending ? 'Marking done…' : `Yes, mark done${counts.back ? ` and return ${counts.back}` : ''}`}
+            </button>
+            <button type="button" className="btn ghost sm" disabled={pending} onClick={() => setSure(false)}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn sec sm" onClick={() => setSure(true)}>
+            Mark society done
+          </button>
+        )}
         <Said state={state} />
       </div>
     </form>
