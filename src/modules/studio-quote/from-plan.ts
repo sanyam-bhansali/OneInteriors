@@ -29,6 +29,7 @@ import { readPlanOnce } from '@/modules/floorplan/plan-reads';
 import { applyConfiguration, createQuote, saveQuoteLines, saveQuoteTerms, type SaveLineInput } from './quotes';
 import { isConfigName } from './configure';
 import { withTitle } from './client-title';
+import { fillFromPrevious } from './from-previous';
 import { readRoomsRefusal } from './write-rules';
 import {
   fileReadingOf,
@@ -390,6 +391,8 @@ export interface FirstQuoteInput {
   onSpotLabel: string | null;
   /** Mr / Mrs / Miss before the name on the quotation (owner, 14 Nov 2026). */
   clientTitle?: string | null;
+  /** The previous quotation the lines were copied from (owner, 17 Nov 2026): its terms come too. */
+  fromQuoteId?: string | null;
 }
 
 /**
@@ -453,6 +456,12 @@ export async function saveFirstQuote(input: FirstQuoteInput): Promise<{ ok: true
 
   const saved = await saveQuoteLines(created.id, input.lines);
   if (!saved.ok) return { ok: false, error: `The quotation was started, but its lines did not save: ${saved.error}` };
+
+  /* Started from a previous quotation: its fee, discount, GST, advance, payment stages and terms text (the lines are the ones on screen). */
+  if (typeof input.fromQuoteId === 'string' && input.fromQuoteId) {
+    const filled = await fillFromPrevious(created.id, input.fromQuoteId, false);
+    if (!filled.ok) return { ok: false, error: `The quotation was saved, but the previous quotation's terms did not copy: ${filled.error}` };
+  }
 
   const row = await prisma.studioQuote.findFirst({
     where: { id: created.id, studioId },

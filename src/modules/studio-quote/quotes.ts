@@ -432,7 +432,7 @@ export interface NewQuoteInput {
  * owner and PM, the studio's; a salesperson, only those of leads assigned
  * to them. `where` goes into every quotation query here, beside `studioId`.
  */
-async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null } | null> {
+export async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null } | null> {
   const lead = await myLeadScope();
   if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return designerQuoteScope();
   /* Sales roles (owner, 22 Oct 2026): `where` is what they may read, `write`

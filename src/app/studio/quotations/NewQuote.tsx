@@ -10,6 +10,7 @@ import type { FoundClient } from '@/modules/studio-practice/clients';
 import { IDLE } from '../form-state';
 import { LineIcon } from '../ui/icons';
 import { CATEGORY_WORDS, QUOTE_CATEGORIES } from '@/modules/studio-quote/category-rules';
+import { PreviousQuotePicker, type PickedQuote } from './PreviousQuotePicker';
 
 /**
  * Starting a quotation — which means building one.
@@ -71,6 +72,9 @@ export function StartQuote({
   const [society, setSociety] = useState('');
   const [found, setFound] = useState<FoundClient[]>([]);
   const [addLead, setAddLead] = useState(true);
+  /* Start from a previous quotation (owner, 17 Nov 2026). */
+  const [copying, setCopying] = useState(false);
+  const [from, setFrom] = useState<PickedQuote | null>(null);
 
   async function look(text: string) {
     setName(text);
@@ -98,6 +102,7 @@ export function StartQuote({
           checkbox would post nothing when unticked, which is exactly the
           value we need to send. */}
       <input type="hidden" name="build" value={build ? 'yes' : 'no'} />
+      <input type="hidden" name="fromQuoteId" value={copying && from ? from.id : ''} />
 
       <div className="chead">
         <div>
@@ -199,25 +204,29 @@ export function StartQuote({
           </select>
         </label>
 
-        <label className="qfield" style={{ width: '8.5rem' }}>
-          <span className="lbl">Kitchen run mm</span>
-          <input name="kitchenRunMm" inputMode="numeric" placeholder={String(standardRunFor(config))} className="fld num" />
-        </label>
+        {copying ? null : (
+          <>
+            <label className="qfield" style={{ width: '8.5rem' }}>
+              <span className="lbl">Kitchen run mm</span>
+              <input name="kitchenRunMm" inputMode="numeric" placeholder={String(standardRunFor(config))} className="fld num" />
+            </label>
 
-        <label className="qfield" style={{ width: '6rem' }}>
-          <span className="lbl">Bathrooms</span>
-          <input name="bathrooms" inputMode="numeric" defaultValue="2" className="fld num" />
-        </label>
+            <label className="qfield" style={{ width: '6rem' }}>
+              <span className="lbl">Bathrooms</span>
+              <input name="bathrooms" inputMode="numeric" defaultValue="2" className="fld num" />
+            </label>
 
-        <label className="qcheck">
-          <input type="checkbox" name="study" value="yes" />
-          Study or office
-        </label>
+            <label className="qcheck">
+              <input type="checkbox" name="study" value="yes" />
+              Study or office
+            </label>
 
-        <label className="qcheck">
-          <input type="checkbox" name="balcony" value="yes" defaultChecked />
-          Dry balcony
-        </label>
+            <label className="qcheck">
+              <input type="checkbox" name="balcony" value="yes" defaultChecked />
+              Dry balcony
+            </label>
+          </>
+        )}
 
         <label className="qfield" style={{ width: '8.5rem' }}>
           <span className="lbl">Carpet sq ft — optional</span>
@@ -238,21 +247,58 @@ export function StartQuote({
         ))}
       </fieldset>
 
-      <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
-        Leave the kitchen run blank and a {config} is assumed at <span className="mono">{standardRunFor(config)}</span>mm — it is
-        the one measurement that moves the total, so it is worth taking. Every size and rate is editable afterwards.
-      </p>
+      <div className="qrow" style={{ display: 'block' }}>
+        <label className="qcheck" style={{ minHeight: 0 }}>
+          <input
+            type="checkbox"
+            checked={copying}
+            onChange={(e) => {
+              setCopying(e.target.checked);
+              if (!e.target.checked) setFrom(null);
+            }}
+          />
+          Start from a previous quotation — copy its rooms, items, rates and terms for this client
+        </label>
+        {copying ? (
+          <div style={{ marginTop: 8 }}>
+            <PreviousQuotePicker
+              picked={from}
+              onPick={(q) => {
+                setFrom(q);
+                if (q.config && (CONFIGS as readonly string[]).includes(q.config)) setConfig(q.config as ConfigName);
+                if (q.category) setCategory(q.category);
+              }}
+              onClear={() => setFrom(null)}
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {copying ? null : (
+        <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
+          Leave the kitchen run blank and a {config} is assumed at <span className="mono">{standardRunFor(config)}</span>mm — it is
+          the one measurement that moves the total, so it is worth taking. Every size and rate is editable afterwards.
+        </p>
+      )}
 
       <div className="hstack" style={{ paddingTop: 14, borderTop: '1px solid var(--fill2)' }}>
-        <button type="submit" disabled={pending} onClick={() => setBuild(true)} className="btn pri">
-          {pending ? 'Building…' : `Build the ${config}`}
-        </button>
+        {copying ? (
+          <button type="submit" disabled={pending || !from} onClick={() => setBuild(false)} className="btn pri">
+            {pending ? 'Copying…' : from ? `Copy ${from.number} for this client` : 'Pick a quotation to copy'}
+          </button>
+        ) : (
+          <>
+            <button type="submit" disabled={pending} onClick={() => setBuild(true)} className="btn pri">
+              {pending ? 'Building…' : `Build the ${config}`}
+            </button>
 
-        {/* Same form, same submit. The flag decides, so there is no second
-            code path to keep in step with the first. */}
-        <button type="submit" disabled={pending} onClick={() => setBuild(false)} className="btn sec">
-          Start it blank
-        </button>
+            {/* Same form, same submit. The flag decides, so there is no second
+                code path to keep in step with the first. */}
+            <button type="submit" disabled={pending} onClick={() => setBuild(false)} className="btn sec">
+              Start it blank
+            </button>
+          </>
+        )}
 
         {compact ? (
           <button type="button" onClick={() => setOpen(false)} className="btn ghost">
