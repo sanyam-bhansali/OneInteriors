@@ -34,6 +34,7 @@ import { asQuoteCategory, CATEGORY_ERRORS } from '@/modules/studio-quote/categor
 // callers take the type from form-state directly.
 import type { State } from '../form-state';
 import { withTitle } from '@/modules/studio-quote/client-title';
+import { fillFromPrevious, previousQuotes, previousQuoteToCopy, type PreviousQuote, type PreviousQuoteCopy } from '@/modules/studio-quote/from-previous';
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 
@@ -109,7 +110,15 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
 
   if (!result.ok) return result;
 
-  if (str(form, 'build') === 'yes' && isConfigName(config)) {
+  /* Start from a previous quotation (owner, 17 Nov 2026): its lines and terms, for this new client. */
+  const fromQuoteId = str(form, 'fromQuoteId');
+  if (fromQuoteId) {
+    const filled = await fillFromPrevious(result.id, fromQuoteId, true);
+    if (!filled.ok) {
+      refresh();
+      return { ok: false, error: `${filled.error} The new quotation is in your list.` };
+    }
+  } else if (str(form, 'build') === 'yes' && isConfigName(config)) {
     const run = Number(str(form, 'kitchenRunMm'));
     const baths = Number(str(form, 'bathrooms'));
 
@@ -196,6 +205,16 @@ export async function copyQuoteAction(quoteId: string, kind: 'template' | 'desig
   if (!result.ok) return result;
   refresh(result.id);
   redirect(`/studio/quotations/${result.id}`);
+}
+
+/** "Start from a previous quotation": the ones this person may copy, matching the search (client, number, society, BHK). */
+export async function previousQuotesAction(search: string): Promise<PreviousQuote[]> {
+  return previousQuotes(String(search ?? '').slice(0, 80));
+}
+
+/** One previous quotation's lines and terms, and what has changed in the product master since. */
+export async function previousQuoteAction(quoteId: string): Promise<PreviousQuoteCopy> {
+  return previousQuoteToCopy(String(quoteId ?? '').slice(0, 64));
 }
 
 /** Delete a draft that was never sent. */

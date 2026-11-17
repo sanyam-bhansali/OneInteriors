@@ -23,6 +23,7 @@ import { DocumentPreview } from '../[id]/QuotePanels';
 import { DiscountPicker, Sec } from '../[id]/HPanels';
 import { rupeesToPaiseText } from '../[id]/TermsPanel';
 import type { EditableLine } from '../[id]/QuoteLines';
+import { PreviousQuotePicker, type PickedQuote } from '../PreviousQuotePicker';
 
 type Lead = Pick<FoundClient, 'id' | 'name' | 'phone' | 'society'>;
 type Plan = { id: string; name: string; read: boolean };
@@ -78,6 +79,9 @@ export function FirstQuote({
   const [lines, setLines] = useState<EditableLine[]>([]);
   const [tab, setTab] = useState<'quote' | 'plan' | 'pdf'>('quote');
   const [status, setStatus] = useState('');
+  /* Start from a previous quotation (owner, 17 Nov 2026): its lines fill the table; its terms are copied on save. */
+  const [from, setFrom] = useState<PickedQuote | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [state, save, saving] = useActionState(async (_prev: State, _f: FormData): Promise<State> => {
     const r = await saveFirstQuoteAction({
       clientId: lead?.id ?? '',
@@ -92,6 +96,7 @@ export function FirstQuote({
       onSpotPaise: rupeesToPaiseText(onSpot) ?? 0,
       onSpotLabel: onSpotLabel || null,
       clientTitle: title || null,
+      fromQuoteId: from?.id ?? null,
     });
     return r ?? { ok: true };
   }, { ok: true } as State);
@@ -206,6 +211,7 @@ export function FirstQuote({
       catalogue,
     );
     let n = 0;
+    setFrom(null);
     setLines(planned.map((l) => ({ ...l, key: `fq-${(n += 1)}`, agreedPaise: null })));
     setTab('quote');
     if (planned.length > 0 && notes.length > 0) setStatus(notes[0]!);
@@ -344,6 +350,44 @@ export function FirstQuote({
         <button type="button" className="btn pri hwide" onClick={() => build()}>
           Build first quotation ▸
         </button>
+        <label className="hcheck">
+          <input
+            type="checkbox"
+            checked={copyOpen}
+            onChange={(e) => {
+              setCopyOpen(e.target.checked);
+              if (!e.target.checked && from) {
+                setFrom(null);
+                setLines([]);
+                setStatus('');
+              }
+            }}
+          />{' '}
+          Or start from a previous quotation
+        </label>
+        {copyOpen ? (
+          <PreviousQuotePicker
+            compact
+            picked={from}
+            onPick={(q) => {
+              let n = 0;
+              setFrom(q);
+              setLines(q.lines.map((l) => ({ ...l, key: `pq-${(n += 1)}` })));
+              if (q.config && (CONFIGS as readonly string[]).includes(q.config)) setConfig(q.config as ConfigName);
+              setRun(q.kitchenRunMm ? String(q.kitchenRunMm) : '');
+              if (q.bathrooms != null) setBaths(String(q.bathrooms));
+              setOnSpot(q.onSpotPaise > 0 ? String(q.onSpotPaise / 100) : '');
+              setOnSpotLabel(q.onSpotPaise > 0 ? (q.onSpotLabel ?? DISCOUNT_NAMES[0]) : '');
+              setTab('quote');
+              setStatus(`Copied ${q.number}'s ${q.lines.length} lines. Edit them here or in the Full Builder; its terms come with it when you save.`);
+            }}
+            onClear={() => {
+              setFrom(null);
+              setLines([]);
+              setStatus('');
+            }}
+          />
+        ) : null}
         <form action={save}>
           <button type="submit" className="btn sec hwide" disabled={saving || lines.length === 0 || (!lead && name.trim().length < 2)}>
             {saving ? 'Saving…' : 'Revise in Full Builder →'}
