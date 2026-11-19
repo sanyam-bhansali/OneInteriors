@@ -13,6 +13,7 @@ import {
   SALES_FINAL_ERRORS,
   type RevisionLine,
   type RevisionTerms,
+  sendRefusal,
 } from '@/modules/studio-sales/revision-rules';
 import { compareToIssued } from '@/modules/studio-quote/revision';
 
@@ -119,4 +120,10 @@ describe('marking the sales final', () => {
     expect(sameLinesAs(r3, [line('Kitchen', 'Base', 320_000)])).toBe(true);
     expect(sameLinesAs(r3, [line('Kitchen', 'Base', 330_000)])).toBe(false);
   });
+});
+
+describe('sendRefusal (sales walkthrough, 19 Nov 2026: no ₹0 quotation to the client)', () => {
+  it('refuses a quotation with no lines', () => expect(sendRefusal({ lineCount: 0, totalPaise: 0 })).toMatch(/nothing on this quotation/));
+  it('refuses lines with no rates (₹0)', () => expect(sendRefusal({ lineCount: 21, totalPaise: 0 })).toMatch(/₹0/));
+  it('lets a priced quotation go', () => expect(sendRefusal({ lineCount: 21, totalPaise: 8_422_100 })).toBeNull());
 });

@@ -40,7 +40,7 @@ import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } fr
 import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
 import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
-import { issueRevision } from '@/modules/studio-sales/revisions';
+import { issueRevision, sendRefusalFor } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
 import { cleanNote } from './line-note';
 import { readRevisionLines, readRevisionTerms, type RevisionLine, type RevisionTerms } from '@/modules/studio-sales/revision-rules';
@@ -1110,6 +1110,9 @@ export async function setQuoteStatus(
     const studioId = (await quoteScope())?.studioId ?? null;
     const refusal = studioId ? await photoGate({ studioId, quoteId }, 'send') : null;
     if (refusal) return { ok: false, error: refusal };
+    /* Not at ₹0 (sales walkthrough, 19 Nov 2026): the sales final could never be marked on it. */
+    const empty = studioId ? await sendRefusalFor(quoteId, studioId) : null;
+    if (empty) return { ok: false, error: empty };
   }
 
   try {
