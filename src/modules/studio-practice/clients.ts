@@ -54,6 +54,7 @@ import { reactionLine, type CallReactionId } from './call-log';
 import { allowedCallMoves } from './call-step-rules';
 import { queueConversions } from '@/modules/studio-sales/conversions';
 import { wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
+import { phoneSearchDigits } from '@/modules/studio/phone-search';
 
 export interface ClientRow {
   id: string;
@@ -1521,7 +1522,7 @@ export async function findClients(query: string): Promise<FoundClient[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const digits = q.replace(/\D/g, '');
+  const digits = phoneSearchDigits(q);
 
   try {
     const rows = await prisma.studioClient.findMany({
@@ -1533,7 +1534,7 @@ export async function findClients(query: string): Promise<FoundClient[]> {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { society: { contains: q, mode: 'insensitive' } },
-          ...(digits.length >= 4 ? [{ phone: { contains: digits } }] : []),
+          ...(digits ? [{ phone: { contains: digits } }] : []),
         ],
       },
       orderBy: { updatedAt: 'desc' },

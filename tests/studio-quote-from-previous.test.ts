@@ -3,6 +3,7 @@ import {
   copiedLines,
   fillRefusal,
   previousQuotesWhere,
+  templateSourceWhere,
   rateChanges,
   templateLines,
   templateTerms,
@@ -155,5 +156,19 @@ describe('which quotation may be filled', () => {
   it('not over lines already there, unless only the terms are copied', () => {
     expect(fillRefusal({ ...fresh, lineCount: 3 }, true)).not.toBeNull();
     expect(fillRefusal({ ...fresh, lineCount: 3 }, false)).toBeNull();
+  });
+});
+
+describe('templateSourceWhere (owner, 19 Nov 2026: reps pick from every quotation)', () => {
+  const own = { studioId: 's1', client: { assignedToId: 'rep' } };
+  it('anyone who writes quotations picks from the whole studio', () => {
+    expect(templateSourceWhere({ studioId: 's1', where: own, lead: { reach: 'own' } })).toEqual({ studioId: 's1' });
+  });
+  it('a designer (no lead scope) keeps their own scope', () => {
+    expect(templateSourceWhere({ studioId: 's1', where: own, lead: null })).toBe(own);
+  });
+  it('the list still stays inside the studio and only quotations with lines', () => {
+    const w = previousQuotesWhere(templateSourceWhere({ studioId: 's1', where: own, lead: {} }), 's1', '');
+    expect(w).toEqual({ AND: [{ studioId: 's1' }, { studioId: 's1' }, { lines: { some: {} } }] });
   });
 });

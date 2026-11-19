@@ -34,7 +34,7 @@ import {
 import { cleanStages, readStages, scheduleAmounts, templateOrDefault, type PaymentStage, type ScheduledStage } from './payment-template';
 import { leadFileExists, leadUploadTicket, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
-import { checkSalesNotes, voiceExtOf } from './revision-rules';
+import { checkSalesNotes, sendRefusal, voiceExtOf } from './revision-rules';
 import { photoGate } from '@/modules/items/server';
 import { categoryRefusal } from '@/modules/studio-quote/category-rules';
 
@@ -319,6 +319,15 @@ export async function quoteSalesView(quoteId: string): Promise<QuoteSalesView | 
   }
 }
 
+/** Why this sales quotation cannot be sent as it stands (no lines, or ₹0), or null. */
+export async function sendRefusalFor(quoteId: string, studioId: string): Promise<string | null> {
+  const q = await prisma.studioQuote.findFirst({ where: { id: quoteId, studioId }, select: { ...QUOTE_FOR_REVISION, stage: true, scopeForProjectId: true } });
+  if (!q) return 'That quotation is not yours.';
+  /* Sales quotations only: a design final or an additional scope (a change order can take things out) is not refused here. */
+  if (q.stage !== 'SALES' || q.scopeForProjectId !== null) return null;
+  return sendRefusal({ lineCount: q.lines.length, totalPaise: snapshotOf(q).totals.totalPaise });
+}
+
 /** Send the quotation again: the next revision, when something changed. */
 export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number; created: boolean } | { ok: false; error: string }> {
   const scope = await myLeadScope();
@@ -338,6 +347,8 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   if (q.status !== 'ISSUED') return { ok: false, error: 'Mark it as sent first.' };
   const noPhoto = await photoGate({ studioId, quoteId: q.id }, 'send');
   if (noPhoto) return { ok: false, error: noPhoto };
+  const empty = await sendRefusalFor(q.id, studioId);
+  if (empty) return { ok: false, error: empty };
   const r = await issueRevision({ quoteId: q.id, studioId });
   if (!r) return { ok: false, error: 'There is nothing on this quotation to send.' };
   await completeRequestForQuote(studioId, q.id, await actingMember());

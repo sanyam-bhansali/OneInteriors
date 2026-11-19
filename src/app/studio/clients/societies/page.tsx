@@ -43,7 +43,7 @@ export default async function SocietiesPage({ searchParams }: { searchParams: Pr
     locality: one('locality') || null,
     status: one('status') === 'done' || one('status') === 'all' ? (one('status') as 'done' | 'all') : '',
   };
-  const [rows, people, localities] = await Promise.all([listSocieties(access, filters), societyPeople(access.scope.studioId), societyLocalities(access)]);
+  const [rows, people, localities] = await Promise.all([listSocieties(access, filters), societyPeople(access), societyLocalities(access)]);
   const counts = { P1: 0, P2: 0, P3: 0 } as Record<Priority, number>;
   for (const r of rows) counts[r.priority]++;
   const filtered = Object.values(filters).some(Boolean);

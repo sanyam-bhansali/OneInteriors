@@ -204,3 +204,21 @@ export function sameLinesAs(revision: readonly RevisionLine[], current: readonly
 }
 
 const ZERO_TERMS: RevisionTerms = { feeBps: 0, discountBps: 0, onSpotPaise: 0, onSpotLabel: null, bookingAdvancePaise: 0, gstBps: 0, phases: null };
+
+/**
+ * Why this quotation cannot go to the client yet, or null (sales walkthrough,
+ * 19 Nov 2026): a draft built from a lead with no rates on its lines totals
+ * ₹0, was marked sent, and then could never be the sales final ("There is no
+ * total to split yet").
+ */
+export function sendRefusal(m: { lineCount: number; totalPaise: number }): string | null {
+  if (m.lineCount === 0) return 'There is nothing on this quotation to send. Add its lines first.';
+  if (!(m.totalPaise > 0)) return 'This quotation totals ₹0. Put a rate on its lines before you send it.';
+  return null;
+}
+
+/** The revision the sales-final picker starts on: the latest one sent (the highest number), or null. */
+export function latestRevision(revisions: readonly { n: number }[]): number | null {
+  return revisions.reduce<number | null>((best, r) => (best === null || r.n > best ? r.n : best), null);
+}
+

@@ -245,3 +245,13 @@ function utcMonth(y: number, mo: number): Date | null {
   if (!(y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12)) return null;
   return new Date(Date.UTC(y, mo - 1, 1));
 }
+
+/**
+ * Whether saving this possession month would clear it, and has not been
+ * confirmed yet (owner, 19 Nov 2026: an empty month cleared every wing with
+ * no question). True means: stop and ask "Clear possession for every wing?".
+ */
+export function clearsPossession(month: unknown, confirmed: boolean): boolean {
+  return !confirmed && (typeof month !== 'string' || month.trim() === '');
+}
+

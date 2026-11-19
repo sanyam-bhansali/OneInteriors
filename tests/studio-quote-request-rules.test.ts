@@ -337,3 +337,18 @@ describe('words', () => {
     expect(requestedMessage({ created: false, assignedName: null, mine: false })).toMatch(/open already/);
   });
 });
+
+describe('a saved builder list is the whole turn list (owner, 19 Nov 2026: only Swarupa and Khushi)', () => {
+  const builds = { 'quotes.build': true };
+  const team = [
+    { id: 'swarupa', name: 'Swarupa', role: 'SALES', status: 'ACTIVE', salesPermissions: builds },
+    { id: 'khushi', name: 'Khushi', role: 'SALES', status: 'ACTIVE', salesPermissions: builds },
+    { id: 'newhead', name: 'New head', role: 'SALES', status: 'ACTIVE', salesPermissions: builds },
+  ];
+  it('a new sales head whose role builds quotations is not added on their own', () => {
+    expect(buildersNow(team, ['swarupa', 'khushi']).map((s) => s.id)).toEqual(['swarupa', 'khushi']);
+  });
+  it('without a saved list, the turns follow the roles (every role with "Builds quotations")', () => {
+    expect(buildersNow(team, []).map((s) => s.id)).toEqual(['swarupa', 'khushi', 'newhead']);
+  });
+});

@@ -288,9 +288,9 @@ export function LeadHeader({
             Converted
           </span>
         ) : (
+          /* "Convert", not "✓ Converted": it looked like the badge of a lead already converted (owner, 19 Nov 2026). */
           <button type="button" onClick={() => setConvertTo('')} className="btn sm" style={{ background: 'var(--good-bg)', color: 'var(--good)' }}>
-            {icon('M5 12.5l4.5 4.5L19 7.5')}
-            Converted
+            Convert
           </button>
         )}
         {may.delete ? (

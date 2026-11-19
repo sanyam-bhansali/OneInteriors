@@ -133,7 +133,8 @@ export const SEE_ALL: Partial<Record<SectionId, string>> = {
   meetings: '/studio/calendar?view=day',
   quotes: '/studio/quotations',
   bookings: '/studio/clients?view=list&booked=7d',
-  pool: '/studio/clients?view=list&owner=pool&kind=open&sort=oldest',
+  /* The Pool tab (owner, 19 Nov 2026: Home's "new leads in the pool" opened the old list view). */
+  pool: '/studio/clients/pool',
   'never-called': '/studio/clients?view=list&never=1&owner=anyone&sort=oldest',
 };
 

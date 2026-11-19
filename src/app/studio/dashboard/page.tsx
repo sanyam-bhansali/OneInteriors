@@ -46,7 +46,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="phead">
         <div>
           <h1>Analytics</h1>
-          <p className="muted">{d.seesAll ? 'Every lead in the studio. Tap any number to see those leads.' : 'Your leads. Tap any number to see them.'}</p>
+          <p className="muted">{d.team ? 'Your team’s leads and your team pool. Tap any number to see those leads.' : d.seesAll ? 'Every lead in the studio. Tap any number to see those leads.' : 'Your leads. Tap any number to see them.'}</p>
         </div>
       </div>
       <AnalyticsTabs active="overview" full={full} />

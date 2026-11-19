@@ -45,3 +45,20 @@ export function checkHandover(raw: unknown): { ok: true; value: string } | { ok:
   if (text.length > HANDOVER_MAX) return { ok: false, error: `Keep the handover under ${HANDOVER_MAX} characters.` };
   return { ok: true, value: text };
 }
+
+/**
+ * What Convert writes on the lead (owner, 19 Nov 2026: "yes clear it"). The
+ * follow-up call goes: the client has booked, and a leftover "call them on
+ * Sunday" kept showing on Today and the calendar.
+ */
+export function convertedLeadData(m: { now: Date; introductionId: string; fromStageId: string; wonStageId: string | null }) {
+  return {
+    bookedIntroductionId: m.introductionId,
+    bookedAt: m.now,
+    preBookingStageId: m.fromStageId,
+    nextAction: null,
+    nextActionOn: null,
+    ...(m.wonStageId ? { stageId: m.wonStageId, lostReason: null } : {}),
+  };
+}
+

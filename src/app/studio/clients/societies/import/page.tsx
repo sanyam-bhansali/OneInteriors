@@ -24,7 +24,7 @@ export default async function SocietyImportPage() {
       </main>
     );
   }
-  const people = access.mayManage ? await societyPeople(access.scope.studioId) : [];
+  const people = access.mayManage ? await societyPeople(access) : [];
   return (
     <main className="content cl-page soc-page">
       <p style={{ margin: 0 }}>

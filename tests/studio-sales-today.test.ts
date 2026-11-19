@@ -150,3 +150,10 @@ describe('the morning email', () => {
     expect(todayEmail(s, 'A', 'B')!.body).toContain('- and 20 more');
   });
 });
+
+describe('the pool link (owner, 19 Nov 2026)', () => {
+  it('opens the Pool tab, not the old list view', async () => {
+    const { SEE_ALL } = await import('@/modules/studio-sales/today-rules');
+    expect(SEE_ALL.pool).toBe('/studio/clients/pool');
+  });
+});

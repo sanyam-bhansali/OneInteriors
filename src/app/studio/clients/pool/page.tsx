@@ -145,6 +145,7 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
           seesAll={scope.seesAll}
           assigner={assigner}
           team={scope.team ? [...scope.team] : null}
+          assignTeam={assignReach === 'team' && hasSalesRole(me) ? [...me.sales.subtree] : null}
           meId={me.id}
           moveTo={moveTo}
           showingAll={showingAll}

@@ -40,7 +40,7 @@ import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } fr
 import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
 import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
-import { issueRevision } from '@/modules/studio-sales/revisions';
+import { issueRevision, sendRefusalFor } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
 import { cleanNote } from './line-note';
 import { readRevisionLines, readRevisionTerms, type RevisionLine, type RevisionTerms } from '@/modules/studio-sales/revision-rules';
@@ -48,6 +48,7 @@ import { currentMember } from '@/modules/studio/access';
 import { asQuoteCategory, categoryRefusal, CATEGORY_ERRORS } from './category-rules';
 import { readSignedStages } from '@/modules/portal/payments';
 import { restageOnTotal } from '@/modules/studio-design/restage';
+import { phoneSearchDigits } from '@/modules/studio/phone-search';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -156,7 +157,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
   if (!studioId) return [];
 
   const q = search?.trim().slice(0, 80);
-  const digits = q?.replace(/\D/g, '') ?? '';
+  const digits = q ? phoneSearchDigits(q) : null;
   try {
     const rows = await prisma.studioQuote.findMany({
       where: {
@@ -168,7 +169,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
                 { clientName: { contains: q, mode: 'insensitive' as const } },
                 { number: { contains: q, mode: 'insensitive' as const } },
                 { society: { contains: q, mode: 'insensitive' as const } },
-                ...(digits.length >= 4 ? [{ clientPhone: { contains: digits } }] : []),
+                ...(digits ? [{ clientPhone: { contains: digits } }] : []),
               ],
             }
           : {}),
@@ -1109,6 +1110,9 @@ export async function setQuoteStatus(
     const studioId = (await quoteScope())?.studioId ?? null;
     const refusal = studioId ? await photoGate({ studioId, quoteId }, 'send') : null;
     if (refusal) return { ok: false, error: refusal };
+    /* Not at ₹0 (sales walkthrough, 19 Nov 2026): the sales final could never be marked on it. */
+    const empty = studioId ? await sendRefusalFor(quoteId, studioId) : null;
+    if (empty) return { ok: false, error: empty };
   }
 
   try {

@@ -60,7 +60,7 @@ export function rangeKpis(range: RangeToken): KpiSpec[] {
     { key: 'contacted', label: 'Contacted', note: 'last call in these days', filters: { contacted: range } },
     { key: 'quoted', label: 'Quotations sent', note: 'leads sent a quotation', filters: { quoted: range } },
     { key: 'final', label: 'Sales finals', note: 'leads with a sales final marked', filters: { final: range } },
-    { key: 'booked', label: 'Bookings', note: 'booking advance recorded', filters: { booked: range } },
+    { key: 'booked', label: 'Bookings', note: 'leads converted (or a booking recorded)', filters: { booked: range } },
   ];
 }
 

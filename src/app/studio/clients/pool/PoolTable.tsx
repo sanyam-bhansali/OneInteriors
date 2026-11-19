@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SELECT_FIRST, type BulkAction } from '@/modules/studio-sales/bulk-rules';
 import { NOT_SET } from '@/modules/studio-sales/lead-filters';
-import { relTime, seesFullLead, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
+import { emptyPoolMessage } from '@/modules/studio-sales/pool-empty';
+import { mayAssignPoolRow, relTime, seesFullLead, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
 import { assignLeadsAction } from '../../sales-actions';
 import { Avatar, SelectMenu, StageBadge, btnOutline } from '../ax-ui';
 import { BulkBar, ClaimOne } from '../LeadList';
@@ -29,6 +30,7 @@ export function PoolTable({
   seesAll,
   assigner = seesAll,
   team = null,
+  assignTeam = null,
   meId = '',
   moveTo = [],
   showingAll,
@@ -49,6 +51,8 @@ export function PoolTable({
   assigner?: boolean;
   /** Sales roles: their team, when their leads reach it (team pool leads open in full). */
   team?: string[] | null;
+  /** Whose leads they may give out: their team (a team `leads.assign`), or null for anyone's. */
+  assignTeam?: string[] | null;
   meId?: string;
   /** Pools a lead may be moved into (`studio` or a head's id). */
   moveTo?: { key: string; label: string }[];
@@ -263,14 +267,14 @@ export function PoolTable({
                       <span className={`chip xs ${l.source === 'ONE_INTERIORS' ? 'oi' : ''}`}>{sourceLabel(l)}</span>
                     </td>
                     <td className={`${TD} sub`}>{now ? relTime(l.createdAt, now) : ''}</td>
-                    <td className={TD}>{assigner ? <AssignRow id={l.id} people={people} current={l.assignedToName} moveTo={moveTo.filter((m) => m.key !== (l.poolTeamId ?? 'studio'))} /> : <ClaimOne id={l.id} />}</td>
+                    <td className={TD}>{assigner && mayAssignPoolRow(meId, assignTeam, l) ? <AssignRow id={l.id} people={people} current={l.assignedToName} moveTo={moveTo.filter((m) => m.key !== (l.poolTeamId ?? 'studio'))} /> : <ClaimOne id={l.id} />}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        {rows.length === 0 ? <p className="muted" style={{ margin: 0, padding: '32px 16px', textAlign: 'center' }}>{showingAll ? 'No leads here.' : 'Nothing in the pool — every lead has an owner.'}</p> : null}
+        {rows.length === 0 ? <p className="muted" style={{ margin: 0, padding: '32px 16px', textAlign: 'center' }}>{emptyPoolMessage(query, showingAll)}</p> : null}
       </section>
       {next ? <div ref={sentinel} style={{ height: 1 }} aria-hidden /> : null}
       {loading ? <p className="cl-foot">Loading…</p> : null}
@@ -297,3 +301,4 @@ function AssignRow({ id, people, current, moveTo = [] }: { id: string; people: {
     </div>
   );
 }
+

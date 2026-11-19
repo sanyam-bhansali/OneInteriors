@@ -223,7 +223,7 @@ export default async function ClientPage({
               {
                 key: 'tasks',
                 label: openTasks ? `Tasks (${openTasks})` : 'Tasks',
-                content: <LeadTasks leadId={client.id} tasks={tasks} people={taskWho} seesAll={seesAll} meId={member?.id ?? null} may={page.may.edit} />,
+                content: <LeadTasks leadId={client.id} tasks={tasks} people={taskWho} seesAll={seesAll} meId={member?.id ?? null} ownerId={client.assignedToId} may={page.may.edit} />,
               },
             ]}
           />

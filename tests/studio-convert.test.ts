@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { BULK_CONVERT, CONVERT_FIRST, HANDOVER_MIN, checkHandover, wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
+import { BULK_CONVERT, CONVERT_FIRST, HANDOVER_MIN, checkHandover, convertedLeadData, wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
 import { can } from '@/modules/studio/roles';
 import { messageFor, EMAILED_TO_STUDIO } from '@/modules/notify/messages';
 
@@ -75,5 +75,18 @@ describe('source guards', () => {
   });
   it('convert writes no payment (accounts records the advance later)', () => {
     expect(read('src/modules/studio-sales/convert.ts')).not.toMatch(/homeProjectPayment\.create/);
+  });
+});
+
+describe('what Convert writes on the lead (owner, 19 Nov 2026)', () => {
+  const now = new Date('2026-11-19T12:00:00Z');
+  it('clears the follow-up call, so it leaves Today', () => {
+    const d = convertedLeadData({ now, introductionId: 'i1', fromStageId: 's1', wonStageId: 'w1' });
+    expect(d).toMatchObject({ nextAction: null, nextActionOn: null, bookedIntroductionId: 'i1', bookedAt: now, preBookingStageId: 's1', stageId: 'w1', lostReason: null });
+  });
+  it('keeps the stage when there is no won column', () => {
+    const d = convertedLeadData({ now, introductionId: 'i1', fromStageId: 's1', wonStageId: null });
+    expect('stageId' in d).toBe(false);
+    expect(d.nextActionOn).toBeNull();
   });
 });

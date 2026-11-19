@@ -394,3 +394,11 @@ describe('diagnose', () => {
     }
   });
 });
+
+describe('Bookings note (sales walkthrough, 19 Nov 2026)', () => {
+  it('counts conversions; Convert does not record the advance, accounts does later', async () => {
+    const { rangeKpis } = await import('@/modules/studio-sales/dashboard-rules');
+    const booked = rangeKpis('7d').find((k) => k.key === 'booked');
+    expect(booked?.note).toBe('leads converted (or a booking recorded)');
+  });
+});

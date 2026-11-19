@@ -70,6 +70,23 @@ export function seesFullLead(
 }
 
 /**
+ * Whether the pool row offers "Assign to…" (sales walkthrough, 19 Nov 2026).
+ * Someone whose "Give leads to people" reaches only their team may hand out
+ * only their team's pool leads (sales-access.ts `leadInReach`): a studio-pool
+ * lead, or one in a head's pool above them, is theirs to claim, not to give.
+ * Offering "Assign to…" there ended in "None of those are leads you can see."
+ * `assignTeam` null = they assign anywhere (owner, PM, an all-reach role).
+ */
+export function mayAssignPoolRow(
+  meId: string,
+  assignTeam: readonly string[] | null,
+  lead: { assignedToId: string | null; poolTeamId?: string | null },
+): boolean {
+  if (assignTeam === null) return true;
+  return seesFullLead({ seesAll: false, member: { id: meId }, team: assignTeam }, lead);
+}
+
+/**
  * A lead as a salesperson sees it before claiming it: name, place, stage,
  * source, age and tags. No phone, no notes or next action, none of the
  * studio's own fields. Applied on the server, so none of it reaches the
