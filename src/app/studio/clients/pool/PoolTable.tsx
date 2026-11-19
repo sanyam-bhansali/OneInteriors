@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SELECT_FIRST, type BulkAction } from '@/modules/studio-sales/bulk-rules';
 import { NOT_SET } from '@/modules/studio-sales/lead-filters';
+import { emptyPoolMessage } from '@/modules/studio-sales/pool-empty';
 import { relTime, seesFullLead, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
 import { assignLeadsAction } from '../../sales-actions';
 import { Avatar, SelectMenu, StageBadge, btnOutline } from '../ax-ui';
@@ -270,7 +271,7 @@ export function PoolTable({
             </tbody>
           </table>
         </div>
-        {rows.length === 0 ? <p className="muted" style={{ margin: 0, padding: '32px 16px', textAlign: 'center' }}>{showingAll ? 'No leads here.' : 'Nothing in the pool — every lead has an owner.'}</p> : null}
+        {rows.length === 0 ? <p className="muted" style={{ margin: 0, padding: '32px 16px', textAlign: 'center' }}>{emptyPoolMessage(query, showingAll)}</p> : null}
       </section>
       {next ? <div ref={sentinel} style={{ height: 1 }} aria-hidden /> : null}
       {loading ? <p className="cl-foot">Loading…</p> : null}
@@ -297,3 +298,4 @@ function AssignRow({ id, people, current, moveTo = [] }: { id: string; people: {
     </div>
   );
 }
+
