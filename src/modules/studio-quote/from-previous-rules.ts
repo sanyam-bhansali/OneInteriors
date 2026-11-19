@@ -222,3 +222,15 @@ export function fillRefusal(target: { status: string; issuedOn: Date | null; lin
   if (withLines && target.lineCount > 0) return 'This quotation already has lines. Start a new quotation to copy one.';
   return null;
 }
+
+/**
+ * Which quotations may be copied FROM (owner, 19 Nov 2026: reps "should see
+ * all quotation" when starting from a previous one): anyone who writes
+ * quotations (`lead` scope present) picks from the whole studio; anyone else
+ * (a designer) keeps their own scope. Only for picking a template: who may
+ * open a quotation is unchanged.
+ */
+export function templateSourceWhere(qs: { studioId: string; where: Prisma.StudioQuoteWhereInput; lead: unknown }): Prisma.StudioQuoteWhereInput {
+  return qs.lead ? { studioId: qs.studioId } : qs.where;
+}
+

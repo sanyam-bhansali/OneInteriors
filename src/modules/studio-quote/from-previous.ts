@@ -3,9 +3,10 @@ import 'server-only';
 /**
  * "Start from a previous quotation" (owner, 17 Nov 2026). What is copied is
  * decided in `from-previous-rules.ts` (pure, tested); this file reads and
- * writes, always inside the signed-in person's quotation scope
- * (`quoteScope`: their studio, and for sales roles only their leads'
- * quotations). The new quotation itself is made by `createQuote`, for the
+ * writes inside the signed-in person's studio. The quotation copied FROM may
+ * be any of the studio's (owner, 19 Nov 2026: reps "should see all
+ * quotation" as templates; `templateSourceWhere`); the one written TO stays
+ * inside their own scope (`qs.write`), and opening a quotation is unchanged. The new quotation itself is made by `createQuote`, for the
  * NEW client, with every check that runs there (lead, role, rates gate,
  * branding); this only fills it.
  */
@@ -16,7 +17,7 @@ import { computeTotals } from './pricing';
 import { readPhases } from '@/modules/studio/payment-phases';
 import { quoteScope } from './quotes';
 import { myProducts } from './store';
-import { copiedLines, fillRefusal, previousQuotesWhere, rateChanges, templateLines, templateTerms, type CopiedLine, type RateChange } from './from-previous-rules';
+import { copiedLines, fillRefusal, previousQuotesWhere, templateSourceWhere, rateChanges, templateLines, templateTerms, type CopiedLine, type RateChange } from './from-previous-rules';
 
 export interface PreviousQuote {
   id: string;
@@ -38,7 +39,7 @@ export async function previousQuotes(search: string): Promise<PreviousQuote[]> {
   if (!qs?.lead) return [];
   try {
     const rows = await prisma.studioQuote.findMany({
-      where: previousQuotesWhere(qs.where, qs.studioId, String(search ?? '')),
+      where: previousQuotesWhere(templateSourceWhere(qs), qs.studioId, String(search ?? '')),
       orderBy: { updatedAt: 'desc' },
       take: 12,
       select: {
@@ -100,7 +101,7 @@ export async function previousQuoteToCopy(id: string): Promise<PreviousQuoteCopy
   const qs = await quoteScope();
   if (!qs?.lead) return { ok: false, error: NOT_YOURS };
   const source = await prisma.studioQuote.findFirst({
-    where: { AND: [qs.where, { studioId: qs.studioId, id: String(id ?? '').slice(0, 64) }] },
+    where: { AND: [templateSourceWhere(qs), { studioId: qs.studioId, id: String(id ?? '').slice(0, 64) }] },
     select: {
       id: true,
       number: true,
@@ -144,7 +145,7 @@ export async function fillFromPrevious(targetId: string, sourceId: string, withL
   const studioId = qs.studioId;
   const [source, target] = await Promise.all([
     prisma.studioQuote.findFirst({
-      where: { AND: [qs.where, { studioId, id: String(sourceId ?? '').slice(0, 64) }] },
+      where: { AND: [templateSourceWhere(qs), { studioId, id: String(sourceId ?? '').slice(0, 64) }] },
       select: {
         feeBps: true,
         discountBps: true,
