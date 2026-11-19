@@ -36,7 +36,7 @@ import { readStages, scheduleAmounts, templateOrDefault } from './payment-templa
 import { queueConversions } from './conversions';
 import { bookingRefusal } from './booking-rules';
 import { BOOKING_QUOTE, factsFor, firstWonStage } from './booking';
-import { checkHandover } from './convert-rules';
+import { checkHandover, convertedLeadData } from './convert-rules';
 
 export interface ConvertRevision {
   n: number;
@@ -221,12 +221,7 @@ export async function convertLead(input: { clientId: unknown; quoteId: unknown; 
         });
         await tx.studioClient.updateMany({
           where: { id: lead.id, studioId },
-          data: {
-            bookedIntroductionId: project.introductionId,
-            bookedAt: now,
-            preBookingStageId: lead.stageId,
-            ...(won ? { stageId: won.id, lostReason: null } : {}),
-          },
+          data: convertedLeadData({ now, introductionId: project.introductionId, fromStageId: lead.stageId, wonStageId: won?.id ?? null }),
         });
         await record({
           db: tx,
