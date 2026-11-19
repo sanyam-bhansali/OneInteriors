@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clearsPossession,
   classifyCall,
   compareSocieties,
   effectiveHeat,
@@ -116,5 +117,16 @@ describe('Society list order and names', () => {
     expect(iso(parsePossession(46447))).toBe('2027-03');
     expect(parsePossession('soon')).toBeNull();
     expect(parsePossession('')).toBeNull();
+  });
+});
+
+describe('clearsPossession (owner, 19 Nov 2026: ask before an empty month clears every wing)', () => {
+  it('asks when the month is empty and not yet confirmed', () => {
+    expect(clearsPossession('', false)).toBe(true);
+    expect(clearsPossession(null, false)).toBe(true);
+  });
+  it('goes ahead once confirmed, or when a month is picked', () => {
+    expect(clearsPossession('', true)).toBe(false);
+    expect(clearsPossession('2027-03', false)).toBe(false);
   });
 });

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { clearsPossession } from '@/modules/studio-practice/society-rules';
 import {
   addSocietyAction,
   assignLeadsAction,
@@ -368,6 +369,8 @@ export function AssignLeads({ id, people, total, unassigned }: { id: string; peo
 export function PossessionForm({ id, current, wings }: { id: string; current: string; wings: number }) {
   const [state, run, pending] = useActionState(possessionAction, null);
   const [open, setOpen] = useState(false);
+  /* An empty month clears every wing: ask first (owner, 19 Nov 2026). */
+  const [askClear, setAskClear] = useState(false);
   if (!open)
     return (
       <button type="button" className="linkbtn" onClick={() => setOpen(true)}>
@@ -375,15 +378,40 @@ export function PossessionForm({ id, current, wings }: { id: string; current: st
       </button>
     );
   return (
-    <form action={run} className="soc-override" aria-label="Change possession">
+    <form
+      action={run}
+      className="soc-override"
+      aria-label="Change possession"
+      onSubmit={(e) => {
+        const month = new FormData(e.currentTarget).get('possession');
+        if (clearsPossession(month, askClear)) {
+          e.preventDefault();
+          setAskClear(true);
+        }
+      }}
+    >
       <input type="hidden" name="id" value={id} />
-      <input name="possession" type="month" defaultValue={current} aria-label="Possession month" />
-      <button type="submit" className="btn pri sm" disabled={pending}>
-        {pending ? 'Saving…' : wings > 1 ? 'Save for all wings' : 'Save'}
-      </button>
-      <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
-        Close
-      </button>
+      <input name="possession" type="month" defaultValue={current} aria-label="Possession month" onChange={() => setAskClear(false)} />
+      {askClear ? (
+        <>
+          <span role="alert">{wings > 1 ? 'Clear possession for every wing?' : 'Clear the possession date?'}</span>
+          <button type="submit" className="btn pri sm" disabled={pending}>
+            {pending ? 'Saving…' : 'Yes, clear it'}
+          </button>
+          <button type="button" className="btn ghost sm" onClick={() => setAskClear(false)}>
+            No
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="submit" className="btn pri sm" disabled={pending}>
+            {pending ? 'Saving…' : wings > 1 ? 'Save for all wings' : 'Save'}
+          </button>
+          <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
+            Close
+          </button>
+        </>
+      )}
       <Said state={state} />
     </form>
   );
