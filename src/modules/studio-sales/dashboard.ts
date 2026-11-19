@@ -39,6 +39,8 @@ export interface PersonRow {
 
 export interface Dashboard {
   seesAll: boolean;
+  /** A sales role whose numbers reach their team (not the studio): the page says "your team", not "every lead". */
+  team: boolean;
   now: Kpi[];
   fresh: Kpi[];
   range: Kpi[];
@@ -118,6 +120,7 @@ export async function myDashboard(range: RangeToken, now = new Date()): Promise<
     return {
       /* The people table shows for the studio and for a team (sales roles). */
       seesAll: scope.seesAll || team !== null,
+      team: !scope.seesAll && team !== null,
       now: nowK,
       fresh: freshK,
       range: rangeK,
