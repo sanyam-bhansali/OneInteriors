@@ -87,11 +87,25 @@ export interface TaskInput {
   title: unknown;
   /** IST day `YYYY-MM-DD`. */
   day: unknown;
-  /** IST `HH:MM`; empty means 10 am. */
+  /** IST `HH:MM`; empty means the end of that day. */
   time: unknown;
 }
 
-export const DEFAULT_TASK_TIME = '10:00';
+/**
+ * A task with no time is due at the end of its day (owner, 19 Nov 2026). It
+ * was 10 am, so a task added for today in the afternoon was "late" the
+ * moment it was saved.
+ */
+export const DEFAULT_TASK_TIME = '23:59';
+
+/**
+ * Who a new task goes to (owner, 19 Nov 2026: a head's task on a rep's lead
+ * "should go to the rep"): the person picked, else the lead's owner, else
+ * the writer.
+ */
+export function defaultTaskAssignee(m: { asked: string | null; meId: string; leadOwnerId: string | null }): string {
+  return m.asked || m.leadOwnerId || m.meId;
+}
 
 /** A checked title and due instant, or what is wrong in plain words. */
 export function readTask(input: TaskInput): { ok: true; title: string; dueAt: Date } | { ok: false; error: string } {

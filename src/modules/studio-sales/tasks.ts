@@ -10,7 +10,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { currentMember } from '@/modules/studio/access';
 import { leadInScope, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
-import { mayAssignTaskTo, mayChangeTask, mayUseTasks, readTask, tasksVisibleTo, type TaskMember } from './task-rules';
+import { defaultTaskAssignee, mayAssignTaskTo, mayChangeTask, mayUseTasks, readTask, tasksVisibleTo, type TaskMember } from './task-rules';
 
 /** What a task write says back (the same shape as app/studio/sales-types.ts `Done`). */
 export type Done = { ok: true; message?: string } | { ok: false; error: string };
@@ -143,18 +143,15 @@ export interface TaskWrite {
   assignedToId?: unknown;
 }
 
-/** Write a task. Given to the writer unless (owner, PM) they pick someone. */
+/** Write a task. Given to the person picked; on a lead, else the lead's owner; else the writer. */
 export async function createTask(input: TaskWrite): Promise<Done> {
   const member = await me();
   if (!member) return { ok: false, error: 'Sign in to your studio first.' };
   const t = readTask(input);
   if (!t.ok) return t;
-  const assignee = typeof input.assignedToId === 'string' && input.assignedToId ? input.assignedToId : member.id;
-  if (!mayAssignTaskTo(member, assignee)) return { ok: false, error: 'You can only write tasks for yourself.' };
   try {
-    const person = await prisma.studioMember.findFirst({ where: { id: assignee, studioId: member.studioId, status: 'ACTIVE' }, select: { id: true } });
-    if (!person) return { ok: false, error: 'That person is not on your team.' };
     let leadId: string | null = null;
+    let leadOwnerId: string | null = null;
     if (typeof input.leadId === 'string' && input.leadId) {
       const scope = await myLeadScope();
       const lead = scope ? await leadInScope(scope, input.leadId) : null;
@@ -162,7 +159,13 @@ export async function createTask(input: TaskWrite): Promise<Done> {
       /* A task on a lead is working it: `lead.edit` on that lead (sales roles, owner 22 Oct 2026). */
       if (!scope || !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: 'Your role does not include working that lead.' };
       leadId = lead.id;
+      leadOwnerId = lead.assignedToId;
     }
+    const asked = typeof input.assignedToId === 'string' && input.assignedToId ? input.assignedToId : null;
+    const assignee = defaultTaskAssignee({ asked, meId: member.id, leadOwnerId });
+    if (!mayAssignTaskTo(member, assignee)) return { ok: false, error: asked ? 'You can only write tasks for yourself.' : 'Only the lead’s owner, or their head, can write tasks on it.' };
+    const person = await prisma.studioMember.findFirst({ where: { id: assignee, studioId: member.studioId, status: 'ACTIVE' }, select: { id: true } });
+    if (!person) return { ok: false, error: 'That person is not on your team.' };
     await prisma.studioTask.create({
       data: { studioId: member.studioId, title: t.title, dueAt: t.dueAt, leadId, assignedToId: person.id, createdById: member.id },
     });

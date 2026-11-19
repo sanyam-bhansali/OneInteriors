@@ -3,7 +3,7 @@ import { parseRange, rangeBounds, rangeLabel, rangeToString, istDayStart } from 
 import { cursorOf, describeFilters, leadFiltersToQuery, leadsHref, parseCursor, parseLeadFilters, parseSort } from '@/modules/studio-sales/lead-filters';
 import { keysetWhere, leadWhere, orderByFor, scopedLeadWhere, type ScopeLike } from '@/modules/studio-sales/lead-where';
 import { bulkActionsFor, bulkFence, chunks, mayBulk, readLimit, splitEvenly, splitSentence } from '@/modules/studio-sales/bulk-rules';
-import { mayAssignTaskTo, mayChangeTask, readTask, seesAllTasks, tasksVisibleTo } from '@/modules/studio-sales/task-rules';
+import { defaultTaskAssignee, mayAssignTaskTo, mayChangeTask, readTask, seesAllTasks, tasksVisibleTo } from '@/modules/studio-sales/task-rules';
 import { buildCalendarItems, calendarWindow, followupAt, itemsByDay, shiftDay, timeLabel, windowTitle } from '@/modules/studio-sales/calendar-rules';
 import { conversion, newLeadKpis, nowKpis, personColumns, rangeKpis } from '@/modules/studio-sales/dashboard-rules';
 import { buildToday, type TodayLead } from '@/modules/studio-sales/today-rules';
@@ -239,7 +239,8 @@ describe('tasks', () => {
   });
 
   it('a task needs words and a day; no time means 10 am India', () => {
-    expect(readTask({ title: ' Send   kitchen ', day: '2026-10-13', time: '' })).toEqual({ ok: true, title: 'Send kitchen', dueAt: new Date('2026-10-13T04:30:00.000Z') });
+    /* No time: the end of that day, 23:59 IST (owner, 19 Nov 2026; was 10 am, so it was late at once). */
+    expect(readTask({ title: ' Send   kitchen ', day: '2026-10-13', time: '' })).toEqual({ ok: true, title: 'Send kitchen', dueAt: new Date('2026-10-13T18:29:00.000Z') });
     expect(readTask({ title: 'Call', day: '2026-10-13', time: '17:30' })).toMatchObject({ ok: true, dueAt: new Date('2026-10-13T12:00:00.000Z') });
     expect(readTask({ title: 'x', day: '2026-10-13', time: '' }).ok).toBe(false);
     expect(readTask({ title: 'Call', day: '13/10/2026', time: '' }).ok).toBe(false);
@@ -442,5 +443,13 @@ describe('a big import goes in pieces', () => {
     expect(pieces.length).toBeGreaterThan(1);
     expect(pieces.every((p) => p.length <= 3000)).toBe(true);
     expect(pieces.flatMap((p) => parseCsv(p).slice(1))).toEqual(rows.slice(1));
+  });
+});
+
+describe('who a new task goes to (owner, 19 Nov 2026)', () => {
+  it('the person picked first', () => expect(defaultTaskAssignee({ asked: 'asha', meId: 'head', leadOwnerId: 'rep' })).toBe('asha'));
+  it('else the lead owner: a head’s task on a rep’s lead goes to the rep', () => expect(defaultTaskAssignee({ asked: null, meId: 'head', leadOwnerId: 'rep' })).toBe('rep'));
+  it('else the writer (no lead, or nobody has the lead)', () => {
+    expect(defaultTaskAssignee({ asked: null, meId: 'head', leadOwnerId: null })).toBe('head');
   });
 });

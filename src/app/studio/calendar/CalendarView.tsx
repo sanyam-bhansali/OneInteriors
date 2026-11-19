@@ -424,7 +424,7 @@ export function TaskForm({
       <input type="text" aria-label="Task" placeholder="What needs doing, e.g. Send the revised kitchen" value={title} onChange={(e) => setTitle(e.target.value)} className="fld" />
       <div className="hstack" style={{ gap: 6 }}>
         <input type="date" aria-label="Due day" value={day} onChange={(e) => setDay(e.target.value)} className="fld sm fit" />
-        <input type="time" aria-label="Time (10 am if empty)" value={time} onChange={(e) => setTime(e.target.value)} className="fld sm fit" />
+        <input type="time" aria-label="Time (end of the day if empty)" value={time} onChange={(e) => setTime(e.target.value)} className="fld sm fit" />
         {seesAll && people.length > 1 ? (
           <select aria-label="Whose task" value={to} onChange={(e) => setTo(e.target.value)} className="fld sm fit">
             {people.map((p) => (

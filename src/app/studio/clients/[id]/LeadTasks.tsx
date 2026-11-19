@@ -32,6 +32,7 @@ export function LeadTasks({
   people,
   seesAll,
   meId,
+  ownerId = null,
   may,
 }: {
   leadId: string;
@@ -39,6 +40,8 @@ export function LeadTasks({
   people: { id: string; name: string }[];
   seesAll: boolean;
   meId: string | null;
+  /** The lead's owner: a new task goes to them by default (owner, 19 Nov 2026). */
+  ownerId?: string | null;
   /** May work this lead (write tasks on it). */
   may: boolean;
 }) {
@@ -59,7 +62,7 @@ export function LeadTasks({
         ) : null}
       </div>
       {adding ? (
-        <TaskForm people={people} seesAll={seesAll} meId={meId} task={{ id: null, title: '', day: today, time: '', assignedToId: meId, leadId }} onClose={() => setAdding(false)} />
+        <TaskForm people={people} seesAll={seesAll} meId={meId} task={{ id: null, title: '', day: today, time: '', assignedToId: ownerId ?? meId, leadId }} onClose={() => setAdding(false)} />
       ) : null}
       {tasks.length === 0 && !adding ? <p className="cl-sub">Nothing to do on this lead yet. Tasks show on the calendar and on Today.</p> : null}
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
