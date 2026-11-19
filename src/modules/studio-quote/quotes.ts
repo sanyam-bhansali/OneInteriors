@@ -48,6 +48,7 @@ import { currentMember } from '@/modules/studio/access';
 import { asQuoteCategory, categoryRefusal, CATEGORY_ERRORS } from './category-rules';
 import { readSignedStages } from '@/modules/portal/payments';
 import { restageOnTotal } from '@/modules/studio-design/restage';
+import { phoneSearchDigits } from '@/modules/studio/phone-search';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -156,7 +157,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
   if (!studioId) return [];
 
   const q = search?.trim().slice(0, 80);
-  const digits = q?.replace(/\D/g, '') ?? '';
+  const digits = q ? phoneSearchDigits(q) : null;
   try {
     const rows = await prisma.studioQuote.findMany({
       where: {
@@ -168,7 +169,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
                 { clientName: { contains: q, mode: 'insensitive' as const } },
                 { number: { contains: q, mode: 'insensitive' as const } },
                 { society: { contains: q, mode: 'insensitive' as const } },
-                ...(digits.length >= 4 ? [{ clientPhone: { contains: digits } }] : []),
+                ...(digits ? [{ clientPhone: { contains: digits } }] : []),
               ],
             }
           : {}),

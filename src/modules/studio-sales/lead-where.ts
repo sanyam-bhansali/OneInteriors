@@ -12,6 +12,7 @@ import { istDayEnd, istDayStart, rangeBounds } from './ist-range';
 import { istDay } from '@/modules/project/working-days';
 import { QUIET_AFTER_DAYS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 import { NOT_SET, salesOwner, type Cursor, type LeadFilters, type SortKey } from './lead-filters';
+import { phoneSearchDigits } from '@/modules/studio/phone-search';
 
 const OPEN_STAGE: Prisma.StudioClientWhereInput = { stage: { kind: { in: ['OPEN', 'WON'] } } };
 
@@ -98,13 +99,13 @@ export function leadWhere(f: LeadFilters, now: Date, meId: string | null = null)
   const end = c.endOfToday;
 
   if (f.q) {
-    const digits = f.q.replace(/\D/g, '');
+    const digits = phoneSearchDigits(f.q, 3);
     const or: Prisma.StudioClientWhereInput[] = [
       { name: { contains: f.q, mode: 'insensitive' } },
       { society: { contains: f.q, mode: 'insensitive' } },
       { locality: { contains: f.q, mode: 'insensitive' } },
     ];
-    if (digits.length >= 3) or.push({ phone: { contains: digits.length > 10 ? digits.slice(-10) : digits } });
+    if (digits) or.push({ phone: { contains: digits } });
     and.push({ OR: or });
   }
   if (f.source?.length) {
