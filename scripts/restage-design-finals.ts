@@ -10,9 +10,10 @@
  * or won; the newest one) or signed off: its stages are re-split on that
  * Design Final's total, the same rule marking it final now uses
  * (src/modules/studio-design/restage.ts): the booking advance keeps its
- * amount, the percentage stages share the rest. Payments already recorded
- * stay on their stage. A project already on that total is skipped, so running
- * it twice changes nothing.
+ * amount, the design advance is as on the sales final (owner, 19 Nov 2026),
+ * and the later stages share the rest of the Design Final. Payments already
+ * recorded stay on their stage. A project already split that way is skipped,
+ * so running it twice changes nothing.
  *
  * The database is DATABASE_URL from the environment; this script loads no
  * .env file. The host is printed first, never the credentials.
@@ -43,7 +44,7 @@ async function main() {
   const { prisma } = await import('../src/lib/prisma');
   const { readSignedStages } = await import('../src/modules/portal/payments');
   const { restageOnTotal } = await import('../src/modules/studio-design/restage');
-  const { quoteTotalInStudio } = await import('../src/modules/studio-quote/quotes');
+  const { quoteTotalInStudio, salesFinalTotalInStudio } = await import('../src/modules/studio-quote/quotes');
   try {
     const studio = await prisma.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true } });
     if (!studio) throw new Error(`No studio with slug "${slug}".`);
@@ -73,7 +74,9 @@ async function main() {
         console.log(`${client.padEnd(26)} skipped: no Design Final total or no payment stages`);
         continue;
       }
-      const r = restageOnTotal(stages, Math.round(total));
+      /* Booking and design advance as on the sales final; the later stages on the Design Final (owner, 19 Nov 2026). */
+      const sales = await salesFinalTotalInStudio(p.signedQuoteId!, studio.id);
+      const r = restageOnTotal(stages, Math.round(total), sales === null ? null : Math.round(sales));
       if (!r.ok) {
         console.log(`${client.padEnd(26)} skipped: ${r.error}`);
         continue;
