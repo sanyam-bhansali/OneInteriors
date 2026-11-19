@@ -90,9 +90,10 @@ export const APPS: readonly StudioApp[] = [
        Quotations, Products, Terms (Electrical and Elec Rates left out by the
        owner). Products is the product master, so the header stays on
        Quotations there; the Product master tile still opens it. */
+    /* One builder tab (owner, 19 Nov 2026: "first quote and full builder
+       shouldn't be different tabs"): Build on it opens the full builder. */
     tabs: [
-      T('First Quote', '/studio/quotations/first'),
-      T('Full Builder', '/studio/quotations/builder'),
+      { label: 'Quotation builder', href: '/studio/quotations/first', also: ['/studio/quotations/builder'] },
       T('My Quotations', '/studio/quotations'),
       T('To build', TO_BUILD_PATH),
       T('Products', '/studio/products'),

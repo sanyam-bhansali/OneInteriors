@@ -62,6 +62,7 @@ export function QuoteBuilder({
   extras,
   doc = null,
   salesFinalLines = null,
+  studioDiscountBps = 0,
 }: {
   quote: QuoteRow;
   products: ProductRow[];
@@ -91,6 +92,8 @@ export function QuoteBuilder({
   extras?: React.ReactNode;
   /** The PDF's brand pages, stages, specification and terms (server, `quoteDocContext`). */
   doc?: DocPreviewStatics | null;
+  /** The studio's usual modular discount, put back when "No discount on modular" is unticked. */
+  studioDiscountBps?: number;
   /** A Design Final: its Sales Final's frozen lines, the Final tab's "Original" (DESIGN-PROCESS-PLAN.md §4.1). */
   salesFinalLines?: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number; details?: string | null }[] | null;
 }) {
@@ -106,7 +109,9 @@ export function QuoteBuilder({
   const [renameTo, setRenameTo] = useState('');
   const [newRoom, setNewRoom] = useState('');
   const [addRoom, setAddRoom] = useState('');
-  const [tab, setTab] = useState<'quote' | 'final' | 'pdf'>('quote');
+  const [tab, setTab] = useState<'quote' | 'plan' | 'final' | 'pdf'>('quote');
+  /* "No discount on modular" (owner, 19 Nov 2026): the % it had before the tick, to put back on untick. */
+  const discountBefore = useRef<string | null>(null);
   const [banner, setBanner] = useState<string>(() =>
     locked
       ? `${quote.number} — ${STAGE_LABELS[quote.stage]}. A project is running on this quotation, so it is read-only. Make the Design Final from it to change what is built.`
@@ -627,6 +632,24 @@ export function QuoteBuilder({
           <ProposeForm mayAddProducts={mayAddProducts} busy={proposing} onPropose={propose} />
 
           <Sec>Discount</Sec>
+          <label className="hcheck">
+            <input
+              type="checkbox"
+              data-testid="no-modular-discount"
+              checked={pctToBps(terms.discountPct) === 0}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  discountBefore.current = terms.discountPct;
+                  setTerms({ ...terms, discountPct: '0' });
+                } else {
+                  const back = discountBefore.current && pctToBps(discountBefore.current) ? discountBefore.current : String((studioDiscountBps || 0) / 100);
+                  setTerms({ ...terms, discountPct: back });
+                }
+              }}
+            />
+            No discount on modular
+          </label>
+          <p className="hhelp">Ticked: modular is quoted at full price (0%). Untick to put the discount back.</p>
           <DiscountPicker
             label={terms.onSpotLabel}
             amount={terms.onSpotRupees}
@@ -721,6 +744,10 @@ export function QuoteBuilder({
             <Tab on={tab === 'quote'} onClick={() => setTab('quote')}>
               Quotation
             </Tab>
+            {/* The lead's floor plan while the quotation is made (owner, 19 Nov 2026). */}
+            <Tab on={tab === 'plan'} onClick={() => setTab('plan')}>
+              Floor plan
+            </Tab>
             <Tab on={tab === 'final'} onClick={() => setTab('final')}>
               Final (Original vs Revised)
             </Tab>
@@ -747,7 +774,7 @@ export function QuoteBuilder({
         </div>
 
         {lines.length === 0 && tab === 'quote' ? (
-          <p className="muted hempty">Add products from the panel, or open a first quote via “Revise in Full Builder”.</p>
+          <p className="muted hempty">Add products from the panel, or build it from the floor plan on the Quotation builder tab.</p>
         ) : tab === 'quote' ? (
           <>
             <div className="hdochead">
@@ -800,12 +827,15 @@ export function QuoteBuilder({
                 readOnly={locked}
               />
             </fieldset>
-            {/* Upload a floor plan from the builder (owner, 14 Nov 2026); it is kept on the lead. */}
+          </>
+        ) : tab === 'plan' ? (
+          <>
+            {/* The plan itself, its note, and Upload floor plan (owner, 14 Nov 2026); kept on the lead. */}
             <QuotePlanUpload clientId={quote.clientId ?? null} leadName={quote.clientName} />
             {quote.planRooms.length > 0 ? (
-              <section className="card" aria-label="Their floor plan" style={{ marginTop: 16 }}>
+              <section className="card" aria-label="Rooms read from the plan" style={{ marginTop: 16 }}>
                 <div className="chead">
-                  <h2>Their floor plan</h2>
+                  <h2>Rooms read from the plan</h2>
                 </div>
                 <FloorPlanView rooms={quote.planRooms} />
               </section>

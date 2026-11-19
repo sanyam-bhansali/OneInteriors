@@ -4440,6 +4440,10 @@ model StudioClientFile {
   /// only after somebody pressed it. Never read automatically.
   reading Json?
 
+  /// What the salesperson typed with a floor plan (owner, 19 Nov 2026): a
+  /// specific requirement for whoever builds the quotation. Optional.
+  note String?
+
   createdAt DateTime @default(now())
 
   @@index([clientId, createdAt])

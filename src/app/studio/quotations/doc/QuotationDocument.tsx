@@ -45,7 +45,8 @@ export type { DocHead, DocStudio };
  * (the column header repeats on a new page, the band does not), every
  * figure printed as `Math.round(n).toLocaleString("en-IN")` (0 prints "0"),
  * MO-01 amounts struck through with the discounted figure in green, Units
- * only on a per-unit line, the Discount on Modular row always shown, the
+ * only on a per-unit line, the Discount on Modular row (left out at 0%, "No
+ * discount on modular", owner 19 Nov 2026), the
  * flat discount as "<name> (₹)", the summary by room with its donut, the
  * totals box, the stages with their End Deliverables, the material
  * specification with its Brand column, then the terms on their own pages.
@@ -371,7 +372,7 @@ export function DocSummary({
             <Row k="Sum-Total (NM-01)  ·  Non-Modular" v={n(totals.onsitePaise)} />
             {totals.feePaise > 0 || feeBps > 0 ? <Row k={`Professional fees (${Math.round(feeBps / 100)}%)`} v={n(totals.feePaise)} /> : null}
             <Row k="Sub-Total" v={n(totals.subTotalPaise)} bold />
-            <Row k={`Discount on Modular (${Math.round(discountBps / 100)}%)`} v={n(totals.discountPaise)} />
+            {discountBps > 0 ? <Row k={`Discount on Modular (${Math.round(discountBps / 100)}%)`} v={n(totals.discountPaise)} /> : null}
             {totals.onSpotPaise ? <Row k={`${onSpotLabel || DEFAULT_DISCOUNT_NAME} (₹)`} v={n(totals.onSpotPaise)} /> : null}
             {gstOn ? (
               <>

@@ -104,7 +104,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
       {/* Hauspire's home: Welcome, the two ways in, the recent quotations. */}
       <div>
         <h1>Welcome</h1>
-        <p className="muted qsub">Auto-build a first quotation from a floor plan, or open the full builder.</p>
+        <p className="muted qsub">Build a quotation from the floor plan: it opens in the builder, ready to edit.</p>
       </div>
 
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts): the quotations this person sees, after any search. */}
@@ -112,12 +112,8 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
 
       <div className="hcards">
         <Link href="/studio/quotations/first" className="hcard">
-          <b>⚡ First Quote</b>
-          <span className="muted">Pick a plan / config, confirm the kitchen run, and get a full draft on your product master rates.</span>
-        </Link>
-        <Link href="/studio/quotations/builder" className="hcard">
-          <b>🧱 Full Builder</b>
-          <span className="muted">Add rooms and products by hand, edit dimensions, and fine-tune every line.</span>
+          <b>Quotation builder</b>
+          <span className="muted">Floor plan, flat and options, then Build: the full draft opens in the builder on your product master rates, to add rooms and fine-tune every line.</span>
         </Link>
       </div>
 
