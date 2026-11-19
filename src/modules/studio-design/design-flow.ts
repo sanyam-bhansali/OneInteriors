@@ -1157,7 +1157,7 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
   /* The payment stages move to the Design Final's total (owner, 14 Nov 2026). */
   const money = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { paymentPhases: true } });
   const stages = readSignedStages(money?.paymentPhases);
-  const restaged = stages ? restageOnTotal(stages, summary.designTotalPaise) : null;
+  const restaged = stages ? restageOnTotal(stages, summary.designTotalPaise, summary.salesTotalPaise) : null;
   const newStages = restaged?.ok && restaged.changed ? restaged.stages : null;
   await prisma.$transaction(async (tx) => {
     await tx.homeProject.update({

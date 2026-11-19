@@ -1063,6 +1063,12 @@ export async function quoteTotalInStudio(quoteId: string, studioId: string): Pro
   return q ? totalsFor(q).totalPaise : null;
 }
 
+/** A sales final's total as booked (its marked sales-final revision, else as it stands): the booking and design advance follow it. */
+export async function salesFinalTotalInStudio(quoteId: string, studioId: string): Promise<number | null> {
+  const q = await loadQuote(quoteId, studioId, {});
+  return q ? totalsFor(await asSalesFinal(q)).totalPaise : null;
+}
+
 async function restageProjectOnDesignFinal(quoteId: string, studioId: string): Promise<void> {
   try {
     const q = await loadQuote(quoteId, studioId, {});
@@ -1073,7 +1079,8 @@ async function restageProjectOnDesignFinal(quoteId: string, studioId: string): P
     });
     const stages = project ? readSignedStages(project.paymentPhases) : null;
     if (!project || !stages) return;
-    const r = restageOnTotal(stages, totalsFor(q).totalPaise);
+    /* Booking and design advance as on the sales final; the later stages on the Design Final (owner, 19 Nov 2026). */
+    const r = restageOnTotal(stages, totalsFor(q).totalPaise, await salesFinalTotalInStudio(q.basedOnId, studioId));
     if (!r.ok || !r.changed) return;
     await prisma.homeProject.update({
       where: { id: project.id },
