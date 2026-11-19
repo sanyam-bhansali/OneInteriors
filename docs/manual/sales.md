@@ -76,7 +76,7 @@ Everyone in sales has a **role**. The role decides what you can see and do.
 
 Home is where you land. It shows:
 
-- **Right now**: for example "2 new leads in the pool".
+- **Right now**: for example "2 new leads in the pool". Tap it to open the **Pool**.
 - **My work**: what is due **Today**, in the **Next 3 days**, what you **Missed**, and the **Next month**.
 - **Your apps**: Leads, Quotations, Calendar.
 - **Today's calls**: the calls due today and how many are done.
@@ -303,7 +303,9 @@ Or drag the card on the **Board**.
 2. Write what needs doing, pick the day, and a time if it matters.
 3. Press **Add task**.
 
-If you leave the time empty, the task is due at 10 am that day.
+If you leave the time empty, the task is due at the end of that day.
+
+A task on a lead goes to the lead's owner. So when a head adds a task on a rep's lead, the rep gets it. On a lead nobody has, it goes to whoever wrote it.
 
 **Internal note**
 
@@ -311,8 +313,7 @@ If you leave the time empty, the task is due at 10 am that day.
 
 **Common mistakes**
 
-- A task for today with no time is due at 10 am. If you add it in the afternoon it shows as late straight away. Pick a time.
-- When a head adds a task on a rep's lead, it is the head's task. Tell the rep, or ask them to add it.
+- Pick a time when it matters (a call at 4 pm). Without one, the task only shows as late after midnight.
 
 ---
 
@@ -376,7 +377,7 @@ The request goes to whoever builds quotations next, in turn, and they are told. 
 
 ## 16. Quotations: To build (for those who build them)
 
-Only people who build quotations (Swarupa and Khushi at Hauspire) have this.
+Only people who build quotations (Swarupa and Khushi at Hauspire) have this. The owner sets who is in the turns in **Settings → Team → Who builds quotations**. A new sales head is not added by themselves.
 
 1. Open **Quotations → To build**. The number on the tab is how many wait for you.
 2. Under **Yours to build** press **Open and build →**. A draft is made from the lead (and its floor plan, if there is one).
@@ -395,15 +396,21 @@ A head can **Hand over** a request to another builder, or **Cancel request**.
 3. Check every line has a rate. The page warns you about lines with no figure.
 4. Press **Mark as sent to [client]** when you have sent it to the client.
 
+A quotation that totals ₹0 cannot be marked sent. Put rates on its lines first.
+
 **Revisions**
 
 - Change the quotation and press **Save Sales Final** (this saves the working copy).
 - When you send the new version, press **Send this version as R2** (R3, R4…).
 - **Compare** shows what changed between two revisions.
 
+**Start from a previous quotation**
+
+When you make a new quotation you can copy an earlier one: its rooms, items, rates and terms. Search **every** quotation in the studio by client, number, society or BHK. This is only for copying. You still open only your own leads' quotations.
+
 **Common mistakes**
 
-- Do not send a quotation that shows ₹0 or has lines with no rate. The sales final cannot be marked on a ₹0 revision.
+- Lines with no rate count as zero. Fill them before you send, or the client sees a lower total.
 
 ---
 
@@ -413,7 +420,7 @@ When the client agrees to a revision, mark it.
 
 1. Open the quotation, go to **Revisions sent**.
 2. Press **Mark as sales final**.
-3. Pick the revision the client agreed to.
+3. Pick the revision the client agreed to. The latest one is picked for you.
 4. Check the **payment stages**. Change them if you agreed something different. Percentages must add up to 100%.
 5. Write **Notes for the design team** (required), or add a voice note.
 6. Press **Mark R… as sales final**.
@@ -430,7 +437,8 @@ When the client agrees to a revision, mark it.
 
 Convert says "the client is booking". It starts the project.
 
-1. Open the lead. Press **Converted** (top right), or pick **Converted** in the stage menu.
+1. Open the lead. Press **Convert** (top right), or pick **Converted** in the stage menu.
+   A lead that is already converted shows a green **✓ Converted** badge there instead.
 2. Pick the quotation revision the client agreed to. It becomes the sales final.
 3. Write the **Handover to design**: rooms in scope, style and colours, must-haves, budget comfort, possession and timeline, the family and the site, anything promised.
 4. Press **Convert and start project**.
@@ -441,6 +449,7 @@ What happens next:
 - The design head is asked to assign a designer.
 - Accounts records the ₹25,000 booking advance later.
 - The lead moves to **Converted**.
+- Any follow-up call still on the lead is cleared, so it leaves Today.
 
 **Who can do it**: a rep on their own leads, a head on their team's leads.
 
@@ -448,7 +457,6 @@ What happens next:
 
 - You cannot drag a card into Converted, or move many at once. Convert one lead at a time.
 - Write a real handover. A one-line note leaves the designer guessing.
-- After converting, clear or finish any follow-up call still on the lead, or it stays on your Today.
 
 ---
 
@@ -498,7 +506,7 @@ Done societies are hidden. Pick **Done** or **All, done included** to see them.
 
 **Common mistakes**
 
-- **Save for all wings** with an empty date clears the possession of every wing. Pick the month first.
+- **Save for all wings** with an empty month clears the possession of every wing. The app asks "Clear possession for every wing?" first. Press **No** if you meant to pick a month.
 - Mark done only when possession is really long over. The leads go back to the pool for anyone to claim.
 
 ---
