@@ -13,6 +13,7 @@ import {
   SALES_FINAL_ERRORS,
   type RevisionLine,
   type RevisionTerms,
+  latestRevision,
   sendRefusal,
 } from '@/modules/studio-sales/revision-rules';
 import { compareToIssued } from '@/modules/studio-quote/revision';
@@ -126,4 +127,12 @@ describe('sendRefusal (sales walkthrough, 19 Nov 2026: no ₹0 quotation to the 
   it('refuses a quotation with no lines', () => expect(sendRefusal({ lineCount: 0, totalPaise: 0 })).toMatch(/nothing on this quotation/));
   it('refuses lines with no rates (₹0)', () => expect(sendRefusal({ lineCount: 21, totalPaise: 0 })).toMatch(/₹0/));
   it('lets a priced quotation go', () => expect(sendRefusal({ lineCount: 21, totalPaise: 8_422_100 })).toBeNull());
+});
+
+describe('latestRevision (the sales-final picker starts on the newest revision)', () => {
+  it('picks the highest number, whatever the order', () => {
+    expect(latestRevision([{ n: 1 }, { n: 2 }])).toBe(2);
+    expect(latestRevision([{ n: 3 }, { n: 1 }, { n: 2 }])).toBe(3);
+  });
+  it('null when nothing was sent', () => expect(latestRevision([])).toBeNull());
 });

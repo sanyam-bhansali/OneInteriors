@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { formatINR } from '@/lib/money';
 import type { QuoteSalesView } from '@/modules/studio-sales/revisions';
 import type { PaymentStage } from '@/modules/studio-sales/payment-template';
+import { latestRevision } from '@/modules/studio-sales/revision-rules';
 import { markSalesFinalAction, sendAgainAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
 import { PaymentStagesEditor } from '../../PaymentStagesEditor';
@@ -114,7 +115,7 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
   const last = view.revisions[view.revisions.length - 1]!;
   const current = view.salesFinal;
   const [open, setOpen] = useState(false);
-  const [n, setN] = useState(last.n);
+  const [n, setN] = useState(latestRevision(view.revisions) ?? last.n);
   const [stages, setStages] = useState<PaymentStage[]>(current?.schedule ?? view.template);
   /* Notes for the design team, required; a voice note kept as audio (DESIGN-PROCESS-PLAN.md §4.2). */
   const [notes, setNotes] = useState(current?.notes ?? '');
@@ -213,7 +214,16 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
             </div>
           </div>
         ) : (
-          <button type="button" onClick={() => setOpen(true)} className={current ? 'btn sec sm' : 'btn pri sm'} style={{ alignSelf: 'flex-start' }}>
+          <button
+            type="button"
+            onClick={() => {
+              /* The latest revision each time it opens: the state was kept from when the page first loaded, so after R2 was sent it still said R1. */
+              setN(latestRevision(view.revisions) ?? last.n);
+              setOpen(true);
+            }}
+            className={current ? 'btn sec sm' : 'btn pri sm'}
+            style={{ alignSelf: 'flex-start' }}
+          >
             {current ? (current.n === last.n ? 'Change the payment stages' : `Mark a later revision instead`) : 'Mark as sales final'}
           </button>
         )

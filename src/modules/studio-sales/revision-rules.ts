@@ -217,3 +217,8 @@ export function sendRefusal(m: { lineCount: number; totalPaise: number }): strin
   return null;
 }
 
+/** The revision the sales-final picker starts on: the latest one sent (the highest number), or null. */
+export function latestRevision(revisions: readonly { n: number }[]): number | null {
+  return revisions.reduce<number | null>((best, r) => (best === null || r.n > best ? r.n : best), null);
+}
+
