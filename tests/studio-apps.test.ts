@@ -70,13 +70,13 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
     expect(appsFor({ role: 'OWNER', status: 'SUSPENDED' })).toEqual([]);
   });
 
-  it("Quotations carries Hauspire's top bar: First Quote, Full Builder, My Quotations, Products, Terms (13 Oct 2026)", () => {
+  it('Quotations: one builder tab (19 Nov 2026; was First Quote + Full Builder), My Quotations, Products, Terms', () => {
     const tabs = (role: StudioRoleName) => appsFor(m(role)).find((a) => a.key === 'quotes')?.tabs.map((t) => t.label);
     /* To build (quotation requests, owner 22 Oct 2026): owner and PM hand requests over. */
-    expect(tabs('OWNER')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'To build', 'Products', 'Terms']);
-    expect(tabs('PM')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'To build', 'Products', 'Terms']);
+    expect(tabs('OWNER')).toEqual(['Quotation builder', 'My Quotations', 'To build', 'Products', 'Terms']);
+    expect(tabs('PM')).toEqual(['Quotation builder', 'My Quotations', 'To build', 'Products', 'Terms']);
     /* A salesperson opens neither the product master nor the studio's terms. */
-    expect(tabs('SALES')).toEqual(['First Quote', 'Full Builder', 'My Quotations']);
+    expect(tabs('SALES')).toEqual(['Quotation builder', 'My Quotations']);
     expect(mayOpen(m('SALES'), '/studio/quotations/terms')).toBe(false);
     expect(mayOpen(m('SALES'), '/studio/quotations/builder')).toBe(true);
   });
@@ -101,7 +101,8 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
     expect(appForPath('/studio/rates')?.key).toBe('rates');
     expect(appsFor(m('OWNER')).find((a) => a.key === 'rates')?.href).toBe('/studio/products');
     expect(tabForPath('/studio/quotations/terms', quotes.tabs)?.label).toBe('Terms');
-    expect(tabForPath('/studio/quotations/builder', quotes.tabs)?.label).toBe('Full Builder');
+    expect(tabForPath('/studio/quotations/builder', quotes.tabs)?.label).toBe('Quotation builder');
+    expect(tabForPath('/studio/quotations/first', quotes.tabs)?.label).toBe('Quotation builder');
     expect(tabForPath('/studio/quotations/abc', quotes.tabs)?.label).toBe('My Quotations');
   });
 

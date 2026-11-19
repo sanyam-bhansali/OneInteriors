@@ -209,3 +209,8 @@ export function editSummary(changed: readonly string[]): string | null {
   if (words.length === 1) return `Changed ${words[0]}`;
   return `Changed ${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
+
+/** The note typed with a floor plan (owner, 19 Nov 2026): one line, at most 300 characters, or nothing. */
+export function planNote(v: unknown): string | null {
+  return typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, 300) || null : null;
+}

@@ -1,50 +1,43 @@
 'use client';
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react';
-import { computeTotals, DISCOUNT_NAMES, FEE_BPS, lineAmount } from '@/modules/studio-quote/pricing';
+import { DISCOUNT_NAMES } from '@/modules/studio-quote/pricing';
 import { CONFIGS, planQuotation, standardRunFor, type CatalogueProduct, type ConfigName } from '@/modules/studio-quote/configure';
-import { orderedRooms } from '@/modules/studio-quote/rooms';
 import type { StoredFileReading } from '@/modules/studio-quote/from-plan-rules';
-import type { QuoteRow } from '@/modules/studio-quote/quotes';
+import type { LeadPlan } from '@/modules/studio-quote/from-plan';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import type { PaymentPhase } from '@/modules/studio/payment-phases';
 import type { FoundClient } from '@/modules/studio-practice/clients';
 import { checkLeadFile, LEAD_FILE_ACCEPT } from '@/modules/studio-sales/lead-rules';
-import { formatINR } from '@/lib/money';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { addPlanLeadAction, leadPlansAction, readLeadPlanAction, saveFirstQuoteAction } from '../actions';
-import { CLIENT_TITLES, withTitle } from '@/modules/studio-quote/client-title';
+import { CLIENT_TITLES } from '@/modules/studio-quote/client-title';
 import { attachFileAction } from '../../sales-actions';
 import { searchAction } from '../../search-actions';
 import type { State } from '../../form-state';
-import { QuoteTable } from '../[id]/QuoteTable';
-import { TotalsTable } from '../[id]/HTotals';
-import { DocumentPreview } from '../[id]/QuotePanels';
 import { DiscountPicker, Sec } from '../[id]/HPanels';
 import { rupeesToPaiseText } from '../[id]/TermsPanel';
-import type { EditableLine } from '../[id]/QuoteLines';
 import { PreviousQuotePicker, type PickedQuote } from '../PreviousQuotePicker';
+import { PlanViewer } from '../PlanViewer';
 
 type Lead = Pick<FoundClient, 'id' | 'name' | 'phone' | 'society'>;
-type Plan = { id: string; name: string; read: boolean };
 
 /**
- * Hauspire's First Quote page, on our standard build: the plan read (when
- * reading is switched on) fills "4 · Detected from plan"; Build lays the
- * quotation out on the right from the product master (`planQuotation`, the
- * same function the builder's rebuild runs on the server); "Revise in Full
- * Builder" saves it as a DRAFT on the lead and opens the builder.
+ * The quotation builder's start (owner, 19 Nov 2026: "first quote and full
+ * builder shouldn't be different tabs"): the floor plan, the project, the
+ * options and what the plan showed, then Build — which builds on our
+ * standard build (`planQuotation`, the same function the builder's rebuild
+ * runs on the server), saves it as a DRAFT on the lead and opens the full
+ * builder on it, with no second step. The lead's floor plan stays in view on
+ * the right while the details are filled in.
  */
 export function FirstQuote({
   products,
-  studioName,
   terms,
   canRead,
   leadRequired,
 }: {
   products: ProductRow[];
-  studioName: string;
-  terms: { discountBps: number; gstBps: number; bookingAdvancePaise: number; phases: PaymentPhase[] | null };
+  terms: { discountBps: number };
   canRead: boolean;
   leadRequired: boolean;
 }) {
@@ -70,19 +63,49 @@ export function FirstQuote({
   // 5 · Discount
   const [onSpotLabel, setOnSpotLabel] = useState('');
   const [onSpot, setOnSpot] = useState('');
+  /* "No discount on modular" (owner, 19 Nov 2026): the quotation is saved with 0% on modular. */
+  const [noModular, setNoModular] = useState(false);
   // 1 · Floor plan
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<LeadPlan[]>([]);
+  const [planNote, setPlanNote] = useState('');
   const [reading, setReading] = useState<{ fileId: string; reading: StoredFileReading } | null>(null);
   const [planBusy, startPlan] = useTransition();
   const picker = useRef<HTMLInputElement>(null);
-  // The quotation
-  const [lines, setLines] = useState<EditableLine[]>([]);
-  const [tab, setTab] = useState<'quote' | 'plan' | 'pdf'>('quote');
+  const [tab, setTab] = useState<'plan' | 'drawn'>('plan');
   const [status, setStatus] = useState('');
-  /* Start from a previous quotation (owner, 17 Nov 2026): its lines fill the table; its terms are copied on save. */
+  /* Start from a previous quotation (owner, 17 Nov 2026): its lines are the quotation; its terms are copied on save. */
   const [from, setFrom] = useState<PickedQuote | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
+
+  const catalogue: CatalogueProduct[] = useMemo(() => products.map((p) => ({ ...p })), [products]);
+  /** The quotation as the left panel says it, on the product master's rates. */
+  function planned() {
+    const rate = Number(ceilingRate.replace(/[,₹\s]/g, ''));
+    /* The plan's rooms size wardrobes and ceilings when either tick is on. */
+    const planRooms = sizeToPlan || ceiling ? reading?.reading.rooms : undefined;
+    return planQuotation(
+      {
+        config,
+        kitchenRunMm: Number(run) > 0 ? Math.round(Number(run)) : null,
+        bathrooms: Math.max(0, Math.round(Number(baths) || 0)),
+        study,
+        balcony,
+        kingMaster: king,
+        falseCeiling: ceiling,
+        falseCeilingRatePaise: ceilingRate.trim() && Number.isFinite(rate) && rate > 0 ? Math.round(rate * 100) : null,
+        planRooms,
+      },
+      catalogue,
+    );
+  }
+
+  /* Build = build, save as a draft on the lead, and open the full builder (the save redirects there). */
   const [state, save, saving] = useActionState(async (_prev: State, _f: FormData): Promise<State> => {
+    const built = from ? null : planned();
+    const lines = from
+      ? from.lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise ?? null, note: l.note ?? null }))
+      : built!.lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: null, note: null }));
+    if (lines.length === 0) return { ok: false, error: built?.notes[0] ?? 'Nothing to build: tick “standard” in the Product master on what each room should have.' };
     const r = await saveFirstQuoteAction({
       clientId: lead?.id ?? '',
       newLead: lead ? null : { name, phone: mobile, society: '' },
@@ -92,11 +115,12 @@ export function FirstQuote({
       locality: location,
       quoteDate,
       fileId: reading?.fileId ?? null,
-      lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise, note: l.note ?? null })),
+      lines,
       onSpotPaise: rupeesToPaiseText(onSpot) ?? 0,
       onSpotLabel: onSpotLabel || null,
       clientTitle: title || null,
       fromQuoteId: from?.id ?? null,
+      noModularDiscount: noModular,
     });
     return r ?? { ok: true };
   }, { ok: true } as State);
@@ -113,29 +137,33 @@ export function FirstQuote({
       setFound([]);
     }
   }
+  function loadPlans(clientId: string) {
+    leadPlansAction(clientId)
+      .then((p) => {
+        setPlans(p);
+        setTab('plan');
+      })
+      .catch(() => setPlans([]));
+  }
   function pickLead(f: FoundClient) {
     setLead(f);
     setName(f.name);
     setMobile(f.phone ?? '');
     setFound([]);
-    leadPlansAction(f.id)
-      .then(setPlans)
-      .catch(() => setPlans([]));
+    loadPlans(f.id);
   }
 
-  /** What the plan showed, into §2 and §4, then a build. */
+  /** What the plan showed, into 2 and 4; Build does the rest. */
   function apply(r: StoredFileReading, fileId: string, summary: string) {
     setReading({ fileId, reading: r });
-    const bhk = r.bedrooms >= 1 ? (`${Math.min(4, r.bedrooms)} BHK` as ConfigName) : config;
-    setConfig(bhk);
+    if (r.bedrooms >= 1) setConfig(`${Math.min(4, r.bedrooms)} BHK` as ConfigName);
     if (r.kitchenRunMm) setRun(String(r.kitchenRunMm));
     if (r.bathrooms > 0) setBaths(String(r.bathrooms));
     if (r.dryBalcony !== null) setBalcony(r.dryBalcony);
     setStudy(r.hasStudy);
     setSizeToPlan(r.rooms.length > 0);
     setCeiling(r.rooms.length > 0);
-    setStatus(`Read the plan: ${summary}. Check 4 and Build.${r.confidence ? ` Confidence: ${r.confidence}.` : ''}`);
-    build({ config: bhk, run: r.kitchenRunMm, baths: r.bathrooms, balcony: r.dryBalcony ?? balcony, study: r.hasStudy, rooms: r.rooms, ceiling: r.rooms.length > 0 });
+    setStatus(`Read the plan: ${summary}. Check 4, then Build: it opens in the full builder.${r.confidence ? ` Confidence: ${r.confidence}.` : ''}`);
   }
   function readPlan(ref: { fileId?: string; path?: string }, clientId = lead?.id) {
     if (!clientId) return;
@@ -179,9 +207,10 @@ export function FirstQuote({
         if (!put.ok) return setStatus('The upload did not finish. Check your connection and try again.');
       }
       const path = ticket.path;
-      const attached = await attachFileAction({ clientId: target.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false });
+      const attached = await attachFileAction({ clientId: target.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false, note: planNote });
       if (!attached.ok) return setStatus('error' in attached ? String(attached.error) : 'That did not attach.');
-      leadPlansAction(target.id).then(setPlans).catch(() => undefined);
+      setPlanNote('');
+      loadPlans(target.id);
       if (canRead) readPlan({ path }, target.id);
       else setStatus(`Floor plan kept on ${target.name}'s lead. Reading plans isn't switched on yet: set the BHK and the counts in 2 and 4, then Build — it builds from the BHK template.`);
     } catch {
@@ -191,52 +220,31 @@ export function FirstQuote({
     }
   }
 
-  const catalogue: CatalogueProduct[] = useMemo(() => products.map((p) => ({ ...p })), [products]);
-  function build(o: { config?: ConfigName; run?: number | null; baths?: number; balcony?: boolean; study?: boolean; rooms?: StoredFileReading['rooms']; ceiling?: boolean } = {}) {
-    const rate = Number(ceilingRate.replace(/[,₹\s]/g, ''));
-    /* The plan's rooms size wardrobes and ceilings when either tick is on. */
-    const planRooms = o.rooms ?? (sizeToPlan || ceiling ? reading?.reading.rooms : undefined);
-    const { lines: planned, notes } = planQuotation(
-      {
-        config: o.config ?? config,
-        kitchenRunMm: o.run !== undefined ? o.run : Number(run) > 0 ? Math.round(Number(run)) : null,
-        bathrooms: o.baths ?? Math.max(0, Math.round(Number(baths) || 0)),
-        study: o.study ?? study,
-        balcony: o.balcony ?? balcony,
-        kingMaster: king,
-        falseCeiling: o.ceiling ?? ceiling,
-        falseCeilingRatePaise: ceilingRate.trim() && Number.isFinite(rate) && rate > 0 ? Math.round(rate * 100) : null,
-        planRooms,
-      },
-      catalogue,
-    );
-    let n = 0;
-    setFrom(null);
-    setLines(planned.map((l) => ({ ...l, key: `fq-${(n += 1)}`, agreedPaise: null })));
-    setTab('quote');
-    if (planned.length > 0 && notes.length > 0) setStatus(notes[0]!);
-    else if (planned.length === 0) setStatus(notes[0] ?? 'Nothing to build.');
-  }
-
-  const priced = lines.map((l) => ({ ...l, amountPaise: lineAmount({ ...l, amountPaise: l.agreedPaise ?? undefined }) }));
-  const onSpotPaise = rupeesToPaiseText(onSpot) ?? 0;
-  const totals = computeTotals(priced, { feeBps: FEE_BPS, discountBps: terms.discountBps, onSpotPaise, bookingAdvancePaise: terms.bookingAdvancePaise, gstBps: terms.gstBps, phases: terms.phases });
-  const rooms = orderedRooms([], lines);
-  const update = (key: string, patch: Partial<EditableLine>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const nothing = () => undefined;
-  const preview = previewQuote({ name: withTitle(title, name), mobile, location, config, quoteDate, terms, onSpotPaise, onSpotLabel });
+  const whoReady = lead !== null || name.trim().length >= 2;
 
   return (
     <div className="hb">
-      <aside className="hside" aria-label="First quote">
+      <aside className="hside" aria-label="Build a quotation">
         <Sec first>1 · Floor plan</Sec>
+        <label className="hlab">
+          Note for the quotation (optional)
+          <textarea
+            className="fld hfld"
+            rows={2}
+            maxLength={300}
+            value={planNote}
+            onChange={(e) => setPlanNote(e.target.value)}
+            placeholder="Any specific requirement: e.g. no loft in the kids' room, budget near 8 lakh"
+            disabled={planBusy}
+          />
+        </label>
         <label className={`hdrop ${lead || newClientReady ? '' : 'off'}`}>
           {lead || newClientReady ? (planBusy ? 'Reading…' : 'Upload floor plan (image or PDF)') : 'Type the client’s name and mobile in 2 · Project, or pick their lead — the plan is kept on their lead'}
           <input ref={picker} type="file" accept={LEAD_FILE_ACCEPT} disabled={!(lead || newClientReady) || planBusy} className="sr-only" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
         </label>
-        {plans.length > 0 ? (
+        {plans.length > 0 && canRead ? (
           <>
-            <span className="hhelp">…or use a plan already on {lead?.name}&rsquo;s lead</span>
+            <span className="hhelp">…or read a plan already on {lead?.name}&rsquo;s lead</span>
             <select className="fld hfld" defaultValue="" disabled={planBusy} onChange={(e) => e.target.value && readPlan({ fileId: e.target.value })} aria-label="A floor plan on the lead">
               <option value="">— pick —</option>
               {plans.map((p) => (
@@ -282,7 +290,7 @@ export function FirstQuote({
               ))}
             </ul>
           ) : name.trim().length >= 2 ? (
-            <p className="hhelp" style={{ marginTop: 4 }}>{leadRequired ? 'Someone new: they are added to your leads when you save.' : 'Someone new: added to the leads when you save.'}</p>
+            <p className="hhelp" style={{ marginTop: 4 }}>{leadRequired ? 'Someone new: they are added to your leads when you build.' : 'Someone new: added to the leads when you build.'}</p>
           ) : null}
         </div>
         <div className="hgrid2">
@@ -315,7 +323,7 @@ export function FirstQuote({
           <input type="checkbox" checked={king} onChange={(e) => setKing(e.target.checked)} /> Master: King bed
         </label>
         <p className="hhelp">
-          What each room includes is set in the <b>Product master</b> (tick &ldquo;standard&rdquo; there). Add one-off extras in the Full Builder.
+          What each room includes is set in the <b>Product master</b> (tick &ldquo;standard&rdquo; there). Add one-off extras in the builder after Build.
         </p>
 
         <Sec>4 · Detected from plan — confirm</Sec>
@@ -332,7 +340,7 @@ export function FirstQuote({
         <label className="hcheck">
           <input type="checkbox" checked={sizeToPlan} disabled={!reading} onChange={(e) => setSizeToPlan(e.target.checked)} /> Size wardrobes to plan walls
         </label>
-        <p className="hhelp">Off = standard sizes. On = 55% of each bedroom&rsquo;s shorter wall, from the plan; rebuild to apply.</p>
+        <p className="hhelp">Off = standard sizes. On = 55% of each bedroom&rsquo;s shorter wall, from the plan.</p>
         <label className="hcheck">
           <input type="checkbox" checked={ceiling} onChange={(e) => setCeiling(e.target.checked)} /> False ceiling (room-wise)
         </label>
@@ -345,22 +353,19 @@ export function FirstQuote({
         <p className="hhelp">Adds each room&rsquo;s &ldquo;False Ceiling (Room)&rdquo; product from the Product master; area from the plan when it was read.</p>
 
         <Sec>5 · Discount (optional)</Sec>
+        <label className="hcheck">
+          <input type="checkbox" checked={noModular} onChange={(e) => setNoModular(e.target.checked)} data-testid="no-modular-discount" /> No discount on modular
+        </label>
+        {terms.discountBps > 0 ? <p className="hhelp">{noModular ? 'Modular is quoted at full price (0%).' : `Your usual ${terms.discountBps / 100}% on modular applies. Tick to remove it.`}</p> : null}
         <DiscountPicker label={onSpotLabel} amount={onSpot} onLabel={setOnSpotLabel} onAmount={(v) => { setOnSpot(v); if (!onSpotLabel) setOnSpotLabel(DISCOUNT_NAMES[0]); }} />
 
-        <button type="button" className="btn pri hwide" onClick={() => build()}>
-          Build first quotation ▸
-        </button>
         <label className="hcheck">
           <input
             type="checkbox"
             checked={copyOpen}
             onChange={(e) => {
               setCopyOpen(e.target.checked);
-              if (!e.target.checked && from) {
-                setFrom(null);
-                setLines([]);
-                setStatus('');
-              }
+              if (!e.target.checked) setFrom(null);
             }}
           />{' '}
           Or start from a previous quotation
@@ -370,90 +375,47 @@ export function FirstQuote({
             compact
             picked={from}
             onPick={(q) => {
-              let n = 0;
               setFrom(q);
-              setLines(q.lines.map((l) => ({ ...l, key: `pq-${(n += 1)}` })));
               if (q.config && (CONFIGS as readonly string[]).includes(q.config)) setConfig(q.config as ConfigName);
               setRun(q.kitchenRunMm ? String(q.kitchenRunMm) : '');
               if (q.bathrooms != null) setBaths(String(q.bathrooms));
               setOnSpot(q.onSpotPaise > 0 ? String(q.onSpotPaise / 100) : '');
               setOnSpotLabel(q.onSpotPaise > 0 ? (q.onSpotLabel ?? DISCOUNT_NAMES[0]) : '');
-              setTab('quote');
-              setStatus(`Copied ${q.number}'s ${q.lines.length} lines. Edit them here or in the Full Builder; its terms come with it when you save.`);
+              setStatus(`Build copies ${q.number}'s ${q.lines.length} lines and its terms, then opens the builder.`);
             }}
             onClear={() => {
               setFrom(null);
-              setLines([]);
               setStatus('');
             }}
           />
         ) : null}
         <form action={save}>
-          <button type="submit" className="btn sec hwide" disabled={saving || lines.length === 0 || (!lead && name.trim().length < 2)}>
-            {saving ? 'Saving…' : 'Revise in Full Builder →'}
+          <button type="submit" className="btn pri hwide" disabled={saving || planBusy || !whoReady} data-testid="build-quote">
+            {saving ? 'Building…' : from ? `Build from ${from.number} ▸` : 'Build quotation ▸'}
           </button>
         </form>
-        <p className="hhelp">Revise saves it as a draft quotation on the lead and opens it in the Full Builder.</p>
+        <p className="hhelp">{whoReady ? 'Build saves it as a draft on the lead and opens it in the builder, ready to edit.' : 'Pick the lead (or type a new client) in 2 · Project first.'}</p>
         {status ? <p className="hstatus">{status}</p> : null}
         {'ok' in state && !state.ok ? <p role="alert" className="qerr">{state.error}</p> : null}
       </aside>
 
-      <section className="hwork" aria-label="First quotation">
+      <section className="hwork" aria-label="Their floor plan">
         <div className="htabs">
-          <div className="tabs" role="tablist" aria-label="First quote view">
-            {(['quote', 'plan', 'pdf'] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
-                {t === 'quote' ? 'Quotation' : t === 'plan' ? '2D plan' : 'PDF preview'}
-              </button>
-            ))}
+          <div className="tabs" role="tablist" aria-label="Floor plan view">
+            <button type="button" role="tab" aria-selected={tab === 'plan'} onClick={() => setTab('plan')}>
+              Floor plan
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'drawn'} onClick={() => setTab('drawn')}>
+              2D plan
+            </button>
           </div>
         </div>
-        {lines.length === 0 ? (
-          <p className="muted hempty">Upload a plan (or set the flat), set the project, then Build.</p>
-        ) : tab === 'quote' ? (
-          <>
-            <div className="hdochead">
-              <div>
-                <div className="hbig">{studioName}</div>
-                <div className="muted hsmall">First-draft quotation · {formatINR(totals.totalPaise)}</div>
-              </div>
-              <div className="hwho">
-                <b>{name.trim() || '—'}</b>
-                <br />
-                {location} · {config}
-              </div>
-            </div>
-            <QuoteTable
-              lines={priced}
-              rooms={rooms}
-              products={products}
-              discountBps={terms.discountBps}
-              onUpdate={update}
-              onRemove={(key) => setLines((ls) => ls.filter((l) => l.key !== key))}
-              onDuplicate={nothing}
-              onMove={nothing}
-              onReorder={nothing}
-              onSwap={(key, p) => update(key, { product: p.name, code: p.code, unit: p.unit, details: p.details, ratePaise: p.ratePaise, agreedPaise: null })}
-              onAddItem={nothing}
-            />
-            <TotalsTable
-              totals={totals}
-              feeBps={FEE_BPS}
-              feeOn
-              gstOn={terms.gstBps > 0}
-              discountPct={String(terms.discountBps / 100)}
-              onSpotLabel={onSpotLabel || null}
-              ownSchedule={(terms.phases?.length ?? 0) > 0}
-            />
-          </>
-        ) : tab === 'plan' ? (
-          reading && reading.reading.rooms.length > 0 ? (
-            <FloorPlanView rooms={reading.reading.rooms} />
-          ) : (
-            <p className="muted hempty">No floor plan read yet — the 2D plan is drawn from the rooms the plan shows.</p>
-          )
+        {tab === 'plan' ? (
+          <PlanViewer plans={plans} leadName={lead?.name ?? 'the client'} empty={lead ? `No floor plan on ${lead.name}’s lead yet. Upload it on the left.` : 'Pick the lead in 2 · Project: their floor plan shows here while you fill in the details.'} />
+        ) : reading && reading.reading.rooms.length > 0 ? (
+          <FloorPlanView rooms={reading.reading.rooms} />
         ) : (
-          <DocumentPreview quote={preview} lines={priced} rooms={rooms} totals={totals} branding={{ legalName: studioName, addressLine: null, city: '', pincode: null, gstin: null, phone: null, email: null, accentHex: '' }} showMark={false} markText="" logoUrl={null} />
+          <p className="muted hempty">No floor plan read yet — the 2D plan is drawn from the rooms the plan shows.</p>
         )}
       </section>
     </div>
@@ -463,53 +425,4 @@ export function FirstQuote({
 function isoDay(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** A quotation-shaped object for the preview; nothing is saved yet. */
-function previewQuote(o: {
-  name: string;
-  mobile: string;
-  location: string;
-  config: string;
-  quoteDate: string;
-  terms: { discountBps: number; gstBps: number; bookingAdvancePaise: number; phases: PaymentPhase[] | null };
-  onSpotPaise: number;
-  onSpotLabel: string;
-}): QuoteRow {
-  return {
-    id: 'first-quote',
-    number: 'Draft',
-    stage: 'SALES',
-    status: 'DRAFT',
-    clientName: o.name.trim() || '—',
-    clientId: null,
-    clientPhone: o.mobile || null,
-    clientEmail: null,
-    society: null,
-    locality: o.location || null,
-    config: o.config,
-    carpetSqft: null,
-    kitchenRunMm: null,
-    bathrooms: null,
-    issuedLines: [],
-    fromMarketplace: false,
-    feeBps: FEE_BPS,
-    discountBps: o.terms.discountBps,
-    onSpotPaise: o.onSpotPaise,
-    bookingAdvancePaise: o.terms.bookingAdvancePaise,
-    gstBps: o.terms.gstBps,
-    onSpotLabel: o.onSpotLabel || null,
-    quoteDate: new Date(`${o.quoteDate}T00:00:00`),
-    phases: o.terms.phases,
-    basedOnId: null,
-    scopeForProjectId: null,
-    category: null,
-    planRooms: [],
-    welcomeNote: null,
-    terms: null,
-    issuedOn: null,
-    updatedAt: new Date(),
-    importedFrom: null,
-    lines: [],
-  };
 }

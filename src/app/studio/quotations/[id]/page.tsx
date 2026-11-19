@@ -218,6 +218,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           markText={MARK_TEXT}
           logoUrl={logoUrl}
           planReader={planReader}
+          studioDiscountBps={branding?.discountBps ?? 0}
           mayAddProducts={mayAddProducts}
           locked={locked}
           sentLabel={lastRev ? lastRev.label : null}

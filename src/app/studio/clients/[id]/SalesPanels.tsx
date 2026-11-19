@@ -415,6 +415,8 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
   const [kind, setKind] = useState<'FLOOR_PLAN' | 'OTHER'>(files.some((f) => f.kind === 'FLOOR_PLAN') ? 'OTHER' : 'FLOOR_PLAN');
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* A specific requirement with the floor plan (owner, 19 Nov 2026): optional; it goes to whoever builds the quotation. */
+  const [planNote, setPlanNote] = useState('');
   const [said, setSaid] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const picker = useRef<HTMLInputElement>(null);
   const act = useAct();
@@ -481,9 +483,11 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
       }
       const path = ticket.path;
       const asKind = kind;
+      const note = asKind === 'FLOOR_PLAN' ? planNote : '';
       act.run(
-        () => attachFileAction({ clientId, path, name: file.name, contentType: type, bytes: file.size, kind: asKind }),
+        () => attachFileAction({ clientId, path, name: file.name, contentType: type, bytes: file.size, kind: asKind, note }),
         (r) => {
+          if (r.ok) setPlanNote('');
           /* After the upload has answered: read the plan and build the
              first quotation from it, with the state on screen. */
           if (r.ok && asKind === 'FLOOR_PLAN') void buildFrom({ path }, 'auto', 'Reading the plan and building the first quotation…');
@@ -528,6 +532,20 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
             </button>
             <span className="muted sm">or drag it here · PDF or photo, up to 15 MB</span>
           </div>
+          {kind === 'FLOOR_PLAN' ? (
+            <label className="muted sm" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              Note for the quotation (optional)
+              <textarea
+                className="fld"
+                rows={2}
+                maxLength={300}
+                value={planNote}
+                onChange={(e) => setPlanNote(e.target.value)}
+                placeholder="Any specific requirement: e.g. no loft in the kids' room, wants a bar unit, budget near 8 lakh"
+                data-testid="plan-note-input"
+              />
+            </label>
+          ) : null}
           {kind === 'FLOOR_PLAN' ? (
             <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
               {plans && !plans.canRead
@@ -634,6 +652,11 @@ function FileRow({
           {f.uploadedByName ? ` · ${f.uploadedByName}` : ''}
         </span>
       </div>
+      {f.note ? (
+        <p className="sm" style={{ margin: 0, lineHeight: 1.5 }} data-testid="file-note">
+          <b>Note:</b> {f.note}
+        </p>
+      ) : null}
       {job && job.message ? (
         <p className={`sm ${JOB_TONE[job.status]}`} style={{ margin: 0, lineHeight: 1.5 }}>
           {job.message}{' '}

@@ -86,7 +86,7 @@ export async function setMeetingAction(clientId: string, day: string, time: stri
   return { ok: true, message: day ? 'Meeting saved. It shows on Today that day.' : 'Meeting cleared.' };
 }
 
-export async function attachFileAction(input: { clientId: string; path: string; name: string; contentType: string; bytes: number; kind: string; quoteRequest?: boolean }): Promise<Done> {
+export async function attachFileAction(input: { clientId: string; path: string; name: string; contentType: string; bytes: number; kind: string; quoteRequest?: boolean; note?: string }): Promise<Done> {
   const r = await attachLeadFile({ ...input, quoteRequest: input.quoteRequest !== false });
   if (!r.ok) return r;
   refreshLead(input.clientId);

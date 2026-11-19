@@ -22,7 +22,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { leadForQuote, leadInScope, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
 import { record } from '@/modules/studio-practice/events';
-import { readLeadFile } from '@/modules/storage/lead-files';
+import { readLeadFile, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { canReadPlans } from '@/modules/floorplan/read';
 import { checkPlanFile, planReadMessage, STALE_READ_MS } from '@/modules/floorplan/plan-cache';
 import { readPlanOnce } from '@/modules/floorplan/plan-reads';
@@ -327,6 +327,13 @@ export interface LeadPlan {
   name: string;
   /** Read before: its rooms are known and reading it again costs nothing. */
   read: boolean;
+  /** A short signed link to look at it (owner, 19 Nov 2026: the plan in view while quoting). Null in local development. */
+  url: string | null;
+  contentType: string;
+  /** The specific requirement typed with it. */
+  note: string | null;
+  uploadedByName: string | null;
+  createdAt: Date;
 }
 
 /** A lead's floor plans, newest first, for "1 · Floor plan". Empty when the lead is not theirs. */
@@ -338,10 +345,20 @@ export async function leadPlans(clientId: string): Promise<LeadPlan[]> {
   const rows = await prisma.studioClientFile.findMany({
     where: { studioId: scope.studioId, clientId: lead.id, kind: 'FLOOR_PLAN' },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, name: true, reading: true },
+    select: { id: true, name: true, reading: true, storagePath: true, contentType: true, note: true, uploadedByName: true, createdAt: true },
     take: 10,
   });
-  return rows.map((r) => ({ id: r.id, name: r.name, read: r.reading !== null }));
+  const links = await signedLeadFileLinks(rows.map((r) => r.storagePath));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    read: r.reading !== null,
+    url: links.get(r.storagePath) ?? null,
+    contentType: r.contentType,
+    note: r.note,
+    uploadedByName: r.uploadedByName,
+    createdAt: r.createdAt,
+  }));
 }
 
 export type LeadPlanRead =
@@ -393,6 +410,8 @@ export interface FirstQuoteInput {
   clientTitle?: string | null;
   /** The previous quotation the lines were copied from (owner, 17 Nov 2026): its terms come too. */
   fromQuoteId?: string | null;
+  /** "No discount on modular" ticked (owner, 19 Nov 2026): the modular discount is 0% on this quotation. */
+  noModularDiscount?: boolean;
 }
 
 /**
@@ -471,7 +490,7 @@ export async function saveFirstQuote(input: FirstQuoteInput): Promise<{ ok: true
     const onSpot = Number(input.onSpotPaise);
     await saveQuoteTerms(created.id, {
       feeBps: row.feeBps,
-      discountBps: row.discountBps,
+      discountBps: input.noModularDiscount === true ? 0 : row.discountBps,
       gstOn: row.gstBps > 0,
       onSpotPaise: Number.isInteger(onSpot) && onSpot > 0 ? onSpot : 0,
       onSpotLabel: typeof input.onSpotLabel === 'string' ? input.onSpotLabel : null,

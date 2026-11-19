@@ -31,6 +31,7 @@ import { leadFileExists, leadUploadTicket, removeLeadFiles, signedLeadFileLinks 
 import {
   budgetText,
   checkLeadFile,
+  planNote,
   cleanFileName,
   editSummary,
   meetingLabel,
@@ -71,6 +72,8 @@ export interface LeadFileView {
   createdAt: Date;
   /** "Read rooms" was pressed and found this many rooms. */
   roomsRead: number | null;
+  /** The specific requirement typed with a floor plan. */
+  note: string | null;
 }
 
 export interface LeadQuoteView {
@@ -124,7 +127,7 @@ export async function leadPage(clientId: string): Promise<LeadPage | null> {
       where: { studioId, clientId: client.id },
       orderBy: { createdAt: 'desc' },
       take: 50,
-      select: { id: true, kind: true, name: true, bytes: true, contentType: true, storagePath: true, uploadedByName: true, createdAt: true, reading: true },
+      select: { id: true, kind: true, name: true, bytes: true, contentType: true, storagePath: true, uploadedByName: true, createdAt: true, reading: true, note: true },
     }),
     prisma.studioQuote.findMany({
       where: { ...scope.quotes, studioId, clientId: client.id },
@@ -165,6 +168,7 @@ export async function leadPage(clientId: string): Promise<LeadPage | null> {
       uploadedByName: f.uploadedByName,
       createdAt: f.createdAt,
       roomsRead: reading && Array.isArray(reading.rooms) ? reading.rooms.length : null,
+      note: f.note,
     };
   });
 
@@ -386,6 +390,8 @@ export async function attachLeadFile(input: {
   kind: unknown;
   /** Quotation requests: false from the First quote page, where the person adding the plan is building the quotation now. */
   quoteRequest?: boolean;
+  /** A specific requirement typed with a floor plan (owner, 19 Nov 2026). Optional. */
+  note?: unknown;
 }): Promise<LeadResult> {
   const found = await leadFor(input.clientId, 'lead.edit');
   if ('error' in found) return { ok: false, error: found.error };
@@ -396,6 +402,7 @@ export async function attachLeadFile(input: {
   if (!(await leadFileExists(input.path))) return { ok: false, error: 'The file did not finish uploading. Try again.' };
   const kind = input.kind === 'FLOOR_PLAN' ? 'FLOOR_PLAN' : 'OTHER';
   const name = cleanFileName(input.name);
+  const note = kind === 'FLOOR_PLAN' ? planNote(input.note) : null;
   const by = await actingMember();
   const created = await prisma.studioClientFile.create({
     select: { id: true },
@@ -409,18 +416,19 @@ export async function attachLeadFile(input: {
       bytes: input.bytes as number,
       uploadedById: by?.id ?? null,
       uploadedByName: by?.name ?? null,
+      note,
     },
   });
-  await record({ studioId, clientId: found.lead.id, kind: 'FILE', summary: kind === 'FLOOR_PLAN' ? `Floor plan attached: ${name}` : `File attached: ${name}` });
+  await record({ studioId, clientId: found.lead.id, kind: 'FILE', summary: kind === 'FLOOR_PLAN' ? `Floor plan attached: ${name}${note ? `. Note: ${note}` : ''}` : `File attached: ${name}` });
   /* Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
      a floor plan makes the lead's request (or joins the open one), handed to
      whoever builds quotations next in turn. Never fails the attach. */
-  if (kind === 'FLOOR_PLAN' && input.quoteRequest !== false) await requestForPlan(studioId, found.lead.id, created.id, by);
+  if (kind === 'FLOOR_PLAN' && input.quoteRequest !== false) await requestForPlan(studioId, found.lead.id, created.id, by, note);
   return { ok: true };
 }
 
 /** A floor plan's quotation request, unless this lead should not get one by itself (quote-request-rules.ts `autoRequestSkip`). */
-async function requestForPlan(studioId: string, clientId: string, fileId: string, by: { id: string; name: string } | null): Promise<void> {
+async function requestForPlan(studioId: string, clientId: string, fileId: string, by: { id: string; name: string } | null, note: string | null): Promise<void> {
   try {
     const lead = await prisma.studioClient.findFirst({
       where: { id: clientId, studioId },
@@ -429,7 +437,7 @@ async function requestForPlan(studioId: string, clientId: string, fileId: string
     if (!lead) return;
     const skip = autoRequestSkip({ fromOneInteriors: lead.introductionId !== null || lead.source === 'ONE_INTERIORS', booked: lead.bookedAt !== null, sentQuotes: lead._count.quotes });
     if (skip) return;
-    await openQuoteRequest({ studioId, clientId, reason: 'FLOOR_PLAN', by, fileId });
+    await openQuoteRequest({ studioId, clientId, reason: 'FLOOR_PLAN', by, fileId, note });
   } catch (error) {
     console.error('[leads] quotation request failed', error instanceof Error ? error.name : 'unknown');
   }
