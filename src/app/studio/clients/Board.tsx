@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { LineIcon } from '../ui/icons';
@@ -566,9 +567,19 @@ function Card({
  * A fixed sheet with its own backdrop cannot be clipped by anything, closes
  * itself when the row is written, and is reachable from the empty state too.
  */
-function AddClient({ label, fields, sources = [] }: { label: string; fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
-  const [open, setOpen] = useState(false);
+function AddClient({ label, fields, sources = [], startOpen = false }: { label: string; fields: FieldRow[]; sources?: { id: string; name: string }[]; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [state, action, pending] = useActionState(addClientAction, IDLE);
+  const router = useRouter();
+
+  /* Opened by ?add=1: take the flag off the address, so the refresh after adding does not open it again. */
+  useEffect(() => {
+    if (!startOpen) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('add')) return;
+    url.searchParams.delete('add');
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [startOpen, router]);
 
   // Close when the row is actually written — not when the form is submitted.
   useEffect(() => {
@@ -742,8 +753,9 @@ export function AddClientButton({ fields, sources }: { fields: FieldRow[]; sourc
 }
 
 /** "+ Add lead" in the leads header (the AxLeads look). */
-export function AddLeadButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
-  return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
+export function AddLeadButton({ fields, sources, startOpen = false }: { fields: FieldRow[]; sources?: { id: string; name: string }[]; startOpen?: boolean }) {
+  /* `startOpen`: Home's "Add a lead" lands here with ?add=1 and the form already open (sales walkthrough, 19 Nov 2026). */
+  return <AddClient label="+ Add a client" fields={fields} sources={sources} startOpen={startOpen} />;
 }
 
 /** The same form, reached from the empty state. See the note on `AddClient`. */

@@ -137,7 +137,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
               Import CSV
             </Link>
           ) : null}
-          <AddLeadButton fields={fields} sources={sources} />
+          <AddLeadButton fields={fields} sources={sources} startOpen={sp.add === '1'} />
         </div>
       </div>
 
