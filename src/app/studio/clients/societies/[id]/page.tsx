@@ -24,7 +24,7 @@ export default async function SocietyPage({ params }: { params: Promise<{ id: st
   if (!access) notFound();
   const s = await getSociety(access, id);
   if (!s) notFound();
-  const people = access.mayManage ? await societyPeople(access.scope.studioId) : [];
+  const people = access.mayManage ? await societyPeople(access) : [];
   const noWing = s.leads.filter((l) => !l.wingId).length;
 
   return (

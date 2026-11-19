@@ -18,7 +18,8 @@ import 'server-only';
 
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { can } from '@/modules/studio/roles';
+import { can, hasSalesRole } from '@/modules/studio/roles';
+import { mayAssignTo } from '@/modules/studio/sales-access';
 import { myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import { bulkAssign, bulkSplit } from '@/modules/studio-sales/bulk';
 import { normalisePhone } from './csv';
@@ -187,12 +188,27 @@ export async function listSocieties(access: SocietyAccess, filters: SocietyFilte
 }
 
 /** The people a society can be given to: active members who work leads. */
-export async function societyPeople(studioId: string): Promise<{ id: string; name: string }[]> {
+/**
+ * Who the society pickers offer (owner, give out leads, import): people who
+ * take leads, and for a sales head whose assigning reaches their team, only
+ * their team (sales walkthrough, 19 Nov 2026: the other team was offered and
+ * every pick was refused).
+ */
+export async function societyPeople(access: SocietyAccess): Promise<{ id: string; name: string }[]> {
   const rows = await prisma.studioMember.findMany({
-    where: { studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
+    where: { studioId: access.scope.studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
     select: { id: true, user: { select: { name: true, email: true, phone: true } } },
   });
-  return rows.map((r) => ({ id: r.id, name: nameOf(r.user) })).sort((a, b) => a.name.localeCompare(b.name));
+  return rows
+    .filter((r) => mayHandTo(access, r.id))
+    .map((r) => ({ id: r.id, name: nameOf(r.user) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Whether this member may give a society, or its leads, to `memberId` (a team reach: their team only). */
+function mayHandTo(access: SocietyAccess, memberId: string): boolean {
+  const me = access.scope.member;
+  return !hasSalesRole(me) || mayAssignTo(me.sales, memberId);
 }
 
 export async function societyLocalities(access: SocietyAccess): Promise<string[]> {
@@ -394,7 +410,7 @@ export async function setSocietyOwner(access: SocietyAccess, id: string, memberI
   if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change who owns a society.' };
   if (memberId) {
     const ok = await prisma.studioMember.findFirst({ where: { id: memberId, studioId: access.scope.studioId, status: 'ACTIVE' }, select: { id: true } });
-    if (!ok) return { ok: false, error: 'Pick someone in your team.' };
+    if (!ok || !mayHandTo(access, memberId)) return { ok: false, error: 'Pick someone in your team.' };
   }
   await prisma.studioSociety.updateMany({ where: { id, studioId: access.scope.studioId }, data: { assignedToId: memberId } });
   return { ok: true };
