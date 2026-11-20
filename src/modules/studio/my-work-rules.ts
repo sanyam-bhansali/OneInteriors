@@ -372,7 +372,9 @@ export function projectSources(p: ProjectFacts, me: Me, today: string, opts: { s
     });
   }
 
-  if (seesProject && isMineExecStep(me, isDesigner)) {
+  /* Not while the project is in design (owner, 20 Nov 2026: "the home page tasks of design projects are not
+     relevant"): the site steps carry the plan's first dates until design is done, so they all read as missed. */
+  if (p.phase !== 'DESIGN' && seesProject && isMineExecStep(me, isDesigner)) {
     for (const s of p.execSteps) {
       if (!s.plannedOn) continue;
       /* The project closure (owner, 13 Nov 2026): in the designer's tasks, saying what it is for. */
