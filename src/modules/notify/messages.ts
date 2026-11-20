@@ -81,10 +81,15 @@ export type ProjectEvent =
   // A project hold (owner, 20 Nov 2026: "head isn't told"), studio staff only: asked, to the design head and the owner;
   // approved or declined, back to the one who asked.
   | { kind: 'hold-asked'; projectId: string; client: string; by: string; reason: string }
-  | { kind: 'hold-decided'; projectId: string; client: string; by: string; approved: boolean };
+  | { kind: 'hold-decided'; projectId: string; client: string; by: string; approved: boolean }
+  // After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md), studio staff only: a covered warranty claim, to the
+  // design head to assign; a paid service visit, to the office and the design head. And to the client: their visit is booked.
+  | { kind: 'warranty-claim'; projectId: string; client: string; title: string; area: string }
+  | { kind: 'service-booked'; projectId: string; client: string; category: string; when: string }
+  | { kind: 'service-confirmed'; category: string; when: string; studio: string };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer', 'service-booked'];
 
 export interface Message {
   title: string;
@@ -433,6 +438,27 @@ export function messageFor(e: ProjectEvent): Message {
         url: `/studio/calendar/meetings#m-${e.meetingId}`,
       };
     }
+    case 'warranty-claim':
+      return {
+        template: 'warranty.claim',
+        title: `Warranty claim: ${clip(e.title, 60)}`,
+        body: clip(`${e.client}. Covered (${e.area}). Assign it with a fix-by date under Snags.`, 160),
+        url: `/studio/projects/${e.projectId}`,
+      };
+    case 'service-booked':
+      return {
+        template: 'service.booked',
+        title: `Service visit booked: ${e.category}`,
+        body: clip(`${e.client}, ${e.when}.`, 160),
+        url: '/studio/service-visits',
+      };
+    case 'service-confirmed':
+      return {
+        template: 'service.confirmed',
+        title: 'Your service visit is booked',
+        body: clip(`${e.category} visit by ${e.studio}, ${e.when}.`, 160),
+        url: '/app/aftercare',
+      };
     case 'hold-asked':
       return {
         template: 'hold.asked',

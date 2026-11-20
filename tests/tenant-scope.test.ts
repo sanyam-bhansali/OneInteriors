@@ -115,6 +115,11 @@ const OPERATOR_ROUTES = ['src/app/ops/'];
  */
 const ALLOWED: { file: string; model: string; why: string }[] = [
   {
+    file: 'src/modules/aftercare/store.ts',
+    model: 'serviceRequest',
+    why: "Razorpay's paid notice (docs/studio-os/AFTERCARE.md) has no session: markServicePaid finds the one visit by its unique payment link id, and only after the redirect's or the webhook's signature was checked. Every other aftercare query is scoped by the client's own project or the member's studioId.",
+  },
+  {
     file: 'src/modules/matching/store.ts',
     model: 'match',
     why: 'Roster-wide "when did matching begin" — one timestamp, no studio data, and no studio to scope it to.',

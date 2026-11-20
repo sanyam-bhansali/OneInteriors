@@ -704,6 +704,17 @@ model Studio {
   /// sign-off starts the warranty (warranty snags). Settings, Warranty.
   snagWindowDays Int @default(30)
 
+  /// Service visits after the handover (owner, 20 Nov 2026; docs/studio-
+  /// os/AFTERCARE.md): the fixed visiting charge per category, in paise,
+  /// { "CARPENTRY": 50000, … }. A category with no charge cannot be booked.
+  /// Settings, Warranty (owner). Read only through aftercare/rules.ts
+  /// `readServiceCharges`.
+  serviceCharges    Json?
+  /// Visits the studio takes in one 2-hour slot.
+  serviceSlotVisits Int                    @default(2)
+  coverageRules     WarrantyCoverageRule[]
+  serviceRequests   ServiceRequest[]
+
   /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
   /// (projects, design, site mode, the payments desk, crews, team) is open
   /// only for pilot studios; every other studio gets Leads, Quotations, the
@@ -1166,7 +1177,6 @@ model StudioHoliday {
   @@map("studio_holidays")
 }
 
-
 /// A team member's leave (owner, 13 Nov 2026: "a calendar-based leave
 /// approval system, where people put their planned or unplanned leaves,
 /// based on approval. It should impact the projects on which they are
@@ -1176,25 +1186,25 @@ model StudioHoliday {
 /// design steps of the projects the member is the designer on move later
 /// by the studio's working days inside the leave (studio-leave/).
 model StudioLeave {
-  id          String       @id @default(cuid())
-  studioId    String
-  studio      Studio       @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  memberId    String
-  member      StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  studioId        String
+  studio          Studio       @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  memberId        String
+  member          StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   /// IST days, both inside the leave.
-  fromDay     DateTime     @db.Date
-  toDay       DateTime     @db.Date
+  fromDay         DateTime     @db.Date
+  toDay           DateTime     @db.Date
   /// PLANNED | UNPLANNED (studio-leave/rules.ts).
-  kind        String
+  kind            String
   /// Short, the team's words. Seen by the member and the approvers only.
-  reason      String
+  reason          String
   /// ASKED | APPROVED | DECLINED | WITHDRAWN.
-  status      String       @default("ASKED")
+  status          String       @default("ASKED")
   /// The user who asked (the member, or an approver entering it for them).
-  askedById   String
-  askedAt     DateTime     @default(now())
-  decidedById String?
-  decidedAt   DateTime?
+  askedById       String
+  askedAt         DateTime     @default(now())
+  decidedById     String?
+  decidedAt       DateTime?
   /// On approval: working days the plans moved, and how many projects.
   shiftedDays     Int?
   shiftedProjects Int?
@@ -1879,6 +1889,9 @@ model HomeProject {
   handoverSignedById    String?
   warrantyEndsOn        DateTime?            @db.Date
   closures              HomeProjectClosure[]
+  /// After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md).
+  warrantyClaims        WarrantyClaim[]
+  serviceRequests       ServiceRequest[]
 
   /// Extra work after design sign-off (change orders) and the client's
   /// digital sign-offs of quotations (owner, 15 Oct 2026;
@@ -2247,18 +2260,18 @@ model HomeChecklistItem {
 
   /// The step's group inside its stage ("Execution stage 2A"); a room on
   /// the older quote-line items.
-  room        String
-  label       String
+  room           String
+  label          String
   /// The step's weight in basis points (10 000 = 100% of the project). What
   /// counts is the effective weight: in-scope weights shared so they sum to
   /// 100% (project/step-rules.ts). Never sent to the customer as stored.
-  weightBp    Int       @default(0)
+  weightBp       Int       @default(0)
   /// False = not in scope for this home: hidden from the customer, its
   /// weight shared across the in-scope steps, never needed to finish a stage.
-  inScope     Boolean   @default(true)
+  inScope        Boolean   @default(true)
   /// The planned day, spread across the stage's window from the template's
   /// sheet days; moves with the stage.
-  plannedOn   DateTime? @db.Date
+  plannedOn      DateTime? @db.Date
   /// The day it was first planned for, never moved (owner, 13 Nov 2026: "har
   /// case mein dikhana hai … previous date kya tha aur abhi"): the studio sees
   /// planned and current side by side; the client never sees dates. Null on a
@@ -2266,8 +2279,8 @@ model HomeChecklistItem {
   firstPlannedOn DateTime? @db.Date
   /// The signed quote line it came from. A snapshot reference, not a key:
   /// quote lines are copied at signing and may be edited or deleted later.
-  quoteLineId String?
-  sortOrder   Int       @default(0)
+  quoteLineId    String?
+  sortOrder      Int       @default(0)
 
   doneAt        DateTime?
   /// The user who ticked it (studio member or ops). Not a foreign key, as
@@ -6545,4 +6558,103 @@ model StudioSocietyNote {
 
   @@index([societyId, createdAt])
   @@map("studio_society_notes")
+}
+
+/// What the warranty covers, as data (owner, 20 Nov 2026; docs/studio-os/
+/// AFTERCARE.md, aftercare/rules.ts). An area the client picks and the photo
+/// reader names; `covered` decides. Rows with no studio are One Interiors'
+/// default list, used by every studio that has no active rows of its own.
+/// Seeded by migration 20261120120000_aftercare; changed as rows, not code.
+model WarrantyCoverageRule {
+  id              String   @id @default(cuid())
+  studioId        String?
+  studio          Studio?  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  key             String
+  /// What the client reads.
+  label           String
+  /// What the area looks like, for the photo reader.
+  examples        String   @db.Text
+  covered         Boolean
+  /// Where a not-covered claim is sent: a service category (rules.ts).
+  serviceCategory String?
+  sortOrder       Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([studioId, active])
+  @@map("warranty_coverage_rules")
+}
+
+/// A client's warranty claim, decided automatically (owner, 20 Nov 2026).
+/// Only a claim past the payment gate and in the warranty is written. COVERED
+/// opens a warranty snag (`snagId`) for the design head to assign; NOT_COVERED
+/// is kept for the record only: nobody is asked to answer it.
+model WarrantyClaim {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  raisedById    String
+  description   String      @db.Text
+  /// Keys in the private `site-photos` bucket; signed links only.
+  photoPaths    String[]    @default([])
+  /// The area the client picked, and the one that decided (rule keys).
+  clientRuleKey String?
+  ruleKey       String
+  covered       Boolean
+  /// 'reader' (the photo reader's area) or 'client' (the reader gave no answer).
+  decidedBy     String
+  readerModel   String?
+  /// The reader's one line on what decided it. Internal.
+  readerReason  String?     @db.Text
+  /// Why the reader gave no answer (not-configured, reader-failed, …).
+  readerFailure String?
+  /// The warranty snag it opened, when covered.
+  snagId        String?     @unique
+  createdAt     DateTime    @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("warranty_claims")
+}
+
+/// HELD while the client pays (until `holdUntil`; past it, read as expired,
+/// never written), BOOKED once Razorpay says paid, CANCELLED by the studio.
+enum ServiceRequestStatus {
+  HELD
+  BOOKED
+  CANCELLED
+}
+
+/// A paid service visit after the handover (owner, 20 Nov 2026): a category,
+/// its fixed visiting charge, a 2-hour slot from 5 days ahead. Booked only
+/// when the charge is paid; that is the only way to book a visit.
+model ServiceRequest {
+  id          String               @id @default(cuid())
+  projectId   String
+  project     HomeProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  studioId    String
+  studio      Studio               @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  raisedById  String
+  /// aftercare/rules.ts SERVICE_CATEGORIES.
+  category    String
+  description String               @db.Text
+  photoPaths  String[]             @default([])
+  /// The visiting charge when it was booked.
+  chargePaise BigInt
+  slotDay     DateTime             @db.Date
+  /// "10:00" | "12:00" | "14:00" | "16:00" (IST).
+  slotStart   String
+  status      ServiceRequestStatus @default(HELD)
+  holdUntil   DateTime
+  /// Razorpay's payment link and payment.
+  payLinkId   String?              @unique
+  payUrl      String?
+  paymentId   String?              @unique
+  paidAt      DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([studioId, slotDay, slotStart])
+  @@index([projectId, createdAt])
+  @@map("service_requests")
 }

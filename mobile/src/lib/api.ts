@@ -164,6 +164,17 @@ export interface ChatThread {
 }
 const chatPath = (projectId: string, kind: ChatKind) => `/chats/${encodeURIComponent(projectId)}/${kind.toLowerCase()}`;
 
+/** GET /aftercare (src/modules/aftercare/store.ts `AftercareView`). */
+export interface Aftercare {
+  projectId: string;
+  studio: string;
+  owner: boolean;
+  warranty: { open: boolean; message: string | null; endsOn: string | null; areas: { key: string; label: string }[] };
+  service: { ready: boolean; free?: boolean; freeUntil?: string | null; categories: { key: string; label: string; chargePaise: number; listPaise?: number | null }[]; days: { date: string; label: string; slots: { start: string; label: string; left: number }[] }[] };
+  requests: { id: string; category: string; when: string; chargePaise: number; listPaise?: number | null; state: 'held' | 'booked' | 'expired' | 'cancelled'; payUrl: string | null }[];
+  claims: { id: string; at: string; covered: boolean; area: string; snagId: string | null }[];
+}
+
 export const api = {
   /** A booked site visit or meeting: "I'll be there", or ask for another day with why (1 Nov 2026). */
   answerVisit: (visitId: string, answer: 'confirm' | 'move', reason?: string) => call<{ message?: string | null }>('POST', `/visits/${encodeURIComponent(visitId)}`, { answer, reason: reason ?? '' }),
@@ -225,6 +236,13 @@ export const api = {
   /** Studio OS Phase 2: approve a shared drawing, or ask for changes with what to change. Owner only. */
   answerDrawing: (documentId: string, verdict: 'APPROVED' | 'CHANGES', comment: string) =>
     call<{ id: string }>('POST', `/design/${encodeURIComponent(documentId)}/answer`, { verdict, comment }),
+  /** After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md): the warranty's areas, service categories and slots, the client's claims and visits. */
+  aftercare: (projectId: string) => call<Aftercare>('GET', `/aftercare?projectId=${encodeURIComponent(projectId)}`),
+  /** Multipart: projectId, area, description, photos. 402 with the payment gate's sentence when the project is not 100% paid. */
+  warrantyClaim: (form: FormData) =>
+    call<{ covered: true; snagId: string; message: string } | { covered: false; message: string; serviceCategory: string | null }>('POST', '/aftercare/warranty', form),
+  /** Multipart: projectId, category, description, day, start. The slot is held while the client pays at `payUrl`. */
+  bookService: (form: FormData) => call<{ id: string; payUrl: string | null; booked?: boolean; chargePaise: number; when: string }>('POST', '/aftercare/service', form),
   /** The project lifecycle: the owner signs off the handover once every snag is closed; the warranty starts. */
   signOffHandover: (projectId: string) => call<{ warrantyEndsOn: string }>('POST', `/project/${encodeURIComponent(projectId)}/handover`, {}),
   /** Change orders (15 Oct 2026): approve extra work, or decline it with a reason. Owner only. */

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
@@ -167,6 +168,10 @@ export default function Snags() {
           <Eyebrow onDark>{handover ? t('snags.walk', { date: shortDate(handover.targetOn) }) : t('snags.walkNoDate')}</Eyebrow>
           <Text style={styles.walkBody}>{assured ? t('snags.walkBody') : t('plan.basic.walk')}</Text>
         </DarkCard>
+        {/* After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md): warranty claims and paid service visits. */}
+        {p.lifecycle?.phase === 'warranty' || p.lifecycle?.phase === 'closed' ? (
+          <Button label={t('after.link')} variant="light" onPress={() => router.push('/aftercare')} />
+        ) : null}
       </View>
     </Screen>
   );
