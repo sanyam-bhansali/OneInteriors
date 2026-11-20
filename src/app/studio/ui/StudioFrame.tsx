@@ -12,6 +12,7 @@ import { Oim, Verified } from './brand';
 import { ThemeToggle } from './theme';
 import { THEME_KEY } from './theme-script';
 import { ProfileMenu } from './ProfileMenu';
+import { NotificationBell } from './NotificationBell';
 
 /**
  * The studio frame from the owner's UI handoff (12 Oct 2026): no side menu.
@@ -142,10 +143,8 @@ export function StudioFrame({
               <kbd>Ctrl K</kbd>
             </button>
             <ThemeToggle />
-            <Link href={STUDIO_HOME} className="iconbtn" aria-label={alerts > 0 ? `Notifications, ${alerts} new` : 'Notifications'}>
-              <LineIcon name="bell" />
-              {alerts > 0 ? <span className="pip" /> : null}
-            </Link>
+            {/* The bell lists and pops every notice (owner, 20 Nov 2026: "notification should pop for every approval"). */}
+            <NotificationBell alerts={alerts} />
             <ProfileMenu name={userName} signOut={signOut} />
           </div>
         </header>
