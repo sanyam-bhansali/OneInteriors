@@ -537,8 +537,7 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
               Note for the quotation (optional)
               <textarea
                 className="fld"
-                rows={2}
-                maxLength={300}
+                rows={4}
                 value={planNote}
                 onChange={(e) => setPlanNote(e.target.value)}
                 placeholder="Any specific requirement: e.g. no loft in the kids' room, wants a bar unit, budget near 8 lakh"
@@ -653,7 +652,7 @@ function FileRow({
         </span>
       </div>
       {f.note ? (
-        <p className="sm" style={{ margin: 0, lineHeight: 1.5 }} data-testid="file-note">
+        <p className="sm" style={{ margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }} data-testid="file-note">
           <b>Note:</b> {f.note}
         </p>
       ) : null}

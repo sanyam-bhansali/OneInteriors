@@ -230,8 +230,7 @@ export function FirstQuote({
           Note for the quotation (optional)
           <textarea
             className="fld hfld"
-            rows={2}
-            maxLength={300}
+            rows={4}
             value={planNote}
             onChange={(e) => setPlanNote(e.target.value)}
             placeholder="Any specific requirement: e.g. no loft in the kids' room, budget near 8 lakh"
