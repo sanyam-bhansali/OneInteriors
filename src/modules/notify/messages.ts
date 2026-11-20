@@ -82,11 +82,19 @@ export type ProjectEvent =
   // approved or declined, back to the one who asked.
   | { kind: 'hold-asked'; projectId: string; client: string; by: string; reason: string }
   | { kind: 'hold-decided'; projectId: string; client: string; by: string; approved: boolean }
+  // Leave (owner, 20 Nov 2026: "notification should pop for every approval"), studio staff only: asked, to the
+  // owner and the design head; approved or declined, back to the person.
+  | { kind: 'leave-asked'; name: string; from: string; to: string }
+  // To the studio (owner, 20 Nov 2026): the client confirmed a payment, or said they did not pay it.
+  | { kind: 'payment-answered'; projectId: string; client: string; amountPaise: number; confirmed: boolean }
+  | { kind: 'leave-decided'; by: string; from: string; to: string; approved: boolean }
   // After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md), studio staff only: a covered warranty claim, to the
-  // design head to assign; a paid service visit, to the office and the design head. And to the client: their visit is booked.
+  // design head to assign; a booked service visit, to the office and the design head. And to the client: their visit is booked,
+  // or the studio moved, cancelled or finished it.
   | { kind: 'warranty-claim'; projectId: string; client: string; title: string; area: string }
   | { kind: 'service-booked'; projectId: string; client: string; category: string; when: string }
-  | { kind: 'service-confirmed'; category: string; when: string; studio: string };
+  | { kind: 'service-confirmed'; category: string; when: string; studio: string }
+  | { kind: 'service-changed'; what: 'moved' | 'cancelled' | 'done'; category: string; when: string; studio: string; note: string | null };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer', 'service-booked'];
@@ -100,6 +108,7 @@ export interface Message {
   template: string;
 }
 
+const rupeesOf = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
 export function messageFor(e: ProjectEvent): Message {
@@ -459,6 +468,16 @@ export function messageFor(e: ProjectEvent): Message {
         body: clip(`${e.category} visit by ${e.studio}, ${e.when}.`, 160),
         url: '/app/aftercare',
       };
+    case 'service-changed':
+      return {
+        template: `service.${e.what}`,
+        title: e.what === 'moved' ? 'Your service visit was moved' : e.what === 'cancelled' ? 'Your service visit was cancelled' : 'Your service visit is done',
+        body: clip(
+          `${e.category} visit by ${e.studio}${e.what === 'moved' ? `, now ${e.when}` : `, ${e.when}`}.${e.note ? ` ${e.note}` : ''}`,
+          160,
+        ),
+        url: '/app/aftercare',
+      };
     case 'hold-asked':
       return {
         template: 'hold.asked',
@@ -472,6 +491,27 @@ export function messageFor(e: ProjectEvent): Message {
         title: e.approved ? `${e.client} is on hold` : `Hold declined for ${e.client}`,
         body: e.approved ? `${e.by} approved it. Nothing counts as late until it is taken off.` : `${e.by} declined it. The project runs as usual.`,
         url: `/studio/projects/${e.projectId}#hold`,
+      };
+    case 'payment-answered':
+      return {
+        template: e.confirmed ? 'payment.confirmed' : 'payment.questioned',
+        title: e.confirmed ? `${e.client} confirmed a payment` : `${e.client} says a payment was not made`,
+        body: e.confirmed ? `${rupeesOf(e.amountPaise)} confirmed in the app.` : `${rupeesOf(e.amountPaise)}: One Interiors will call to sort it out.`,
+        url: `/studio/projects/${e.projectId}?tab=payments`,
+      };
+    case 'leave-asked':
+      return {
+        template: 'leave.asked',
+        title: `${e.name} asked for leave`,
+        body: `${e.from === e.to ? e.from : `${e.from} to ${e.to}`}. Approve or decline it in Leave and holidays.`,
+        url: '/studio/calendar/leave',
+      };
+    case 'leave-decided':
+      return {
+        template: e.approved ? 'leave.approved' : 'leave.declined',
+        title: e.approved ? 'Your leave is approved' : 'Your leave was declined',
+        body: `${e.from === e.to ? e.from : `${e.from} to ${e.to}`}, by ${e.by}.`,
+        url: '/studio/calendar/leave',
       };
   }
 }

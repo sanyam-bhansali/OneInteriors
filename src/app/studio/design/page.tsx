@@ -13,7 +13,7 @@ import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { maySeeClosing } from '@/modules/studio/expected-closing';
 import { newProjectsForMe } from '@/modules/studio-design/new-projects';
 import { NewProjects } from './NewProjects';
-import { applyBoardView, BOARD_CATEGORIES, BOARD_SHOWS, BOARD_SORTS, boardViewQuery, isDefaultView, readBoardView } from '@/modules/studio/board-view';
+import { applyBoardView, BOARD_CATEGORIES, BOARD_SHOWS, BOARD_SORTS, boardViewQuery, isDefaultView, readBoardView, stageChoices } from '@/modules/studio/board-view';
 import '../projects/projects.css';
 
 export const metadata: Metadata = { title: 'Design', robots: { index: false, follow: false } };
@@ -31,8 +31,8 @@ const muted = 'text-[12.5px] text-[var(--muted)]';
 const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
-export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string; sort?: string; cat?: string; show?: string }> }) {
-  const [{ tab: rawTab, deleted, designer, sort, cat, show }, fullBoard, w, member, fresh] = await Promise.all([
+export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string; sort?: string; cat?: string; show?: string; stage?: string }> }) {
+  const [{ tab: rawTab, deleted, designer, sort, cat, show, stage }, fullBoard, w, member, fresh] = await Promise.all([
     searchParams,
     lifecycleBoard().catch(() => null),
     designWorkload(),
@@ -44,7 +44,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
   const picked = pickDesigner(designer, choices);
   const narrowed: LifecycleBoard | null = fullBoard && picked ? narrowBoard(fullBoard, picked) : fullBoard;
   /* Sort and filter (owner, 20 Nov 2026; studio/board-view.ts): the numbers above stay on every project, the cards follow the view. */
-  const view = readBoardView({ sort, cat, show });
+  const view = readBoardView({ sort, cat, show, stage });
   const board: LifecycleBoard | null = narrowed ? applyBoardView(narrowed, view) : null;
   const viewQ = boardViewQuery(view);
   const designers = w ? w.designers.filter((d) => picked === null || (picked === NO_DESIGNER ? d.id === null : d.id === picked)) : null;
@@ -57,6 +57,8 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
   }
   const mine = board ? board.scope === 'designer' : !w?.everyone;
   const tab = asLifeTab(rawTab);
+  /* Every stage the projects in this tab are at, before the filter (owner, 20 Nov 2026). */
+  const stages = narrowed ? stageChoices(tab === 'design' ? [...narrowed.design, ...narrowed.preExecution] : narrowed[tab]) : [];
   return (
     <div className="content oi-proj">
       <div className="phead">
@@ -136,6 +138,18 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                   {v}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="hstack sm" style={{ gap: 6 }}>
+            <span className="muted">Stage</span>
+            <select name="stage" defaultValue={view.stage ?? ''} className="fld" style={{ width: 'auto', minHeight: 32, maxWidth: 260 }}>
+              <option value="">All stages</option>
+              {stages.map((c) => (
+                <option key={c.stage} value={c.stage}>
+                  {c.stage} · {c.count}
+                </option>
+              ))}
+              {view.stage && !stages.some((c) => c.stage === view.stage) ? <option value={view.stage}>{view.stage} · 0</option> : null}
             </select>
           </label>
           <label className="hstack sm" style={{ gap: 6 }}>

@@ -82,7 +82,21 @@ export async function notifyStudio(studioId: string, event: ProjectEvent): Promi
       where: { studioId, ...OFFICE_MEMBER },
       select: { userId: true, user: { select: { email: true } } },
     });
-    await Promise.all(members.map((m) => notify(m.userId, event, { email: false })));
+    /* And the people working the project (owner, 20 Nov 2026: "notification should pop for every approval"): for an
+       event about one project, its designer, its team and the design head hear it too, in the app (no extra email). */
+    const projectId = 'projectId' in event && typeof event.projectId === 'string' ? event.projectId : null;
+    const extra = projectId
+      ? await prisma.studioMember.findMany({
+          where: {
+            studioId,
+            status: 'ACTIVE',
+            OR: [...(event.kind === 'chat' ? [] : [{ role: 'DESIGNER' as const, designHead: true }]), { designing: { some: { id: projectId } } }, { projects: { some: { homeProjectId: projectId } } }],
+          },
+          select: { userId: true },
+        })
+      : [];
+    const users = [...new Set([...members.map((m) => m.userId), ...extra.map((m) => m.userId)])];
+    await Promise.all(users.map((u) => notify(u, event, { email: false })));
     if (EMAILED_TO_STUDIO.includes(event.kind)) {
       const msg = messageFor(event);
       const url = `${resolveSiteUrl()}${msg.url}`;

@@ -134,6 +134,8 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
         </span>
         <span className="flex flex-col items-end gap-1">
           <span className={`chip ${tone}`}>{c.phaseLabel}</span>
+          {/* % complete (owner, 20 Nov 2026: sort by it on the Design board). */}
+          <span className="chip mono" data-testid="life-card-pct">{c.pct}%</span>
           {/* On-site carcass (owner, 13 Nov 2026): carcass built on site, only shutters from the factory. */}
           {c.onSiteCarcass ? (
             <span className="chip warn" title="Carcass built on site, only shutters from the factory" data-testid="life-card-carcass">

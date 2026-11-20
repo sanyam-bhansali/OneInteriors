@@ -26,7 +26,7 @@ import type { PaymentMode, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb } from '@/lib/money';
 import { readSignedStages } from '@/modules/portal/payments';
-import { notify, notifyOps } from '@/modules/notify/service';
+import { notify, notifyOps, notifyStudio } from '@/modules/notify/service';
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
 import { currentMember, projectsVisibleTo } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
@@ -421,7 +421,20 @@ export async function confirmPayment(userId: string, paymentId: string, now = ne
     await recordEvent(tx, { projectId: row.projectId, type: 'payment.confirmed', actor, refId: row.id, payload: { stageIndex: row.stageIndex, amountPaise: fromDb(row.amountPaise) } });
     await mirror(tx, row.projectId);
   });
+  void tellStudioPayment(row.projectId, fromDb(row.amountPaise), true);
   return { ok: true, id: row.id };
+}
+
+/** The client confirmed a payment: the studio hears it (owner, 20 Nov 2026). "I didn't pay this" stays with our team. Logged, never thrown. */
+async function tellStudioPayment(projectId: string, amountPaise: number, confirmed: boolean): Promise<void> {
+  try {
+    const p = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { introduction: { select: { studioId: true, brief: { select: { contactName: true, user: { select: { name: true } } } } } } } });
+    if (!p) return;
+    const client = p.introduction.brief.contactName?.trim() || p.introduction.brief.user?.name?.trim() || 'The client';
+    await notifyStudio(p.introduction.studioId, { kind: 'payment-answered', projectId, client, amountPaise, confirmed });
+  } catch (error) {
+    console.error('[payments] tell studio failed', error instanceof Error ? error.name : 'unknown');
+  }
 }
 
 /** "I didn't pay this." Goes to our team with the customer's words; the stage is owed again. */
