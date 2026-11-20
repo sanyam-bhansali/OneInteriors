@@ -68,6 +68,13 @@ export interface BoardCard {
   extras: { withClient: number; toPay: number; toRelease: number };
   /** On-site carcass, shutters from the factory (owner, 13 Nov 2026; studio/expected-closing.ts). */
   onSiteCarcass: boolean;
+  /* For sort and filter on the Design board (owner, 20 Nov 2026; studio/board-view.ts). */
+  /** On hold right now. */
+  onHold: boolean;
+  /** The design stage's planned end, YYYY-MM-DD. */
+  designEndsOn: string | null;
+  /** The project's start, YYYY-MM-DD. */
+  startedOn: string | null;
 }
 
 export interface LifecycleBoard {
@@ -91,6 +98,7 @@ const SELECT = {
   priority: true,
   category: true,
   onSiteCarcass: true,
+  startOn: true,
   id: true,
   phase: true,
   warrantyEndsOn: true,
@@ -109,6 +117,7 @@ const SELECT = {
     select: {
       kind: true,
       name: true,
+      plannedEnd: true,
       items: { orderBy: { sortOrder: 'asc' }, select: { label: true, doneAt: true, inScope: true, plannedOn: true, responsible: true, gatePayment: true } },
     },
   },
@@ -206,6 +215,9 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
       toRelease: p.changeOrders.filter((c) => c.status === 'PAID').length,
     },
     onSiteCarcass: p.onSiteCarcass,
+    onHold: (p.holds?.length ?? 0) > 0,
+    designEndsOn: designStage?.plannedEnd ? istDay(designStage.plannedEnd) : null,
+    startedOn: p.startOn ? istDay(p.startOn) : null,
   };
 }
 
