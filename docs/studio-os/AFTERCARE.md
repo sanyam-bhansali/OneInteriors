@@ -79,8 +79,8 @@ service when the payment terms were not kept.)
 
 ## Open with the owner
 
-- The agreement (5.4) asks 7 working days' notice for a paid visit; the owner asked for the
-  first slot at today + 5. Built as today + 5.
+- Notice for a visit: the agreement (5.4) says 7 working days; the owner decided (20 Nov 2026)
+  to keep the first slot at **today + 5**. Worth aligning the agreement's next version.
 - The agreement (5.4) prices paid service case by case; built as the owner asked, a fixed
   visiting charge per kind. Extra work found on the visit is quoted as before (change orders).
 - Visiting charges land in whichever Razorpay account the keys belong to; paying them on to
