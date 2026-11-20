@@ -31,7 +31,7 @@ import { normalisePhone as leadPhone } from '@/modules/studio-practice/csv';
 import { readPhases } from '@/modules/studio/payment-phases';
 import { snapshotOf } from '@/modules/studio-sales/revisions';
 import { nextRevisionNumber, readRevisionLines, readRevisionTotals, revisionLabel, sameLinesAs } from '@/modules/studio-sales/revision-rules';
-import { cleanStages, readStages, scheduleAmounts, templateOrDefault, type PaymentStage } from '@/modules/studio-sales/payment-template';
+import { cleanStages, projectStages, readStages, scheduleAmounts, templateOrDefault, type PaymentStage } from '@/modules/studio-sales/payment-template';
 import { PLAN_TX } from '@/modules/portal/plan-write';
 import { templateStages } from '@/modules/portal/quote-to-plan';
 import { designPlanInput } from '@/modules/studio-design/plan-input';
@@ -594,7 +594,7 @@ export async function bringInAs(
         startOn: dayToDb(startDay),
         totalDays,
         contractPaise: resolved.contractPaise,
-        stages: amounts.stages.map((s) => ({ label: s.label, pct: null, amountPaise: s.amountPaise })),
+        stages: projectStages(amounts.stages),
         signedAt: now,
         code,
         design,

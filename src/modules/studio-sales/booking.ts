@@ -34,7 +34,7 @@ import { dayToDb } from '@/modules/project/working-days';
 import { record } from '@/modules/studio-practice/events';
 import { stageSummary } from '@/modules/studio-practice/event-copy';
 import { readRevisionLines, readRevisionTotals, revisionLabel, sameLinesAs } from './revision-rules';
-import { readStages, refundDaysOf, scheduleAmounts, templateOrDefault } from './payment-template';
+import { projectStages, readStages, refundDaysOf, scheduleAmounts, templateOrDefault } from './payment-template';
 import { snapshotOf } from './revisions';
 import { queueConversions } from './conversions';
 import { categoryRefusal } from '@/modules/studio-quote/category-rules';
@@ -203,7 +203,7 @@ export async function recordBooking(input: RecordBookingInput, now = new Date())
     {
       action: 'booking.record',
       contractPaise: contract,
-      stages: amounts.stages.map((s) => ({ label: s.label, pct: null, amountPaise: s.amountPaise })),
+      stages: projectStages(amounts.stages),
       onCreated: async (tx, project) => {
         await lockProject(tx, project.id);
         const row = await tx.homeProjectPayment.create({
