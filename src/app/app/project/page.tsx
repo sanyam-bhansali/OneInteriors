@@ -230,6 +230,16 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
               </span>
               <span aria-hidden>→</span>
             </Link>
+            {/* After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md). */}
+            {project.lifecycle?.phase === 'warranty' || project.lifecycle?.phase === 'closed' ? (
+              <Link href="/app/aftercare" className="oa-row" style={{ textDecoration: 'none' }}>
+                <span>
+                  <span className="oa-row-title">Warranty and service</span>
+                  <span className="oa-row-sub">Raise a warranty claim, or book a paid service visit</span>
+                </span>
+                <span aria-hidden>→</span>
+              </Link>
+            ) : null}
           </div>
         );
       case 'nextPayment':

@@ -126,7 +126,7 @@ export function useBrief(): [Brief | null, (patch: Partial<Brief>) => void] {
 
 const TABS = [
   { href: '/app/home', label: 'tab.home', icon: <HomeIcon />, also: [] as string[] },
-  { href: '/app/project', label: 'tab.project', icon: <ListIcon />, also: ['/app/snags', '/app/decision', '/app/site', '/app/3d', '/app/story', '/app/signoff'] },
+  { href: '/app/project', label: 'tab.project', icon: <ListIcon />, also: ['/app/snags', '/app/aftercare', '/app/decision', '/app/site', '/app/3d', '/app/story', '/app/signoff'] },
   { href: '/app/geio', label: 'tab.geio', icon: null, also: [] },
   { href: '/app/chats', label: 'tab.chats', icon: <ChatIcon />, also: [] },
   { href: '/app/me', label: 'tab.me', icon: <PersonIcon />, also: ['/app/locker', '/app/notifications', '/app/coins', '/app/family', '/app/dream', '/app/refer'] },

@@ -25,22 +25,7 @@
  */
 
 import type { MemberRole } from './roles';
-import {
-  CREWS_HOME,
-  CREW_SETTINGS_PATH,
-  DESIGN_HOME,
-  DESIGN_STEPS_PATH,
-  HOLIDAYS_PATH,
-  DOCUMENTS_HOME,
-  PAYMENTS_HOME,
-  SITE_CREW_PATH,
-  SITE_HOME,
-  homeFor,
-  isFullSoftwarePath,
-  mayOpen,
-  needsFullSoftware,
-  SOCIETIES_PATH,
-} from './surfaces';
+import { CREWS_HOME, CREW_SETTINGS_PATH, DESIGN_HOME, DESIGN_STEPS_PATH, DOCUMENTS_HOME, HOLIDAYS_PATH, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_CREW_PATH, SITE_HOME, SOCIETIES_PATH, homeFor, isFullSoftwarePath, mayOpen, needsFullSoftware } from './surfaces';
 
 /** The closed areas, each with its own "coming soon". */
 export type PilotArea = 'projects' | 'design' | 'site' | 'money' | 'vendors' | 'team' | 'listing' | 'societies';
@@ -94,6 +79,8 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   /* Chats with clients (1 Nov 2026) are about their projects. */
   ['/studio/chats', 'projects'],
   ['/studio/updates', 'projects'],
+  /* Service visits after the handover (owner, 20 Nov 2026) are about projects. */
+  [SERVICE_VISITS_PATH, 'projects'],
   [DESIGN_HOME, 'design'],
   [DESIGN_STEPS_PATH, 'design'],
   /* Holidays move design plans (owner, 13 Nov 2026). */
