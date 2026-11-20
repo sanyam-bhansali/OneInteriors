@@ -28,6 +28,7 @@ import { lifecycleCard, type CardBlocker, type CardStep } from '@/modules/projec
 import { eventsOrLegacy, snagStatus } from '@/modules/project/snag-status';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { fromDb } from '@/lib/money';
+import { progressOf } from '@/modules/project/step-rules';
 
 /** The category's words (BudgetTier LUXURY reads "Luxe"). */
 const CATEGORY_WORD: Record<string, string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxe' };
@@ -75,6 +76,12 @@ export interface BoardCard {
   designEndsOn: string | null;
   /** The project's start, YYYY-MM-DD. */
   startedOn: string | null;
+  /** The project's % complete, by step weights, as on its Plan tab (owner, 20 Nov 2026: sort by % complete). */
+  pct: number;
+  /** The stage it is at: the open design step, the execution stage, else the phase (owner, 20 Nov 2026: "all stages filter"). */
+  stage: string;
+  /** Where that stage sits in the plan, to list the stages in order. */
+  stageOrder: number;
 }
 
 export interface LifecycleBoard {
@@ -115,10 +122,11 @@ const SELECT = {
   stages: {
     orderBy: { sortOrder: 'asc' },
     select: {
+      id: true,
       kind: true,
       name: true,
       plannedEnd: true,
-      items: { orderBy: { sortOrder: 'asc' }, select: { label: true, doneAt: true, inScope: true, plannedOn: true, responsible: true, gatePayment: true } },
+      items: { orderBy: { sortOrder: 'asc' }, select: { id: true, weightBp: true, label: true, doneAt: true, inScope: true, plannedOn: true, responsible: true, gatePayment: true } },
     },
   },
   snags: {
@@ -218,7 +226,34 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     onHold: (p.holds?.length ?? 0) > 0,
     designEndsOn: designStage?.plannedEnd ? istDay(designStage.plannedEnd) : null,
     startedOn: p.startOn ? istDay(p.startOn) : null,
+    pct: pctOf(phase, p.stages),
+    ...stageOf(phase, p.stages),
   };
+}
+
+/** % complete (owner, 20 Nov 2026): the design's % in design and pre-execution (as on its Design tab; design weighs ~2% of the whole), the project's after. */
+function pctOf(phase: Phase, stages: Row['stages']): number {
+  const progress = progressOf(stages.flatMap((s) => s.items.map((i) => ({ id: i.id, stageId: s.id, weightBp: i.weightBp, inScope: i.inScope, done: i.doneAt !== null }))));
+  if (phase === 'DESIGN' || phase === 'PRE_EXECUTION') {
+    const d = stages.find((s) => s.kind === 'DESIGN');
+    const st = d ? progress.stages.get(d.id) : undefined;
+    if (st?.pct !== null && st?.pct !== undefined) return st.pct;
+  }
+  return progress.pct;
+}
+
+/** The stage a project is at (owner, 20 Nov 2026): its first open design step in design and pre-execution, its execution stage on site, else the phase. */
+function stageOf(phase: Phase, stages: Row['stages']): { stage: string; stageOrder: number } {
+  if (phase === 'DESIGN' || phase === 'PRE_EXECUTION') {
+    const items = stages.find((s) => s.kind === 'DESIGN')?.items ?? [];
+    const k = items.findIndex((i) => i.inScope && !i.doneAt);
+    if (k >= 0) return { stage: items[k]!.label, stageOrder: k };
+  }
+  if (phase === 'EXECUTION') {
+    const k = stages.findIndex((s) => s.kind !== 'DESIGN' && s.items.some((i) => i.inScope && !i.doneAt));
+    if (k >= 0) return { stage: stages[k]!.name, stageOrder: 100 + k };
+  }
+  return { stage: PHASE_LABEL[phase], stageOrder: 1000 };
 }
 
 /**

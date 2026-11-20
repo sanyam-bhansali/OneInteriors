@@ -13,6 +13,9 @@ export const BOARD_SORTS = {
   ends: 'Design ends soonest',
   newest: 'Newest first',
   client: 'Client A–Z',
+  /* Owner, 20 Nov 2026: "percentage completion ascending and descending". */
+  'pct-desc': '% complete, highest first',
+  'pct-asc': '% complete, lowest first',
 } as const;
 export type BoardSort = keyof typeof BOARD_SORTS;
 
@@ -37,30 +40,47 @@ export interface BoardView {
   sort: BoardSort;
   cat: BoardCategory | null;
   show: BoardShow | null;
+  /** The stage it is at (owner, 20 Nov 2026: "all stages filter"): a design step, an execution stage or a phase, as on the card. */
+  stage: string | null;
 }
 
 const isKey = <T extends object>(map: T, v: unknown): v is keyof T => typeof v === 'string' && Object.prototype.hasOwnProperty.call(map, v);
 
 /** The view from the address bar; anything unknown is dropped. */
-export function readBoardView(q: { sort?: string; cat?: string; show?: string }): BoardView {
+export function readBoardView(q: { sort?: string; cat?: string; show?: string; stage?: string }): BoardView {
+  const stage = typeof q.stage === 'string' ? q.stage.trim().slice(0, 120) : '';
   return {
     sort: isKey(BOARD_SORTS, q.sort) ? q.sort : 'stars',
     cat: isKey(BOARD_CATEGORIES, q.cat) ? q.cat : null,
     show: isKey(BOARD_SHOWS, q.show) ? q.show : null,
+    stage: stage || null,
   };
 }
 
 /** "&sort=late&cat=Luxe" for links, leaving out the defaults. */
 export function boardViewQuery(v: BoardView): string {
-  return `${v.sort !== 'stars' ? `&sort=${v.sort}` : ''}${v.cat ? `&cat=${v.cat}` : ''}${v.show ? `&show=${v.show}` : ''}`;
+  return `${v.sort !== 'stars' ? `&sort=${v.sort}` : ''}${v.cat ? `&cat=${v.cat}` : ''}${v.show ? `&show=${v.show}` : ''}${v.stage ? `&stage=${encodeURIComponent(v.stage)}` : ''}`;
 }
 
-export const isDefaultView = (v: BoardView) => v.sort === 'stars' && !v.cat && !v.show;
+export const isDefaultView = (v: BoardView) => v.sort === 'stars' && !v.cat && !v.show && !v.stage;
 
-type Card = Pick<BoardCard, 'priority' | 'lateDays' | 'client' | 'category' | 'blocker' | 'onSiteCarcass' | 'onHold' | 'designEndsOn' | 'startedOn'>;
+type Card = Pick<BoardCard, 'priority' | 'lateDays' | 'client' | 'category' | 'blocker' | 'onSiteCarcass' | 'onHold' | 'designEndsOn' | 'startedOn' | 'pct' | 'stage' | 'stageOrder'>;
+
+/** Every stage the cards are at, in plan order, with how many are there: the Stage filter's choices. */
+export function stageChoices(cards: readonly Pick<BoardCard, 'stage' | 'stageOrder'>[]): { stage: string; count: number }[] {
+  const by = new Map<string, { stage: string; count: number; order: number }>();
+  for (const c of cards) {
+    const e = by.get(c.stage) ?? { stage: c.stage, count: 0, order: c.stageOrder };
+    e.count += 1;
+    e.order = Math.min(e.order, c.stageOrder);
+    by.set(c.stage, e);
+  }
+  return [...by.values()].sort((a, b) => a.order - b.order || a.stage.localeCompare(b.stage)).map(({ stage, count }) => ({ stage, count }));
+}
 
 export function keepCard(c: Card, v: BoardView): boolean {
   if (v.cat && (v.cat === 'none' ? c.category !== null : c.category !== v.cat)) return false;
+  if (v.stage && c.stage !== v.stage) return false;
   switch (v.show) {
     case 'late':
       return c.lateDays > 0;
@@ -90,6 +110,10 @@ export function compareCards(sort: BoardSort): (a: Card, b: Card) => number {
       return (a, b) => (b.startedOn ?? '').localeCompare(a.startedOn ?? '') || stars(a, b);
     case 'client':
       return (a, b) => a.client.localeCompare(b.client, 'en-IN', { sensitivity: 'base' });
+    case 'pct-desc':
+      return (a, b) => b.pct - a.pct || stars(a, b);
+    case 'pct-asc':
+      return (a, b) => a.pct - b.pct || stars(a, b);
     default:
       return stars;
   }
