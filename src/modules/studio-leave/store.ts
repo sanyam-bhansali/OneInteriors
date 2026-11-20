@@ -16,6 +16,7 @@ import type { MovePlan, RuleStage, StageKind } from '@/modules/project/project-r
 import { calendarOf, daysBetween, dayFromDb, dayToDb, isDay, istDay, isoWeekday, isWorkingDay, type IsoWeekday, type StudioCalendar } from '@/modules/project/working-days';
 import { projectCalendar } from '@/modules/studio-design/step-settle';
 import { mayApproveHold } from '@/modules/studio-hold/rules';
+import { notify } from '@/modules/notify/service';
 import {
   checkLeaveAsk,
   cleanHolidayName,
@@ -409,7 +410,11 @@ export async function askLeave(input: { memberId?: unknown; fromDay: unknown; to
     });
     return approver ? approveInside(tx, row, member.userId, now) : null;
   }, TX);
-  if (!result) return { ok: true, message: 'Asked. The owner or the design head approves it; design dates move only when it is approved.' };
+  if (!result) {
+    /* Tell the approvers (owner, 20 Nov 2026: "notification should pop for every approval"). Never fails the ask. */
+    void tellLeave(member.studioId, { kind: 'asked', memberId: forId, fromDay: ok.fromDay, toDay: ok.toDay });
+    return { ok: true, message: 'Asked. The owner or the design head approves it; design dates move only when it is approved.' };
+  }
   return { ok: true, message: `Leave entered and approved.${approvedWords(result)}` };
 }
 
@@ -429,8 +434,36 @@ export async function decideLeave(leaveId: unknown, approve: boolean, now = new 
     return approveInside(tx, leave, member.userId, now);
   }, TX);
   if (result === 'gone') return { ok: false, error: 'That leave is not waiting for approval any more. Reload the page.' };
+  void tellLeave(member.studioId, { kind: 'decided', leaveId: id, approved: approve, byUserId: member.userId });
   if (!result) return { ok: true, message: 'Declined.' };
   return { ok: true, message: `Approved.${approvedWords(result)}` };
+}
+
+const dayShort = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** Leave asked (to the owner and the design head) or decided (to the person). Logged, never thrown. */
+async function tellLeave(
+  studioId: string,
+  e: { kind: 'asked'; memberId: string; fromDay: string; toDay: string } | { kind: 'decided'; leaveId: string; approved: boolean; byUserId: string },
+): Promise<void> {
+  try {
+    if (e.kind === 'asked') {
+      const who = await prisma.studioMember.findUnique({ where: { id: e.memberId }, select: { user: { select: { name: true } } } });
+      const approvers = await prisma.studioMember.findMany({
+        where: { studioId, status: 'ACTIVE', OR: [{ role: 'OWNER' }, { role: 'DESIGNER', designHead: true }] },
+        select: { userId: true },
+      });
+      const event = { kind: 'leave-asked' as const, name: who?.user.name?.trim() || 'Someone', from: dayShort(e.fromDay), to: dayShort(e.toDay) };
+      await Promise.all([...new Set(approvers.map((a) => a.userId))].map((u) => notify(u, event, { email: false })));
+      return;
+    }
+    const leave = await prisma.studioLeave.findUnique({ where: { id: e.leaveId }, select: { fromDay: true, toDay: true, member: { select: { userId: true } } } });
+    const by = await prisma.user.findUnique({ where: { id: e.byUserId }, select: { name: true } });
+    if (!leave || leave.member.userId === e.byUserId) return;
+    await notify(leave.member.userId, { kind: 'leave-decided', by: by?.name?.trim() || 'The owner', from: dayShort(dayFromDb(leave.fromDay)), to: dayShort(dayFromDb(leave.toDay)), approved: e.approved }, { email: false });
+  } catch (error) {
+    console.error('[studio-leave] tell failed', error instanceof Error ? error.name : 'unknown');
+  }
 }
 
 /** The member withdraws leave not approved yet. Approved leave stays: its dates have moved. */
