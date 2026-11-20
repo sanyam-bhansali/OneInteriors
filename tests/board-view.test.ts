@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyBoardView, boardViewQuery, keepCard, readBoardView } from '@/modules/studio/board-view';
+import { applyBoardView, boardViewQuery, keepCard, readBoardView, stageChoices } from '@/modules/studio/board-view';
 import type { BoardCard } from '@/modules/studio/lifecycle-store';
 
 const card = (o: Partial<BoardCard>): BoardCard =>
@@ -26,21 +26,24 @@ const card = (o: Partial<BoardCard>): BoardCard =>
     onHold: false,
     designEndsOn: null,
     startedOn: null,
+    pct: 0,
+    stage: 'Design',
+    stageOrder: 1000,
     ...o,
   }) as BoardCard;
 
-const A = card({ client: 'Asha', priority: 5, lateDays: 1, category: 'Luxe', designEndsOn: '2026-12-20', startedOn: '2026-10-01', blocker: { side: 'studio', text: '' } });
-const B = card({ client: 'bhushan', priority: 3, lateDays: 9, category: 'Essential', designEndsOn: '2026-11-30', startedOn: '2026-11-10', blocker: { side: 'client', text: '' }, onHold: true });
-const C = card({ client: 'Chetan', priority: null, lateDays: 0, category: null, designEndsOn: null, startedOn: '2026-09-01', onSiteCarcass: true });
+const A = card({ client: 'Asha', pct: 40, stage: 'First draft (3D)', stageOrder: 5, priority: 5, lateDays: 1, category: 'Luxe', designEndsOn: '2026-12-20', startedOn: '2026-10-01', blocker: { side: 'studio', text: '' } });
+const B = card({ client: 'bhushan', pct: 10, stage: '2D layout', stageOrder: 2, priority: 3, lateDays: 9, category: 'Essential', designEndsOn: '2026-11-30', startedOn: '2026-11-10', blocker: { side: 'client', text: '' }, onHold: true });
+const C = card({ client: 'Chetan', pct: 70, stage: 'First draft (3D)', stageOrder: 5, priority: null, lateDays: 0, category: null, designEndsOn: null, startedOn: '2026-09-01', onSiteCarcass: true });
 const board = { design: [A, B, C], preExecution: [], execution: [], snags: [], closed: [], closures: [] };
 const names = (l: BoardCard[]) => l.map((c) => c.client);
 
 describe('Design board sort and filter (owner, 20 Nov 2026)', () => {
   it('reads the view from the address bar, dropping anything unknown', () => {
-    expect(readBoardView({ sort: 'late', cat: 'Luxe', show: 'hold' })).toEqual({ sort: 'late', cat: 'Luxe', show: 'hold' });
-    expect(readBoardView({ sort: 'nope', cat: 'toString', show: '' })).toEqual({ sort: 'stars', cat: null, show: null });
-    expect(boardViewQuery({ sort: 'stars', cat: null, show: null })).toBe('');
-    expect(boardViewQuery({ sort: 'ends', cat: 'none', show: 'late' })).toBe('&sort=ends&cat=none&show=late');
+    expect(readBoardView({ sort: 'late', cat: 'Luxe', show: 'hold' })).toEqual({ sort: 'late', cat: 'Luxe', show: 'hold', stage: null });
+    expect(readBoardView({ sort: 'nope', cat: 'toString', show: '' })).toEqual({ sort: 'stars', cat: null, show: null, stage: null });
+    expect(boardViewQuery({ sort: 'stars', cat: null, show: null, stage: null })).toBe('');
+    expect(boardViewQuery({ sort: 'ends', cat: 'none', show: 'late', stage: 'Final 2D' })).toBe('&sort=ends&cat=none&show=late&stage=Final%202D');
   });
 
   it('leaves the board as built on the default view', () => {
@@ -62,5 +65,15 @@ describe('Design board sort and filter (owner, 20 Nov 2026)', () => {
     expect(names(applyBoardView(board, readBoardView({ show: 'late' })).design)).toEqual(['Asha', 'bhushan']);
     expect(names(applyBoardView(board, readBoardView({ show: 'hold' })).design)).toEqual(['bhushan']);
     expect(names(applyBoardView(board, readBoardView({ show: 'carcass' })).design)).toEqual(['Chetan']);
+  });
+
+  it('sorts by % complete both ways (owner, 20 Nov 2026)', () => {
+    expect(names(applyBoardView(board, readBoardView({ sort: 'pct-desc' })).design)).toEqual(['Chetan', 'Asha', 'bhushan']);
+    expect(names(applyBoardView(board, readBoardView({ sort: 'pct-asc' })).design)).toEqual(['bhushan', 'Asha', 'Chetan']);
+  });
+
+  it('filters by the stage, listing every stage in plan order with its count', () => {
+    expect(stageChoices(board.design)).toEqual([{ stage: '2D layout', count: 1 }, { stage: 'First draft (3D)', count: 2 }]);
+    expect(names(applyBoardView(board, readBoardView({ stage: 'First draft (3D)' })).design)).toEqual(['Asha', 'Chetan']);
   });
 });
