@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatINR } from '@/lib/money';
 import type { ConvertScreen } from '@/modules/studio-sales/convert';
-import { HANDOVER_MAX, HANDOVER_MIN } from '@/modules/studio-sales/convert-rules';
+import { ADDRESS_MAX, BUILDING_MAX, HANDOVER_MAX, HANDOVER_MIN, checkProperty } from '@/modules/studio-sales/convert-rules';
 import { Modal } from './ax-ui';
 import { convertLeadAction, convertScreenAction } from './convert-actions';
 
@@ -34,6 +34,8 @@ export function ConvertDialog({
   const [screen, setScreen] = useState<ConvertScreen | null | 'loading'>('loading');
   const [pick, setPick] = useState<{ quoteId: string; n: number } | null>(null);
   const [notes, setNotes] = useState('');
+  const [building, setBuilding] = useState('');
+  const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +48,8 @@ export function ConvertDialog({
         if (s) {
           setNotes(s.notes);
           setPick(s.picked);
+          setBuilding(s.building);
+          setAddress(s.address);
         }
       })
       .catch(() => live && setScreen(null));
@@ -55,14 +59,15 @@ export function ConvertDialog({
   }, [clientId]);
 
   const length = notes.trim().length;
-  const ready = screen !== 'loading' && screen !== null && !screen.blocked && pick !== null && length >= HANDOVER_MIN && length <= HANDOVER_MAX;
+  const propertyOk = checkProperty(building, address).ok;
+  const ready = screen !== 'loading' && screen !== null && !screen.blocked && pick !== null && propertyOk && length >= HANDOVER_MIN && length <= HANDOVER_MAX;
 
   async function go() {
     setBusy(true);
     setError(null);
     try {
       if (!pick) return;
-      const r = await convertLeadAction(clientId, pick.quoteId, pick.n, notes, stageId);
+      const r = await convertLeadAction(clientId, pick.quoteId, pick.n, notes, { building, address }, stageId);
       if (!r.ok) setError(r.error);
       else onDone({ projectId: r.projectId, stage: r.stage });
     } catch {
@@ -131,6 +136,24 @@ export function ConvertDialog({
             ) : null}
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Building name</span>
+              <input value={building} onChange={(e) => setBuilding(e.target.value)} maxLength={BUILDING_MAX} className="fld" placeholder="Society or tower" required />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Property address</span>
+              <textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={2}
+                maxLength={ADDRESS_MAX}
+                className="fld"
+                placeholder="Flat number, wing, road, area"
+                required
+                style={{ resize: 'vertical' }}
+              />
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>Handover to design</span>
               <span className="muted" style={{ fontSize: 12.5 }}>
                 In detail: rooms in scope, style and colours, must-haves, budget comfort, possession and timeline, the family and the site, and anything promised to the client.
@@ -163,6 +186,11 @@ export function ConvertDialog({
         ) : null}
 
         {error ? <p className="cl-err">{error}</p> : null}
+        {screen && screen !== 'loading' && !screen.blocked && !propertyOk ? (
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Fill in the building name and the property address to convert.
+          </p>
+        ) : null}
 
         <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" onClick={onClose} disabled={busy} className="btn sec sm">
