@@ -39,10 +39,23 @@ describe('payment stages on the Design Final total (owner, 14 Nov 2026)', () => 
     if (!r.ok) throw new Error(r.error);
     expect(r.stages[0]!.amountPaise).toBe(2_500_000);
     expect(r.stages[1]!.amountPaise).toBe(4_875_000);
-    const later = 111_352_200 - 2_500_000 - 4_875_000;
-    expect(r.stages.slice(2).reduce((a, s) => a + s.amountPaise, 0)).toBe(later);
-    expect(r.stages[3]!.amountPaise).toBe(Math.round((later * 40) / 95));
+    expect(r.stages.slice(2).reduce((a, s) => a + s.amountPaise, 0)).toBe(111_352_200 - 2_500_000 - 4_875_000);
+    // Procurement is 40% of the Design Final after the booking, as the quotation sheet works it out.
+    expect(Math.abs(r.stages[3]!.amountPaise - ((111_352_200 - 2_500_000) * 40) / 100)).toBeLessThan(100);
     expect(r.stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(111_352_200);
+  });
+
+  it("matches Hauspire's quotation sheet's payment stages (owner, 20 Nov 2026)", () => {
+    // A sheet's Original and Revised totals and its stage figures (Sheet1 rows 143-149).
+    const sales = 87_866_060;
+    const df = 114_496_185;
+    const signed = restageOnTotal(HAUSPIRE, sales);
+    if (!signed.ok) throw new Error('sales split failed');
+    const r = restageOnTotal(signed.stages, df, sales);
+    if (!r.ok) throw new Error(r.error);
+    const sheet = [2_500_000, 4_268_303, 12_531_125, 44_798_474, 44_798_474, 5_599_809];
+    r.stages.forEach((s, i) => expect(Math.abs(s.amountPaise - sheet[i]!)).toBeLessThanOrEqual(1));
+    expect(r.stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(df);
   });
 
   it('puts right a project restaged under the older rule, and then changes nothing', () => {

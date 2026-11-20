@@ -12,9 +12,12 @@
  *   the sales final: its share of the sales final's total after the fixed
  *   stages. Given the sales total, it is worked out again from it, so a
  *   project restaged under the older rule is put right.
- * - The other percentage stages (design closure, procurement, dispatch,
- *   handover) share what is left of the Design Final's total by their
- *   percentages, exactly (`splitAcross`).
+ * - Procurement, dispatch and handover are their own percentage of the
+ *   Design Final after the fixed stages, as Hauspire's quotation sheet works
+ *   them out (owner, 20 Nov 2026). Design closure is its percentage too, plus
+ *   the design advance's catch-up: the advance's percentage of the Design
+ *   Final less the advance already charged on the sales final. So the stages
+ *   still add up to the Design Final exactly.
  *
  * Without the sales total (or with one percentage stage only), every
  * percentage stage shares the rest of the new total, as before. With no
@@ -23,7 +26,7 @@
  * new amount due on each.
  */
 
-import { splitAcross } from '@/lib/money';
+import { splitAcross, splitRupees } from '@/lib/money';
 
 export interface Stage {
   label: string;
@@ -48,14 +51,19 @@ export function restageOnTotal(stages: readonly Stage[], totalPaise: number, sal
     amounts = stages.map((s) => s.amountPaise);
     const sales = salesTotalPaise !== null && Number.isInteger(salesTotalPaise) && salesTotalPaise > fixed && pctAt.length >= 2 ? salesTotalPaise : null;
     if (sales !== null) {
-      // The design advance as on the sales final; the rest of the Design Final over the later stages.
-      const advance = splitAcross(sales - fixed, pctAt.map((i) => stages[i]!.pct!))[0]!;
-      const rest = totalPaise - fixed - advance;
-      if (rest < 0) return { ok: false, error: 'The Design Final is less than the booking advance and design advance.' };
-      const later = pctAt.slice(1);
-      const parts = splitAcross(rest, later.map((i) => stages[i]!.pct!));
+      /* Hauspire's quotation sheet (owner, 20 Nov 2026: "use this calculation for payment stages"):
+         the design advance as on the sales final; every later stage its own percentage of the Design
+         Final after the booking; design closure also takes the design advance's catch-up, its
+         percentage of the Design Final less the advance already charged. */
+      const pcts = pctAt.map((i) => stages[i]!.pct!);
+      const split = (n: number) => (n % 100 === 0 ? splitRupees : splitAcross)(n, pcts);
+      const advance = split(sales - fixed)[0]!;
+      const onFinal = split(totalPaise - fixed);
+      const catchUp = onFinal[0]! - advance;
+      if (onFinal[1]! + catchUp < 0) return { ok: false, error: 'The Design Final is too far below the sales final to cover the design advance already charged.' };
+      pctAt.forEach((i, k) => (amounts[i] = onFinal[k]!));
       amounts[pctAt[0]!] = advance;
-      later.forEach((i, k) => (amounts[i] = parts[k]!));
+      amounts[pctAt[1]!] = onFinal[1]! + catchUp;
     } else {
       const rest = totalPaise - fixed;
       if (rest < 0) return { ok: false, error: 'The Design Final is less than the fixed stages (like the booking advance).' };
