@@ -22,24 +22,27 @@ import { notify, notifyStudio } from '@/modules/notify/service';
 import { CUSTOMER_PAYMENT_SELECT, CUSTOMER_QUOTE_CHANGE_SELECT, customerLedger } from '@/modules/portal/money-locker-view';
 import { effectivePhase, isPhase } from '@/modules/project/lifecycle-rules';
 import { createWarrantyClaimSnag } from '@/modules/project/snag-flow';
-import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { addDays, dayFromDb, istDay } from '@/modules/project/working-days';
 import { storeSitePhoto } from '@/modules/storage/site-photos';
 import { can, currentMember } from '@/modules/studio/access';
 import { planOf } from '@/modules/studio/software-plan';
-import { createPaymentLink, razorpayReady } from './razorpay';
+import { createPaymentLink, razorpayReady, refundPayment } from './razorpay';
 import { READER_MODEL, readClaim, type ReaderPhoto } from './reader';
 import {
   CLAIM_DESCRIPTION_MAX,
   CLAIM_PHOTOS_MAX,
   HOLD_MINUTES,
-  NOT_COVERED,
+  notCoveredReply,
   SERVICE_CATEGORIES,
   SERVICE_DESCRIPTION_MAX,
   SERVICE_LABEL,
+  SLOT_STARTS,
+  STUDIO_MOVE_DAYS,
   checkDescription,
   checkServiceChargesInput,
   bookingIsFree,
   checkSlot,
+  checkStudioSlot,
   claimTitle,
   coverageRulesFrom,
   decideCoverage,
@@ -119,6 +122,11 @@ async function load(userId: string, projectId: string): Promise<{ ok: true; v: L
   return { ok: true, v: { p, owner, studioId: p.introduction.studioId, phase, gate: paymentGate(customerLedger(p)), freeUntil } };
 }
 
+/** Has the project used its one free visit (a booked visit at ₹0)? */
+async function freeVisitUsed(projectId: string): Promise<boolean> {
+  return (await prisma.serviceRequest.count({ where: { projectId, status: 'BOOKED', chargePaise: 0 } })) > 0;
+}
+
 async function rulesFor(studioId: string): Promise<CoverageRule[]> {
   const own = await prisma.warrantyCoverageRule.findMany({ where: { studioId, active: true } });
   if (own.length > 0) return coverageRulesFrom(own);
@@ -153,14 +161,15 @@ export interface AftercareView {
   warranty: { open: boolean; message: string | null; endsOn: string | null; areas: { key: string; label: string }[] };
   service: {
     ready: boolean;
-    /** Within the free month after the handover: visits cost nothing (the payment gate still applies). */
+    /** The one free visit within 30 days of the handover is still open (the payment gate still applies). */
     free: boolean;
     freeUntil: string | null;
     /** `chargePaise` is what the client pays now; `listPaise` the studio's visiting charge, shown struck out in the free month (null: none set). */
     categories: { key: ServiceCategory; label: string; chargePaise: number; listPaise: number | null }[];
     days: SlotDay[];
   };
-  requests: { id: string; category: string; when: string; chargePaise: number; listPaise: number | null; state: ServiceState; payUrl: string | null }[];
+  /** `note`: the studio's line when it moved, cancelled or finished the visit; `refunded` when a cancelled paid visit was refunded. */
+  requests: { id: string; category: string; when: string; chargePaise: number; listPaise: number | null; state: ServiceState; payUrl: string | null; note: string | null; refunded: boolean }[];
   claims: { id: string; at: string; covered: boolean; area: string; snagId: string | null }[];
 }
 
@@ -171,7 +180,7 @@ export async function aftercareView(userId: string, projectId: string, now = new
   const rules = await rulesFor(studioId);
   const charges = readServiceCharges(p.introduction.studio.serviceCharges);
   const today = istDay(now);
-  const free = bookingIsFree(today, freeUntil);
+  const free = bookingIsFree(today, freeUntil, freeUntil !== null && (await freeVisitUsed(p.id)));
   const days0 = serviceSlotDays(today, readSlotVisits(p.introduction.studio.serviceSlotVisits), new Map());
   const taken = await takenSlots(studioId, days0[0]!.date, days0[days0.length - 1]!.date, now);
   const [requests, claims] = await Promise.all([
@@ -179,7 +188,7 @@ export async function aftercareView(userId: string, projectId: string, now = new
       where: { projectId: p.id },
       orderBy: { createdAt: 'desc' },
       take: 20,
-      select: { id: true, category: true, slotDay: true, slotStart: true, chargePaise: true, status: true, holdUntil: true, payUrl: true },
+      select: { id: true, category: true, slotDay: true, slotStart: true, chargePaise: true, status: true, holdUntil: true, payUrl: true, studioNote: true, refundId: true },
     }),
     prisma.warrantyClaim.findMany({ where: { projectId: p.id }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, createdAt: true, covered: true, ruleKey: true, snagId: true } }),
   ]);
@@ -202,7 +211,7 @@ export async function aftercareView(userId: string, projectId: string, now = new
         ready: free || razorpayReady(),
         free,
         freeUntil,
-        /* In the free month every kind of work is open at ₹0; after it, only the kinds the studio has a charge for. */
+        /* The free visit: every kind of work open at ₹0; otherwise only the kinds the studio has a charge for. */
         categories: SERVICE_CATEGORIES.filter((c) => free || charges[c] !== undefined).map((c) => ({ key: c, label: SERVICE_LABEL[c], chargePaise: free ? 0 : charges[c]!, listPaise: charges[c] ?? null })),
         days: serviceSlotDays(today, readSlotVisits(p.introduction.studio.serviceSlotVisits), taken),
       },
@@ -217,6 +226,8 @@ export async function aftercareView(userId: string, projectId: string, now = new
           listPaise: fromDb(x.chargePaise) === 0 && isServiceCategory(x.category) ? (charges[x.category] ?? null) : null,
           state,
           payUrl: state === 'held' ? x.payUrl : null,
+          note: x.studioNote,
+          refunded: x.refundId !== null,
         };
       }),
       claims: claims.map((c) => ({ id: c.id, at: c.createdAt.toISOString(), covered: c.covered, area: label(c.ruleKey), snagId: c.snagId })),
@@ -284,7 +295,7 @@ export async function raiseWarrantyClaim(
   if (!decision.covered) {
     /* Not covered: the automatic reply, nothing raised, nobody asked to answer. */
     const claim = await prisma.warrantyClaim.create({ data: record, select: { id: true } });
-    return { ok: true, covered: false, claimId: claim.id, message: NOT_COVERED, serviceCategory: decision.rule.serviceCategory };
+    return { ok: true, covered: false, claimId: claim.id, message: notCoveredReply(decision.rule), serviceCategory: decision.rule.serviceCategory };
   }
 
   /* 3. Covered: a warranty snag, for the design head to assign. */
@@ -329,7 +340,7 @@ export async function bookServiceVisit(
   if (!owner) return { ok: false, error: AFTERCARE_ERRORS.ownerOnly };
   if (!isServiceCategory(input.category)) return { ok: false, error: AFTERCARE_ERRORS.category };
   const category = input.category;
-  const free = bookingIsFree(istDay(now), freeUntil);
+  const free = bookingIsFree(istDay(now), freeUntil, freeUntil !== null && (await freeVisitUsed(p.id)));
   const charge = free ? 0 : readServiceCharges(p.introduction.studio.serviceCharges)[category];
   if (charge === undefined) return { ok: false, error: AFTERCARE_ERRORS.noCharge };
   const desc = checkDescription(input.description, SERVICE_DESCRIPTION_MAX);
@@ -493,19 +504,48 @@ export interface StudioVisit {
   category: string;
   when: string;
   day: string;
+  start: string;
   description: string;
   charge: string;
+  paid: boolean;
   state: ServiceState;
 }
 
-/** Booked and held visits for the office and the design head, soonest first. */
-export async function studioServiceVisits(now = new Date()): Promise<StudioVisit[] | null> {
+export interface StudioVisits {
+  visits: StudioVisit[];
+  /** Owner, PM and design head move, cancel and finish visits; accounts reads. */
+  canAct: boolean;
+  /** Days the studio may move a visit to. */
+  moveDays: { date: string; label: string }[];
+  starts: { start: string; label: string }[];
+}
+
+/** The office and the design head; accounts reads. */
+async function visitStaff(): Promise<{ studioId: string; canAct: boolean; userId: string } | null> {
   const member = await currentMember();
-  if (!member) return null;
+  if (!member || member.status !== 'ACTIVE') return null;
   const head = member.role === 'DESIGNER' && member.designHead === true;
   if (!['OWNER', 'PM', 'ACCOUNTS'].includes(member.role) && !head) return null;
+  return { studioId: member.studioId, canAct: member.role === 'OWNER' || member.role === 'PM' || head, userId: member.userId };
+}
+
+/**
+ * Visits for the office and the design head, soonest first: booked and held
+ * ones from today, and booked ones of the last 14 days still to be marked done.
+ */
+export async function studioServiceVisits(now = new Date()): Promise<StudioVisits | null> {
+  const staff = await visitStaff();
+  if (!staff) return null;
+  const today = istDay(now);
   const rows = await prisma.serviceRequest.findMany({
-    where: { studioId: member.studioId, slotDay: { gte: new Date(`${istDay(now)}T00:00:00Z`) }, status: { in: ['BOOKED', 'HELD'] }, project: { cancelledAt: null } },
+    where: {
+      studioId: staff.studioId,
+      project: { cancelledAt: null },
+      OR: [
+        { slotDay: { gte: new Date(`${today}T00:00:00Z`) }, status: { in: ['BOOKED', 'HELD'] } },
+        { slotDay: { gte: new Date(`${addDays(today, -14)}T00:00:00Z`), lt: new Date(`${today}T00:00:00Z`) }, status: 'BOOKED' },
+      ],
+    },
     orderBy: [{ slotDay: 'asc' }, { slotStart: 'asc' }],
     take: 200,
     select: {
@@ -516,12 +556,13 @@ export async function studioServiceVisits(now = new Date()): Promise<StudioVisit
       slotStart: true,
       description: true,
       chargePaise: true,
+      paymentId: true,
       status: true,
       holdUntil: true,
       project: { select: { introduction: { select: { brief: { select: { user: { select: { name: true } } } } } } } },
     },
   });
-  return rows
+  const visits = rows
     .map((r) => ({
       id: r.id,
       projectId: r.projectId,
@@ -529,9 +570,102 @@ export async function studioServiceVisits(now = new Date()): Promise<StudioVisit
       category: isServiceCategory(r.category) ? SERVICE_LABEL[r.category] : r.category,
       when: `${slotDayLabel(dayFromDb(r.slotDay))}, ${slotLabel(r.slotStart)}`,
       day: dayFromDb(r.slotDay),
+      start: r.slotStart,
       description: r.description,
-      charge: fromDb(r.chargePaise) === 0 ? 'Free (first month)' : formatINR(fromDb(r.chargePaise)),
+      charge: fromDb(r.chargePaise) === 0 ? 'Free visit' : formatINR(fromDb(r.chargePaise)),
+      paid: r.paymentId !== null,
       state: serviceState(r.status, r.holdUntil, now),
     }))
     .filter((v) => v.state === 'booked' || v.state === 'held');
+  const moveDays = Array.from({ length: STUDIO_MOVE_DAYS }, (_, i) => addDays(today, i + 1)).map((d) => ({ date: d, label: slotDayLabel(d) }));
+  return { visits, canAct: staff.canAct, moveDays, starts: SLOT_STARTS.map((st) => ({ start: st, label: slotLabel(st) })) };
+}
+
+type VisitResult = { ok: true; message: string } | { ok: false; error: string };
+
+const VISIT_FOR_CHANGE = {
+  id: true,
+  studioId: true,
+  status: true,
+  category: true,
+  slotDay: true,
+  slotStart: true,
+  chargePaise: true,
+  paymentId: true,
+  raisedById: true,
+  studio: { select: { tradeName: true } },
+} satisfies Prisma.ServiceRequestSelect;
+
+/** A booked visit of the member's own studio, for a change. */
+async function bookedVisit(requestId: string): Promise<{ ok: true; staff: { studioId: string }; v: Prisma.ServiceRequestGetPayload<{ select: typeof VISIT_FOR_CHANGE }> } | { ok: false; error: string }> {
+  const staff = await visitStaff();
+  if (!staff || !staff.canAct) return { ok: false, error: 'Only the owner, a project manager or the design head changes a visit.' };
+  const v = await prisma.serviceRequest.findFirst({ where: { id: requestId.slice(0, 64), studioId: staff.studioId }, select: VISIT_FOR_CHANGE });
+  if (!v) return { ok: false, error: 'That visit is gone.' };
+  if (v.status !== 'BOOKED') return { ok: false, error: 'Only a booked visit can be changed.' };
+  return { ok: true, staff, v };
+}
+
+const visitWords = (v: { category: string; slotDay: Date; slotStart: string }) => ({
+  category: isServiceCategory(v.category) ? SERVICE_LABEL[v.category] : v.category,
+  when: `${slotDayLabel(dayFromDb(v.slotDay))}, ${slotLabel(v.slotStart)}`,
+});
+
+const studioLine = (v: unknown): string | null => {
+  const t = typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, 300) : '';
+  return t || null;
+};
+
+/** The studio moves a booked visit to another slot (not before tomorrow); the client hears. */
+export async function moveServiceVisit(requestId: string, input: { day: unknown; start: unknown; note: unknown }, now = new Date()): Promise<VisitResult> {
+  const r = await bookedVisit(requestId);
+  if (!r.ok) return r;
+  const slot = checkStudioSlot(input.day, input.start, istDay(now));
+  if (!slot.ok) return slot;
+  const note = studioLine(input.note);
+  await prisma.serviceRequest.update({
+    where: { id: r.v.id },
+    data: { slotDay: new Date(`${slot.day}T00:00:00Z`), slotStart: slot.start, studioNote: note },
+    select: { id: true },
+  });
+  const w = visitWords({ category: r.v.category, slotDay: new Date(`${slot.day}T00:00:00Z`), slotStart: slot.start });
+  void notify(r.v.raisedById, { kind: 'service-changed', what: 'moved', category: w.category, when: w.when, studio: r.v.studio.tradeName, note });
+  return { ok: true, message: `Moved to ${w.when}. The client is told.` };
+}
+
+/**
+ * The studio cancels a booked visit, with a reason the client reads. A paid
+ * visit is refunded in full through Razorpay first; if the refund does not
+ * go through, nothing is cancelled.
+ */
+export async function cancelServiceVisit(requestId: string, reason: unknown): Promise<VisitResult> {
+  const r = await bookedVisit(requestId);
+  if (!r.ok) return r;
+  const note = studioLine(reason);
+  if (!note || note.length < 5) return { ok: false, error: 'Say why, in a few words. The client reads this.' };
+  const amount = fromDb(r.v.chargePaise);
+  let refundId: string | null = null;
+  if (r.v.paymentId && amount > 0) {
+    const refund = await refundPayment(r.v.paymentId, amount);
+    if (!refund.ok) return refund;
+    refundId = refund.id;
+  }
+  const moved = await prisma.serviceRequest.updateMany({ where: { id: r.v.id, studioId: r.staff.studioId, status: 'BOOKED' }, data: { status: 'CANCELLED', studioNote: note, refundId } });
+  if (moved.count === 0) return { ok: false, error: 'Someone just changed this visit. Refresh to see the latest.' };
+  const w = visitWords(r.v);
+  const line = refundId ? `${note} Your ${formatINR(amount)} is refunded.` : note;
+  void notify(r.v.raisedById, { kind: 'service-changed', what: 'cancelled', category: w.category, when: w.when, studio: r.v.studio.tradeName, note: line });
+  return { ok: true, message: refundId ? `Cancelled, and ${formatINR(amount)} refunded. The client is told.` : 'Cancelled. The client is told.' };
+}
+
+/** The visit happened: done, with an optional line for the client. */
+export async function finishServiceVisit(requestId: string, note: unknown, now = new Date()): Promise<VisitResult> {
+  const r = await bookedVisit(requestId);
+  if (!r.ok) return r;
+  const line = studioLine(note);
+  const moved = await prisma.serviceRequest.updateMany({ where: { id: r.v.id, studioId: r.staff.studioId, status: 'BOOKED' }, data: { status: 'DONE', doneAt: now, studioNote: line } });
+  if (moved.count === 0) return { ok: false, error: 'Someone just changed this visit. Refresh to see the latest.' };
+  const w = visitWords(r.v);
+  void notify(r.v.raisedById, { kind: 'service-changed', what: 'done', category: w.category, when: w.when, studio: r.v.studio.tradeName, note: line });
+  return { ok: true, message: 'Marked done. The client is told.' };
 }

@@ -20,17 +20,21 @@ const RUN = process.env.AFTERCARE_TEST_DB === '1';
 const URL_OK = /127\.0\.0\.1:543\d\d/.test(process.env.DATABASE_URL ?? '');
 if (RUN && !URL_OK) throw new Error('Test database only: DATABASE_URL must point at a local 127.0.0.1:543xx PGlite.');
 
-const fx = vi.hoisted(() => ({ reader: { ok: true, key: 'MODULAR_HARDWARE', summary: 'Drawer channel stuck', reason: 'channel bent' } as Record<string, unknown> }));
+const fx = vi.hoisted(() => ({ reader: { ok: true, key: 'MODULAR_CORE', summary: 'Wardrobe panel delaminating', reason: 'layers separating' } as Record<string, unknown> }));
 vi.mock('@/modules/aftercare/reader', () => ({ READER_MODEL: 'claude-sonnet-5-5', readClaim: vi.fn(async () => fx.reader) }));
 vi.mock('@/modules/storage/site-photos', () => ({ storeSitePhoto: vi.fn(async () => ({ ok: true, path: `project_x/${Math.random().toString(36).slice(2)}.jpg` })) }));
 vi.mock('@/modules/aftercare/razorpay', () => ({
   razorpayReady: () => true,
   createPaymentLink: vi.fn(async (i: { referenceId: string }) => ({ ok: true, id: `plink_${i.referenceId}`, url: 'https://rzp.io/i/test' })),
+  refundPayment: vi.fn(async () => ({ ok: true, id: 'rfnd_test' })),
 }));
+/* The studio's side acts as st-akara's owner (the member is read in the test's own setup). */
+const staff = vi.hoisted(() => ({ member: null as Record<string, unknown> | null }));
+vi.mock('@/modules/studio/access', () => ({ currentMember: vi.fn(async () => staff.member), can: vi.fn(() => true) }));
 
 const STUDIO = 'st-akara';
 const TAG = `act${Date.now().toString(36)}`;
-const made = { users: [] as string[], briefs: [] as string[], intros: [] as string[], projects: [] as string[] };
+const made = { users: [] as string[], members: [] as string[], briefs: [] as string[], intros: [] as string[], projects: [] as string[] };
 let projectId = '';
 let userId = '';
 let studioBefore: { softwarePlan: string; serviceCharges: unknown; serviceSlotVisits: number } | null = null;
@@ -41,6 +45,7 @@ afterAll(async () => {
   await prisma.homeProject.deleteMany({ where: { id: { in: made.projects } } });
   await prisma.introduction.deleteMany({ where: { id: { in: made.intros } } });
   await prisma.brief.deleteMany({ where: { id: { in: made.briefs } } });
+  await prisma.studioMember.deleteMany({ where: { id: { in: made.members } } });
   await prisma.notification.deleteMany({ where: { userId: { in: made.users } } });
   await prisma.user.deleteMany({ where: { id: { in: made.users } } });
   if (studioBefore) {
@@ -97,8 +102,8 @@ describe.skipIf(!RUN)('aftercare (test database)', () => {
     if (!r.ok) return;
     expect(r.view.payments.cleared).toBe(true);
     expect(r.view.warranty.open).toBe(true);
-    expect(r.view.warranty.areas.map((a) => a.key)).toContain('MODULAR_HARDWARE');
-    expect(r.view.warranty.areas).toHaveLength(11);
+    expect(r.view.warranty.areas.map((a) => a.key)).toContain('MODULAR_CORE');
+    expect(r.view.warranty.areas).toHaveLength(14);
     expect(r.view.service.categories.map((c) => c.key)).toEqual(['CARPENTRY', 'ELECTRICAL']);
     expect(r.view.service.days[0]!.date).toBe('2026-11-25');
   });
@@ -106,11 +111,11 @@ describe.skipIf(!RUN)('aftercare (test database)', () => {
   it('a covered claim writes a warranty snag with its RAISED event', async () => {
     const { prisma } = await import('@/lib/prisma');
     const { raiseWarrantyClaim } = await import('@/modules/aftercare/store');
-    const r = await raiseWarrantyClaim(userId, projectId, { description: 'kitchen drawer will not close', area: 'MODULAR_HARDWARE' }, [photo()]);
+    const r = await raiseWarrantyClaim(userId, projectId, { description: 'wardrobe side panel is splitting', area: 'MODULAR_CORE' }, [photo()]);
     expect(r).toMatchObject({ ok: true, covered: true });
     if (!r.ok || !r.covered) return;
     const snag = await prisma.homeSnag.findUnique({ where: { id: r.snagId }, select: { warranty: true, title: true, events: { select: { kind: true } } } });
-    expect(snag).toMatchObject({ warranty: true, title: 'Drawer channel stuck', events: [{ kind: 'RAISED' }] });
+    expect(snag).toMatchObject({ warranty: true, title: 'Wardrobe panel delaminating', events: [{ kind: 'RAISED' }] });
   });
 
   it('a paint crack raises nothing', async () => {
@@ -118,7 +123,7 @@ describe.skipIf(!RUN)('aftercare (test database)', () => {
     const { raiseWarrantyClaim } = await import('@/modules/aftercare/store');
     fx.reader = { ok: true, key: 'PAINTING', summary: 'Wall paint crack', reason: '' };
     const before = await prisma.homeSnag.count({ where: { projectId } });
-    const r = await raiseWarrantyClaim(userId, projectId, { description: 'crack in the wall paint', area: 'MODULAR_STRUCTURE' }, [photo()]);
+    const r = await raiseWarrantyClaim(userId, projectId, { description: 'crack in the wall paint', area: 'MODULAR_CORE' }, [photo()]);
     expect(r).toMatchObject({ ok: true, covered: false, serviceCategory: 'PAINTING' });
     expect(await prisma.homeSnag.count({ where: { projectId } })).toBe(before);
     expect(await prisma.warrantyClaim.count({ where: { projectId } })).toBe(2);
@@ -144,13 +149,60 @@ describe.skipIf(!RUN)('aftercare (test database)', () => {
     expect(await bookServiceVisit(userId, projectId, ask, [], now)).toMatchObject({ ok: false, error: 'That slot was just taken. Pick another one.' });
   });
 
+  it('the studio moves, finishes and cancels a paid visit (refunded)', async () => {
+    const { prisma } = await import('@/lib/prisma');
+    const { bookServiceVisit, cancelServiceVisit, finishServiceVisit, markServicePaid, moveServiceVisit, studioServiceVisits } = await import('@/modules/aftercare/store');
+    const { addDays, istDay } = await import('@/modules/project/working-days');
+    const ownerUser = await prisma.user.create({ data: { phone: `+9197${String(Date.now()).slice(-8)}`, name: `${TAG} Owner`, role: 'STUDIO' }, select: { id: true } });
+    made.users.push(ownerUser.id);
+    const owner = await prisma.studioMember.create({ data: { studioId: STUDIO, userId: ownerUser.id, role: 'OWNER', status: 'ACTIVE' }, select: { id: true, userId: true, role: true, status: true, studioId: true } });
+    made.members.push(owner.id);
+    staff.member = { ...owner };
+    const day = addDays(istDay(new Date()), 7);
+    const a = await bookServiceVisit(userId, projectId, { category: 'CARPENTRY', description: 'shutter needs adjusting', day, start: '10:00' }, []);
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    await markServicePaid(`plink_${a.id}`, `pay2_${TAG}`);
+    const list = await studioServiceVisits();
+    expect(list!.canAct).toBe(true);
+    expect(list!.visits.find((v) => v.id === a.id)).toMatchObject({ paid: true, state: 'booked' });
+    const moved = await moveServiceVisit(a.id, { day: addDays(istDay(new Date()), 9), start: '14:00', note: 'Carpenter free that day' });
+    expect(moved.ok).toBe(true);
+    expect(await prisma.serviceRequest.findUnique({ where: { id: a.id }, select: { slotStart: true, studioNote: true } })).toEqual({ slotStart: '14:00', studioNote: 'Carpenter free that day' });
+    expect(await cancelServiceVisit(a.id, 'no')).toMatchObject({ ok: false });
+    const c = await cancelServiceVisit(a.id, 'Fixed it on the phone, no visit needed');
+    expect(c).toMatchObject({ ok: true, message: expect.stringMatching(/refunded/) });
+    expect(await prisma.serviceRequest.findUnique({ where: { id: a.id }, select: { status: true, refundId: true } })).toEqual({ status: 'CANCELLED', refundId: 'rfnd_test' });
+    expect(await finishServiceVisit(a.id, '')).toMatchObject({ ok: false, error: 'Only a booked visit can be changed.' });
+    const b = await bookServiceVisit(userId, projectId, { category: 'CARPENTRY', description: 'handle loose', day, start: '16:00' }, []);
+    if (!b.ok) throw new Error(b.error);
+    await markServicePaid(`plink_${b.id}`, `pay3_${TAG}`);
+    expect(await finishServiceVisit(b.id, 'Handle tightened')).toMatchObject({ ok: true });
+    expect((await prisma.serviceRequest.findUnique({ where: { id: b.id }, select: { status: true } }))!.status).toBe('DONE');
+  });
+
+  it('one free visit within 30 days of the handover, then the charge again', async () => {
+    const { prisma } = await import('@/lib/prisma');
+    const { aftercareView, bookServiceVisit } = await import('@/modules/aftercare/store');
+    const { addDays, istDay } = await import('@/modules/project/working-days');
+    await prisma.homeProject.update({ where: { id: projectId }, data: { handoverSignedAt: new Date(Date.now() - 10 * 86_400_000) } });
+    const v = await aftercareView(userId, projectId);
+    expect(v.ok && v.view.service.free).toBe(true);
+    if (v.ok) expect(v.view.service.categories.find((c) => c.key === 'CARPENTRY')).toEqual({ key: 'CARPENTRY', label: 'Carpentry', chargePaise: 0, listPaise: 50000 });
+    const day = addDays(istDay(new Date()), 8);
+    const free = await bookServiceVisit(userId, projectId, { category: 'PAINTING', description: 'touch up a wall', day, start: '10:00' }, []);
+    expect(free).toMatchObject({ ok: true, payUrl: null, booked: true, chargePaise: 0 });
+    const next = await bookServiceVisit(userId, projectId, { category: 'CARPENTRY', description: 'another small fix', day, start: '12:00' }, []);
+    expect(next).toMatchObject({ ok: true, booked: false, chargePaise: 50000 });
+  });
+
   it('₹1 owed refuses both, before anything is written', async () => {
     const { prisma } = await import('@/lib/prisma');
     const { bookServiceVisit, raiseWarrantyClaim } = await import('@/modules/aftercare/store');
     const pay = await prisma.homeProjectPayment.findFirst({ where: { projectId, stageIndex: 1 }, select: { id: true } });
     await prisma.homeProjectPayment.update({ where: { id: pay!.id }, data: { amountPaise: BigInt(90_000_00 - 100) } });
     const claims = await prisma.warrantyClaim.count({ where: { projectId } });
-    const c = await raiseWarrantyClaim(userId, projectId, { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [photo()]);
+    const c = await raiseWarrantyClaim(userId, projectId, { description: 'panel splitting', area: 'MODULAR_CORE' }, [photo()]);
     expect(c).toMatchObject({ ok: false, pendingPaise: 100, error: 'Please clear your payments first. ₹1 is pending.' });
     const s = await bookServiceVisit(userId, projectId, { category: 'CARPENTRY', description: 'shutter loose', day: '2026-12-30', start: '10:00' }, []);
     expect(s).toMatchObject({ ok: false, pendingPaise: 100 });

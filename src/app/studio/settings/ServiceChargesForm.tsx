@@ -30,7 +30,7 @@ export function ServiceChargesForm({ charges, visits, canEdit }: { charges: Reco
       <div className="flex flex-col gap-1">
         <h2 className="m-0 text-[17px]">Service visits</h2>
         <p className="m-0 muted text-[14px]">
-          After the handover, a client books a service visit by paying its visiting charge in the app, then picks a 2-hour slot from 5 days ahead. Leave a kind blank and clients cannot book it.
+          After the handover, a client books a service visit by paying its visiting charge in the app, then picks a 2-hour slot from 5 days ahead. Leave a kind blank and clients cannot book it. A fully paid client&rsquo;s first visit within 30 days of the handover is free; they see your charge struck out.
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">

@@ -96,8 +96,9 @@ export default function AftercareScreen() {
                     <Text style={styles.mono}>
                       {`${r.when} · `}
                       {r.chargePaise === 0 && r.listPaise ? <Text style={styles.struck}>{inr(r.listPaise)}</Text> : null}
-                      {`${r.chargePaise === 0 ? `${r.listPaise ? ' ' : ''}${t('after.free')}` : inr(r.chargePaise)} · ${t(`after.${r.state}`)}`}
+                      {`${r.chargePaise === 0 ? `${r.listPaise ? ' ' : ''}${t('after.free')}` : inr(r.chargePaise)} · ${t(`after.${r.state}`)}${r.refunded ? ` · ${t('after.refunded')}` : ''}`}
                     </Text>
+                    {r.note ? <Body>{r.note}</Body> : null}
                     {r.payUrl ? (
                       <Button
                         label={t('after.payNow', { amount: inr(r.chargePaise) })}

@@ -8,6 +8,9 @@ import {
   DEFAULT_COVERAGE_RULES,
   NOT_COVERED,
   bookingIsFree,
+  checkRuleInput,
+  checkStudioSlot,
+  notCoveredReply,
   freeServiceUntil,
   SLOT_STARTS,
   checkServiceChargesInput,
@@ -127,21 +130,21 @@ describe('warranty coverage, as data', () => {
   });
 
   it('the photo reader wins over the client pick: a paint crack filed as modular is not covered', () => {
-    const d = decideCoverage(rules, 'MODULAR_STRUCTURE', { ok: true, key: 'PAINTING', summary: 'Crack in bedroom wall paint', reason: 'hairline crack in paint' })!;
+    const d = decideCoverage(rules, 'MODULAR_CORE', { ok: true, key: 'PAINTING', summary: 'Crack in bedroom wall paint', reason: 'hairline crack in paint' })!;
     expect(d).toMatchObject({ covered: false, by: 'reader' });
     expect(d.rule.serviceCategory).toBe('PAINTING');
   });
 
   it('a light not working is not covered', () => {
-    expect(decideCoverage(rules, 'MODULAR_HARDWARE', { ok: true, key: 'ELECTRICAL', summary: 'LED profile off', reason: '' })!.covered).toBe(false);
+    expect(decideCoverage(rules, 'MODULAR_CORE', { ok: true, key: 'ELECTRICAL', summary: 'LED profile off', reason: '' })!.covered).toBe(false);
   });
 
   it('a covered modular fault is covered', () => {
-    expect(decideCoverage(rules, 'MODULAR_HARDWARE', { ok: true, key: 'MODULAR_HARDWARE', summary: 'Drawer channel stuck', reason: '' })).toMatchObject({ covered: true, by: 'reader' });
+    expect(decideCoverage(rules, 'MODULAR_CORE', { ok: true, key: 'MODULAR_CORE', summary: 'Wardrobe panel delaminating', reason: '' })).toMatchObject({ covered: true, by: 'reader' });
   });
 
   it('with no reader answer, the client pick decides; an unknown pick decides nothing', () => {
-    expect(decideCoverage(rules, 'MODULAR_HARDWARE', { ok: false, why: 'reader-failed' })).toMatchObject({ covered: true, by: 'client' });
+    expect(decideCoverage(rules, 'MODULAR_CORE', { ok: false, why: 'reader-failed' })).toMatchObject({ covered: true, by: 'client' });
     expect(decideCoverage(rules, 'NOT_A_RULE', { ok: false, why: 'reader-failed' })).toBeNull();
   });
 
@@ -164,6 +167,7 @@ describe('warranty coverage, as data', () => {
       expect(line).toContain(`'${r.examples.replace(/'/g, "''")}'`);
       expect(line).toContain(`, ${r.covered}, `);
       expect(line).toContain(r.serviceCategory ? `'${r.serviceCategory}', ${r.sortOrder},` : `NULL, ${r.sortOrder},`);
+      expect(line).toContain(r.clientNote ? `, '${r.clientNote.replace(/'/g, "''")}', true,` : ', NULL, true,');
     }
     expect(sql.match(/'wcr_default_/g)!.length).toBe(DEFAULT_COVERAGE_RULES.length);
   });
@@ -248,10 +252,10 @@ describe('service visits', () => {
 });
 
 describe('the free month after the handover', () => {
-  it('runs to the same day next month, or the last day of a shorter one', () => {
+  it('runs 30 days from the handover (agreement clause 5.1)', () => {
     expect(freeServiceUntil('2026-11-20')).toBe('2026-12-20');
-    expect(freeServiceUntil('2026-01-31')).toBe('2026-02-28');
-    expect(freeServiceUntil('2026-12-15')).toBe('2027-01-15');
+    expect(freeServiceUntil('2026-01-31')).toBe('2026-03-02');
+    expect(freeServiceUntil('2026-12-15')).toBe('2027-01-14');
     expect(freeServiceUntil(null)).toBeNull();
   });
 
@@ -259,6 +263,66 @@ describe('the free month after the handover', () => {
     expect(bookingIsFree('2026-12-20', '2026-12-20')).toBe(true);
     expect(bookingIsFree('2026-12-21', '2026-12-20')).toBe(false);
     expect(bookingIsFree('2026-12-01', null)).toBe(false);
+    // One free visit: once used, the next is charged.
+    expect(bookingIsFree('2026-12-01', '2026-12-20', true)).toBe(false);
+  });
+});
+
+describe('Hauspire agreement, clause 5', () => {
+  const rules = coverageRulesFrom([]);
+  const rule = (k: string) => rules.find((r) => r.key === k)!;
+
+  it('covers manufacturing defects in modular woodwork only', () => {
+    expect(rules.filter((r) => r.covered).map((r) => r.key)).toEqual(['MODULAR_CORE', 'MODULAR_FINISH']);
+  });
+
+  it('hardware is the manufacturer’s warranty, and says so', () => {
+    expect(rule('MODULAR_HARDWARE').covered).toBe(false);
+    expect(notCoveredReply(rule('MODULAR_HARDWARE'))).toBe(`${NOT_COVERED} Hinges, channels and other hardware carry their manufacturer's warranty; your studio helps you claim it on the visit.`);
+  });
+
+  it('excludes small adjustments, water, damp and pests, wear and misuse', () => {
+    for (const k of ['MINOR_ADJUSTMENT', 'MOISTURE_PESTS', 'DAMAGE_FROM_USE']) expect(rule(k).covered).toBe(false);
+  });
+
+  it('a rule with no line of its own gets the owner’s sentence alone', () => {
+    expect(notCoveredReply(rule('PAINTING'))).toBe(NOT_COVERED);
+  });
+});
+
+describe('ops’ rule editor', () => {
+  const ok = { key: 'mirror chips', label: 'Mirror edges', examples: 'chipped mirror edge, flaking silver', covered: 'false', serviceCategory: 'CARPENTRY', sortOrder: '155', clientNote: '' };
+
+  it('reads a rule as typed', () => {
+    expect(checkRuleInput(ok)).toEqual({
+      ok: true,
+      value: { key: 'MIRROR_CHIPS', label: 'Mirror edges', examples: 'chipped mirror edge, flaking silver', covered: false, serviceCategory: 'CARPENTRY', sortOrder: 155, clientNote: null, active: true },
+    });
+  });
+
+  it('a covered rule sends nowhere and carries no extra line', () => {
+    expect(checkRuleInput({ ...ok, covered: true, clientNote: 'x' })).toMatchObject({ ok: true, value: { covered: true, serviceCategory: null, clientNote: null } });
+  });
+
+  it('refuses a bad key, no examples, or not covered with nowhere to go', () => {
+    expect(checkRuleInput({ ...ok, key: '9x' }).ok).toBe(false);
+    expect(checkRuleInput({ ...ok, examples: 'x' }).ok).toBe(false);
+    expect(checkRuleInput({ ...ok, serviceCategory: '' }).ok).toBe(false);
+    expect(checkRuleInput({ ...ok, serviceCategory: 'ROOF' }).ok).toBe(false);
+    expect(checkRuleInput({ ...ok, sortOrder: '-1' }).ok).toBe(false);
+  });
+});
+
+describe('the studio moves a visit', () => {
+  it('to any slot from tomorrow, up to 60 days', () => {
+    expect(checkStudioSlot('2026-11-21', '16:00', '2026-11-20')).toEqual({ ok: true, day: '2026-11-21', start: '16:00' });
+    expect(checkStudioSlot('2026-11-20', '16:00', '2026-11-20').ok).toBe(false);
+    expect(checkStudioSlot('2027-01-20', '16:00', '2026-11-20').ok).toBe(false);
+    expect(checkStudioSlot('2026-11-21', '18:00', '2026-11-20').ok).toBe(false);
+  });
+
+  it('a done visit reads as done', () => {
+    expect(serviceState('DONE', new Date(0), new Date())).toBe('done');
   });
 });
 

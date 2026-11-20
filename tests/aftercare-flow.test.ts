@@ -131,7 +131,7 @@ beforeEach(() => {
 describe('warranty claim', () => {
   it('₹1 pending: "Please clear your payments first", and nothing is read, stored or raised', async () => {
     db.project = project({ paidRupees: 99_999 });
-    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'Drawer channel stuck', area: 'MODULAR_HARDWARE' }, [photo()]);
+    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'Wardrobe panel cracking', area: 'MODULAR_CORE' }, [photo()]);
     expect(r).toMatchObject({ ok: false, pendingPaise: 100, error: 'Please clear your payments first. ₹1 is pending.' });
     expect(fx.readClaim).not.toHaveBeenCalled();
     expect(fx.storeSitePhoto).not.toHaveBeenCalled();
@@ -146,18 +146,18 @@ describe('warranty claim', () => {
 
   it('covered: a warranty snag is raised and the design head is told', async () => {
     db.project = project();
-    fx.readClaim.mockResolvedValue({ ok: true, key: 'MODULAR_HARDWARE', summary: 'Kitchen drawer channel stuck', reason: 'channel bent' });
-    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'the kitchen drawer will not close', area: 'MODULAR_HARDWARE' }, [photo()]);
+    fx.readClaim.mockResolvedValue({ ok: true, key: 'MODULAR_CORE', summary: 'Wardrobe side panel delaminating', reason: 'layers separating' });
+    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'the wardrobe side panel is splitting', area: 'MODULAR_CORE' }, [photo()]);
     expect(r).toMatchObject({ ok: true, covered: true, snagId: 'snag_1' });
-    expect(fx.createWarrantyClaimSnag).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Kitchen drawer channel stuck', projectId: 'hp_1', userId: 'u_owner' }));
-    expect(db.claims[0]).toMatchObject({ covered: true, ruleKey: 'MODULAR_HARDWARE', decidedBy: 'reader', snagId: 'snag_1' });
+    expect(fx.createWarrantyClaimSnag).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Wardrobe side panel delaminating', projectId: 'hp_1', userId: 'u_owner' }));
+    expect(db.claims[0]).toMatchObject({ covered: true, ruleKey: 'MODULAR_CORE', decidedBy: 'reader', snagId: 'snag_1' });
     await vi.waitFor(() => expect(fx.notify).toHaveBeenCalledWith('u_head', expect.objectContaining({ kind: 'warranty-claim', projectId: 'hp_1' })));
   });
 
   it('not covered (a paint crack): the automatic reply, no snag, nobody told', async () => {
     db.project = project();
     fx.readClaim.mockResolvedValue({ ok: true, key: 'PAINTING', summary: 'Crack in wall paint', reason: 'hairline crack' });
-    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'crack near the wardrobe', area: 'MODULAR_STRUCTURE' }, [photo()]);
+    const r = await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'crack near the wardrobe', area: 'MODULAR_CORE' }, [photo()]);
     expect(r).toEqual({ ok: true, covered: false, claimId: 'wc_1', message: 'This is not covered under your warranty. Please raise a service request.', serviceCategory: 'PAINTING' });
     expect(fx.createWarrantyClaimSnag).not.toHaveBeenCalled();
     expect(fx.notify).not.toHaveBeenCalled();
@@ -166,13 +166,13 @@ describe('warranty claim', () => {
 
   it('needs a photo, the owner, the warranty, and a Max studio', async () => {
     db.project = project();
-    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [])).toMatchObject({ ok: false, error: 'Add at least one photo of the problem.' });
-    expect(await raiseWarrantyClaim('u_family', 'hp_1', { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [photo()])).toMatchObject({ ok: false, error: 'Only the person whose home it is can raise this.' });
-    expect(await raiseWarrantyClaim('u_stranger', 'hp_1', { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [photo()])).toMatchObject({ ok: false, error: 'That project is not yours.' });
+    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'panel splitting', area: 'MODULAR_CORE' }, [])).toMatchObject({ ok: false, error: 'Add at least one photo of the problem.' });
+    expect(await raiseWarrantyClaim('u_family', 'hp_1', { description: 'panel splitting', area: 'MODULAR_CORE' }, [photo()])).toMatchObject({ ok: false, error: 'Only the person whose home it is can raise this.' });
+    expect(await raiseWarrantyClaim('u_stranger', 'hp_1', { description: 'panel splitting', area: 'MODULAR_CORE' }, [photo()])).toMatchObject({ ok: false, error: 'That project is not yours.' });
     db.project = project({ phase: 'SNAGS' });
-    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [photo()])).toMatchObject({ ok: false, error: expect.stringMatching(/sign off the handover/) });
+    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'panel splitting', area: 'MODULAR_CORE' }, [photo()])).toMatchObject({ ok: false, error: expect.stringMatching(/sign off the handover/) });
     db.project = project({ plan: 'PRO' });
-    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'hinge broken', area: 'MODULAR_HARDWARE' }, [photo()])).toMatchObject({ ok: false, error: 'This is not open for your project yet.' });
+    expect(await raiseWarrantyClaim('u_owner', 'hp_1', { description: 'panel splitting', area: 'MODULAR_CORE' }, [photo()])).toMatchObject({ ok: false, error: 'This is not open for your project yet.' });
     expect(fx.readClaim).not.toHaveBeenCalled();
   });
 });

@@ -42,6 +42,36 @@ export interface LinkInput {
 
 export type LinkResult = { ok: true; id: string; url: string } | { ok: false; error: string };
 
+/**
+ * A full refund of a visit's charge, when the studio cancels a paid visit
+ * (owner, 20 Nov 2026). Razorpay returns the money to how the client paid.
+ */
+export async function refundPayment(paymentId: string, amountPaise: number): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!razorpayReady()) return { ok: false, error: 'Payments are not switched on, so the refund could not be sent.' };
+  const auth = Buffer.from(`${env('RAZORPAY_KEY_ID')}:${env('RAZORPAY_KEY_SECRET')}`).toString('base64');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API}/payments/${encodeURIComponent(paymentId)}/refund`, {
+      method: 'POST',
+      headers: { authorization: `Basic ${auth}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ amount: amountPaise, speed: 'normal' }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      console.error('[razorpay] refund refused', res.status);
+      return { ok: false, error: 'Razorpay did not take the refund. Nothing was cancelled; try again, or refund it from the Razorpay dashboard first.' };
+    }
+    const json = (await res.json()) as { id?: unknown };
+    return typeof json.id === 'string' ? { ok: true, id: json.id } : { ok: false, error: 'Razorpay did not confirm the refund. Check the Razorpay dashboard.' };
+  } catch (error) {
+    console.error('[razorpay] refund error', error instanceof Error ? (error.name === 'AbortError' ? 'timeout' : error.name) : 'unknown');
+    return { ok: false, error: 'We could not reach Razorpay. Nothing was cancelled; try again in a minute.' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function createPaymentLink(input: LinkInput): Promise<LinkResult> {
   if (!razorpayReady()) return { ok: false, error: 'Paying for a visit is not switched on yet.' };
   const auth = Buffer.from(`${env('RAZORPAY_KEY_ID')}:${env('RAZORPAY_KEY_SECRET')}`).toString('base64');

@@ -171,7 +171,7 @@ export interface Aftercare {
   owner: boolean;
   warranty: { open: boolean; message: string | null; endsOn: string | null; areas: { key: string; label: string }[] };
   service: { ready: boolean; free?: boolean; freeUntil?: string | null; categories: { key: string; label: string; chargePaise: number; listPaise?: number | null }[]; days: { date: string; label: string; slots: { start: string; label: string; left: number }[] }[] };
-  requests: { id: string; category: string; when: string; chargePaise: number; listPaise?: number | null; state: 'held' | 'booked' | 'expired' | 'cancelled'; payUrl: string | null }[];
+  requests: { id: string; category: string; when: string; chargePaise: number; listPaise?: number | null; state: 'held' | 'booked' | 'done' | 'expired' | 'cancelled'; payUrl: string | null; note?: string | null; refunded?: boolean }[];
   claims: { id: string; at: string; covered: boolean; area: string; snagId: string | null }[];
 }
 

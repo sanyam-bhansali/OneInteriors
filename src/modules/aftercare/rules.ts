@@ -154,24 +154,23 @@ export const slotLabel = (start: string): string => (isSlotStart(start) ? SLOT_L
 export const slotKey = (day: string, start: string): string => `${day} ${start}`;
 
 /**
- * The free service window (owner, 20 Nov 2026): for one month after the
- * handover sign-off, a service visit costs nothing, and only when 100% is paid
- * (the payment gate runs first on every booking). The same day next month
- * (the last day of a shorter month). It goes by the day the client books, not
- * the visit's day: the earliest slot is 5 days out, and a client who asks on
- * day 28 asked within the month.
+ * The free service visit (owner, 20 Nov 2026; Hauspire's agreement, clause
+ * 5.1: "one complimentary service visit within thirty days from the date of
+ * Project handover"). One visit, booked within 30 days of the handover
+ * sign-off, only when 100% is paid (the payment gate runs first on every
+ * booking). It goes by the day the client books, not the visit's day: the
+ * earliest slot is 5 days out, and a client who asks on day 28 asked in time.
  */
+export const FREE_VISIT_DAYS = 30;
+
+/** The last day a free visit may be booked; null before the handover sign-off. */
 export function freeServiceUntil(handoverDay: string | null): string | null {
   if (!handoverDay || !isDay(handoverDay)) return null;
-  const [y, m, d] = handoverDay.split('-').map(Number);
-  const ny = m === 12 ? y! + 1 : y!;
-  const nm = m === 12 ? 1 : m! + 1;
-  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
-  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(d!, last)).padStart(2, '0')}`;
+  return addDays(handoverDay, FREE_VISIT_DAYS);
 }
 
-/** Is a visit booked on `today` (IST) free? */
-export const bookingIsFree = (today: string, freeUntil: string | null): boolean => freeUntil !== null && today <= freeUntil;
+/** Is a visit booked on `today` (IST) free? Within the 30 days, and the free visit not used yet. */
+export const bookingIsFree = (today: string, freeUntil: string | null, freeVisitUsed = false): boolean => !freeVisitUsed && freeUntil !== null && today <= freeUntil;
 
 /** How long a picked slot is held while the client pays. */
 export const HOLD_MINUTES = 20;
@@ -216,11 +215,23 @@ export function checkSlot(day: unknown, start: unknown, today: string): { ok: tr
   return { ok: true, day, start };
 }
 
-export type ServiceState = 'held' | 'booked' | 'expired' | 'cancelled';
+/** How far ahead the studio may move a visit. */
+export const STUDIO_MOVE_DAYS = 60;
+
+/** The studio moves a visit: any slot from tomorrow, up to 60 days out. */
+export function checkStudioSlot(day: unknown, start: unknown, today: string): { ok: true; day: string; start: SlotStart } | { ok: false; error: string } {
+  if (!isDay(day) || !isSlotStart(start)) return { ok: false, error: 'Pick a day and a time slot.' };
+  if (day <= today) return { ok: false, error: 'Pick a day from tomorrow.' };
+  if (day > addDays(today, STUDIO_MOVE_DAYS)) return { ok: false, error: `Pick a day within the next ${STUDIO_MOVE_DAYS} days.` };
+  return { ok: true, day, start };
+}
+
+export type ServiceState = 'held' | 'booked' | 'done' | 'expired' | 'cancelled';
 
 /** A request's state now: a hold past its time has expired (read, never written). */
 export function serviceState(status: string, holdUntil: Date, now: Date): ServiceState {
   if (status === 'BOOKED') return 'booked';
+  if (status === 'DONE') return 'done';
   if (status === 'CANCELLED') return 'cancelled';
   return holdUntil.getTime() > now.getTime() ? 'held' : 'expired';
 }
@@ -249,40 +260,85 @@ export interface CoverageRule {
   /** Where to send the client when it is not covered. */
   serviceCategory: ServiceCategory | null;
   sortOrder: number;
+  /** One more line for the client when it is not covered ("Hinges carry their manufacturer's warranty…"). */
+  clientNote: string | null;
 }
 
 /**
- * One Interiors' default list (owner, 20 Nov 2026: "generally only modular
- * issues are covered"). The migration seeds exactly these rows
- * (20261120120000_aftercare; a test keeps them equal); this copy is used
- * only when the table has no active rows.
+ * The default list: Hauspire's Interior Design Services Agreement, clause 5
+ * (owner, 20 Nov 2026). A 10-year limited warranty on modular woodwork,
+ * covering only manufacturing defects in the core material and workmanship
+ * under normal use (5.3); hardware is the manufacturer's warranty (5.2);
+ * wear, misuse, water, damp, pests, loose screws, small alignments and
+ * fading are excluded (5.3 a–d); electrical, paint, plumbing, ceilings,
+ * tiles and decor were never in the modular scope (2.3). The migration seeds
+ * exactly these rows (20261120120000_aftercare; a test keeps them equal);
+ * this copy is used only when the table has no active rows.
  */
 export const DEFAULT_COVERAGE_RULES: readonly CoverageRule[] = [
   {
-    key: 'MODULAR_STRUCTURE',
-    label: 'Modular furniture body: wardrobe, kitchen, vanity, TV unit, bed',
-    examples: 'carcass or panel swelling from inside, sagging shelf, joints opening, a unit coming loose from the wall, a factory panel cracked',
+    key: 'MODULAR_CORE',
+    label: 'Modular woodwork: a defect in the board or the build',
+    examples: 'a factory panel or carcass cracked, splitting or delaminating, a shelf sagging, joints opening, a unit coming loose from the wall, a shutter warped beyond adjustment, with no sign of water or misuse',
     covered: true,
     serviceCategory: null,
     sortOrder: 10,
+    clientNote: null,
   },
   {
-    key: 'MODULAR_HARDWARE',
-    label: 'Hinges, channels, drawers, lift-ups and handles',
-    examples: 'hinge broken or loose, drawer channel stuck or dropped, soft-close not working, lift-up or gas strut failing, handle loose, wardrobe sliding track',
+    key: 'MODULAR_FINISH',
+    label: 'Laminate, edge banding or finish lifting on modular woodwork',
+    examples: 'laminate or edge band peeling or bubbling, acrylic or PU finish lifting, veneer coming off, from workmanship and not from water, heat or a knock',
     covered: true,
     serviceCategory: null,
     sortOrder: 20,
+    clientNote: null,
   },
   {
-    key: 'MODULAR_SHUTTER_FINISH',
-    label: 'Shutters, laminate and edge banding on modular furniture',
-    examples: 'shutter warped or out of line, laminate or edge band peeling, acrylic or PU finish lifting, veneer coming off',
-    covered: true,
-    serviceCategory: null,
+    key: 'MODULAR_HARDWARE',
+    label: 'Hinges, channels, drawer slides, lift-ups and handles',
+    examples: 'hinge broken, drawer channel or slide failed, soft-close not working, lift-up or gas strut failing, wardrobe sliding track, handle broken',
+    covered: false,
+    serviceCategory: 'CARPENTRY',
     sortOrder: 30,
+    clientNote: "Hinges, channels and other hardware carry their manufacturer's warranty; your studio helps you claim it on the visit.",
   },
-  { key: 'PAINTING', label: 'Wall paint and putty', examples: 'crack in wall paint, peeling or flaking paint, patches, dampness marks, touch-up', covered: false, serviceCategory: 'PAINTING', sortOrder: 100 },
+  {
+    key: 'MINOR_ADJUSTMENT',
+    label: 'Loose screws, doors or drawers slightly out of line',
+    examples: 'loose screw, door or drawer slightly out of line or rubbing, handle loose, shutter gap uneven, an easy adjustment',
+    covered: false,
+    serviceCategory: 'CARPENTRY',
+    sortOrder: 40,
+    clientNote: 'Small adjustments are part of a service visit, not the warranty.',
+  },
+  {
+    key: 'MOISTURE_PESTS',
+    label: 'Swelling from water or damp, termites or pests',
+    examples: 'board swollen near a sink, from a spill, seepage or damp wall, water marks, termites, borer holes, fungus',
+    covered: false,
+    serviceCategory: 'CARPENTRY',
+    sortOrder: 50,
+    clientNote: 'Damage from water, damp or pests is not covered by the warranty.',
+  },
+  {
+    key: 'DAMAGE_FROM_USE',
+    label: 'Damage from use, wear or fading',
+    examples: 'burn mark, scratches, dents, chipped edge from a knock, broken by force, normal wear, colour fading or yellowing over time',
+    covered: false,
+    serviceCategory: 'CARPENTRY',
+    sortOrder: 60,
+    clientNote: null,
+  },
+  {
+    key: 'PAINTING',
+    label: 'Wall paint and putty',
+    examples: 'crack in wall paint, peeling or flaking paint, patches, dampness marks, touch-up',
+    covered: false,
+    serviceCategory: 'PAINTING',
+    sortOrder: 100,
+    clientNote: null,
+  },
   {
     key: 'ELECTRICAL',
     label: 'Lights, LEDs, switches and wiring',
@@ -290,32 +346,67 @@ export const DEFAULT_COVERAGE_RULES: readonly CoverageRule[] = [
     covered: false,
     serviceCategory: 'ELECTRICAL',
     sortOrder: 110,
+    clientNote: null,
   },
-  { key: 'WALLPAPER', label: 'Wallpaper', examples: 'wallpaper peeling, bubbles, seams opening, stains', covered: false, serviceCategory: 'WALLPAPER', sortOrder: 120 },
-  { key: 'PLUMBING', label: 'Taps, sinks and water', examples: 'leaking tap, sink drain blocked, water leak, dampness from a pipe', covered: false, serviceCategory: 'PLUMBING', sortOrder: 130 },
+  {
+    key: 'WALLPAPER',
+    label: 'Wallpaper',
+    examples: 'wallpaper peeling, bubbles, seams opening, stains',
+    covered: false,
+    serviceCategory: 'WALLPAPER',
+    sortOrder: 120,
+    clientNote: null,
+  },
+  {
+    key: 'PLUMBING',
+    label: 'Taps, sinks and water',
+    examples: 'leaking tap, sink drain blocked, water leak, dampness from a pipe',
+    covered: false,
+    serviceCategory: 'PLUMBING',
+    sortOrder: 130,
+    clientNote: null,
+  },
   {
     key: 'CEILING_CIVIL',
     label: 'False ceiling, tiles and civil work',
-    examples: 'false ceiling crack, gypsum joint line, tile crack, grout, flooring',
+    examples: 'false ceiling crack, gypsum joint line, tile crack, grout, flooring, wall panelling',
     covered: false,
     serviceCategory: 'CIVIL',
     sortOrder: 140,
+    clientNote: null,
   },
-  { key: 'GLASS_MIRROR', label: 'Glass and mirrors', examples: 'broken glass, cracked mirror, glass shutter broken', covered: false, serviceCategory: 'CARPENTRY', sortOrder: 150 },
   {
-    key: 'DAMAGE_FROM_USE',
-    label: 'Damage from use',
-    examples: 'burn mark, scratches, dents, swelling from water spilled on the outside, broken by force, termites or pests',
+    key: 'GLASS_MIRROR',
+    label: 'Glass and mirrors',
+    examples: 'broken glass, cracked mirror, glass shutter broken',
     covered: false,
     serviceCategory: 'CARPENTRY',
-    sortOrder: 160,
+    sortOrder: 150,
+    clientNote: null,
   },
-  { key: 'APPLIANCE', label: 'Appliances: chimney, hob, oven, geyser', examples: 'chimney, hob, oven, dishwasher, geyser, any branded appliance', covered: false, serviceCategory: 'OTHER', sortOrder: 170 },
+  {
+    key: 'CURTAINS_DECOR',
+    label: 'Curtains, blinds and decor',
+    examples: 'curtain rod, blinds, loose decor, artwork, accessories',
+    covered: false,
+    serviceCategory: 'OTHER',
+    sortOrder: 160,
+    clientNote: null,
+  },
+  {
+    key: 'APPLIANCE',
+    label: 'Appliances: chimney, hob, oven, geyser',
+    examples: 'chimney, hob, oven, dishwasher, geyser, any branded appliance',
+    covered: false,
+    serviceCategory: 'OTHER',
+    sortOrder: 170,
+    clientNote: "Appliances carry their brand's warranty.",
+  },
 ];
 
 /** Rows from the table, cleaned; the default list when there are none. */
 export function coverageRulesFrom(
-  rows: readonly { key: string; label: string; examples: string; covered: boolean; serviceCategory: string | null; sortOrder: number; active?: boolean }[],
+  rows: readonly { key: string; label: string; examples: string; covered: boolean; serviceCategory: string | null; sortOrder: number; clientNote?: string | null; active?: boolean }[],
 ): CoverageRule[] {
   const live = rows
     .filter((r) => r.active !== false && r.key.trim() && r.label.trim())
@@ -326,12 +417,50 @@ export function coverageRulesFrom(
       covered: r.covered,
       serviceCategory: isServiceCategory(r.serviceCategory) ? r.serviceCategory : null,
       sortOrder: r.sortOrder,
+      clientNote: r.clientNote?.trim() || null,
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return live.length > 0 ? live : [...DEFAULT_COVERAGE_RULES];
 }
 
-export const NOT_COVERED = 'This is not covered under your warranty. Please raise a service request.';
+export interface RuleInput {
+  key: string;
+  label: string;
+  examples: string;
+  covered: boolean;
+  serviceCategory: ServiceCategory | null;
+  sortOrder: number;
+  clientNote: string | null;
+  active: boolean;
+}
+
+/**
+ * Ops' rule editor (/ops/warranty-rules): a rule as typed, checked. The key
+ * is what the photo reader answers with, so it is short capitals; a rule
+ * that is not covered must send the client somewhere.
+ */
+export function checkRuleInput(raw: Record<string, unknown>): { ok: true; value: RuleInput } | { ok: false; error: string } {
+  const key = typeof raw.key === 'string' ? raw.key.trim().toUpperCase().replace(/[\s-]+/g, '_') : '';
+  if (!/^[A-Z][A-Z0-9_]{2,39}$/.test(key)) return { ok: false, error: 'The key is 3 to 40 capital letters, digits or _, like MODULAR_CORE.' };
+  const label = clean(raw.label, 120);
+  if (label.length < 3) return { ok: false, error: 'Give the area a name the client reads.' };
+  const examples = clean(raw.examples, 600);
+  if (examples.length < 10) return { ok: false, error: 'Describe what it looks like, for the photo reader: a few examples.' };
+  const covered = raw.covered === true || raw.covered === 'on' || raw.covered === 'true';
+  const sc = typeof raw.serviceCategory === 'string' && raw.serviceCategory ? raw.serviceCategory : null;
+  if (sc !== null && !isServiceCategory(sc)) return { ok: false, error: 'Pick a service category from the list.' };
+  if (!covered && sc === null) return { ok: false, error: 'A rule that is not covered must say which service visit to book instead.' };
+  const order = Number(typeof raw.sortOrder === 'string' ? raw.sortOrder.trim() : raw.sortOrder);
+  if (!Number.isInteger(order) || order < 0 || order > 9999) return { ok: false, error: 'The order is a whole number from 0 to 9999.' };
+  const note = clean(raw.clientNote, 300) || null;
+  const active = !(raw.active === false || raw.active === 'false' || raw.active === 'off');
+  return { ok: true, value: { key, label, examples, covered, serviceCategory: covered ? null : sc, sortOrder: order, clientNote: covered ? null : note, active } };
+}
+
+export const NOT_COVERED ='This is not covered under your warranty. Please raise a service request.';
+
+/** The automatic reply: the owner's sentence, then the area's own line when it has one. */
+export const notCoveredReply = (rule: CoverageRule): string => (rule.clientNote ? `${NOT_COVERED} ${rule.clientNote}` : NOT_COVERED);
 
 /** The photo reader's answer, as reader.ts hands it over. */
 export type ReaderAnswer = { ok: true; key: string; summary: string; reason: string } | { ok: false; why: string };

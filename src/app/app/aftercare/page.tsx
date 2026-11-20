@@ -28,13 +28,13 @@ interface View {
   owner: boolean;
   warranty: { open: boolean; message: string | null; endsOn: string | null; areas: { key: string; label: string }[] };
   service: { ready: boolean; free: boolean; freeUntil: string | null; categories: { key: string; label: string; chargePaise: number; listPaise: number | null }[]; days: { date: string; label: string; slots: { start: string; label: string; left: number }[] }[] };
-  requests: { id: string; category: string; when: string; chargePaise: number; listPaise: number | null; state: 'held' | 'booked' | 'expired' | 'cancelled'; payUrl: string | null }[];
+  requests: { id: string; category: string; when: string; chargePaise: number; listPaise: number | null; state: 'held' | 'booked' | 'done' | 'expired' | 'cancelled'; payUrl: string | null; note: string | null; refunded: boolean }[];
   claims: { id: string; at: string; covered: boolean; area: string; snagId: string | null }[];
 }
 
 type Note = { ok: boolean; text: string; pending?: number | null } | null;
 
-const STATE_WORD = { held: 'Waiting for payment', booked: 'Booked', expired: 'Not paid in time', cancelled: 'Cancelled' } as const;
+const STATE_WORD = { held: 'Waiting for payment', booked: 'Booked', done: 'Done', expired: 'Not paid in time', cancelled: 'Cancelled' } as const;
 
 async function post(path: string, form: FormData): Promise<{ ok: boolean; body: Record<string, unknown> }> {
   try {
@@ -53,6 +53,10 @@ export default function Aftercare() {
   const [closed, setClosed] = useState<string | null>(null);
   const [tab, setTab] = useState<'warranty' | 'service'>('warranty');
   const [note, setNote] = useState<Note>(null);
+  const noteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (note) noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [note]);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -105,7 +109,7 @@ export default function Aftercare() {
               </button>
             </div>
             {note ? (
-              <div className={note.ok ? 'oa-toast' : 'oa-note'} role="status" style={note.ok ? undefined : { color: 'var(--accent-ink)' }}>
+              <div ref={noteRef} className={note.ok ? 'oa-toast' : 'oa-note'} role="status" style={note.ok ? undefined : { color: 'var(--accent-ink)' }}>
                 {note.text}
                 {note.pending !== undefined ? (
                   <>
@@ -145,7 +149,9 @@ export default function Aftercare() {
                     <b style={{ fontSize: 16 }}>{r.category}</b>
                     <p style={{ margin: '4px 0 0', font: '400 13px var(--mono)', color: 'var(--ink-2)' }}>
                       {r.when} · <Price paise={r.chargePaise} list={r.listPaise} /> · {STATE_WORD[r.state]}
+                      {r.refunded ? ' · refunded' : ''}
                     </p>
+                    {r.note ? <p style={{ margin: '6px 0 0', fontSize: 14.5, lineHeight: 1.45 }}>{r.note}</p> : null}
                     {r.payUrl ? (
                       <a className="oa-cta" style={{ marginTop: 10 }} href={r.payUrl}>
                         Pay {formatINR(r.chargePaise)}
@@ -238,7 +244,7 @@ function WarrantyClaim({ view, onResult }: { view: View; onResult: (n: Note, toS
     <div className="oa-card">
       <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>
         {view.warranty.open
-          ? `Your warranty${view.warranty.endsOn ? ` runs to ${new Date(`${view.warranty.endsOn}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}. It covers your modular furniture. Tell us what is wrong and add photos; we check it straight away.`
+          ? `Your warranty${view.warranty.endsOn ? ` runs to ${new Date(`${view.warranty.endsOn}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}. It covers manufacturing defects in your modular woodwork. Tell us what is wrong and add photos; we check it straight away.`
           : (view.warranty.message ?? '')}
       </p>
       <p className="oa-label" style={{ marginTop: 14 }}>
@@ -316,7 +322,7 @@ function ServiceVisit({ view, onResult }: { view: View; onResult: (n: Note) => v
     setCategory('');
     setText('');
     setStart('');
-    onResult({ ok: true, text: `Booked: ${String(b.when)}. Free, in your first month after the handover.` });
+    onResult({ ok: true, text: `Booked: ${String(b.when)}. Your free visit after the handover.` });
   };
 
   if (view.service.categories.length === 0) {
@@ -326,7 +332,7 @@ function ServiceVisit({ view, onResult }: { view: View; onResult: (n: Note) => v
     <div className="oa-card">
       <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>
         {view.service.free
-          ? `Service visits are free in your first month after the handover${view.service.freeUntil ? `, until ${new Date(`${view.service.freeUntil}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}. Pick a slot and book.`
+          ? `Your first service visit is free when you book it within 30 days of the handover${view.service.freeUntil ? ` (until ${new Date(`${view.service.freeUntil}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})` : ''}. Pick a slot and book.`
           : 'Each kind of visit has a fixed visiting charge. Pick a slot and pay it; the visit is booked once it is paid.'}
       </p>
       <p className="oa-label" style={{ marginTop: 14 }}>

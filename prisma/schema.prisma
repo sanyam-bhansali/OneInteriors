@@ -6578,6 +6578,9 @@ model WarrantyCoverageRule {
   /// Where a not-covered claim is sent: a service category (rules.ts).
   serviceCategory String?
   sortOrder       Int      @default(0)
+  /// One more line for the client when not covered ("Hinges carry their
+  /// manufacturer's warranty…").
+  clientNote      String?  @db.Text
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -6618,10 +6621,13 @@ model WarrantyClaim {
 }
 
 /// HELD while the client pays (until `holdUntil`; past it, read as expired,
-/// never written), BOOKED once Razorpay says paid, CANCELLED by the studio.
+/// never written), BOOKED once paid (or free), DONE when the studio marks the
+/// visit done, CANCELLED (a new pick let go of the hold, or the studio
+/// cancelled it; a paid one is refunded).
 enum ServiceRequestStatus {
   HELD
   BOOKED
+  DONE
   CANCELLED
 }
 
@@ -6651,6 +6657,11 @@ model ServiceRequest {
   payUrl      String?
   paymentId   String?              @unique
   paidAt      DateTime?
+  /// The studio's line to the client when it moved, cancelled or finished the visit.
+  studioNote  String?              @db.Text
+  doneAt      DateTime?
+  /// Razorpay's refund, when the studio cancelled a paid visit.
+  refundId    String?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 
