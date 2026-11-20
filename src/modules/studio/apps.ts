@@ -12,7 +12,7 @@
  */
 
 import { asSeenBy, can, type MemberRole, type StudioRoleName } from './roles';
-import { CREWS_HOME, DESIGN_HOME, DOCUMENTS_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
+import { CREWS_HOME, DESIGN_HOME, DOCUMENTS_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
 
 export { STUDIO_HOME };
 
@@ -103,8 +103,8 @@ export const APPS: readonly StudioApp[] = [
   },
   {
     key: 'projects', name: 'Projects', href: '/studio/projects', icon: 'layers', bg: 'var(--good-bg)', fg: 'var(--good)',
-    tabs: [T('All projects', '/studio/projects'), T('Design', DESIGN_HOME), T('Start a project', '/studio/projects/start')],
-    owns: ['/studio/projects', DESIGN_HOME, '/studio/updates'],
+    tabs: [T('All projects', '/studio/projects'), T('Design', DESIGN_HOME), T('Start a project', '/studio/projects/start'), T('Service visits', SERVICE_VISITS_PATH)],
+    owns: ['/studio/projects', DESIGN_HOME, '/studio/updates', SERVICE_VISITS_PATH],
   },
   {
     /* Project documents (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §3.4): a folder per project. */

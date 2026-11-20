@@ -291,6 +291,28 @@ async function createSnag(
   return snag.id;
 }
 
+/**
+ * A warranty snag opened by a covered warranty claim (aftercare/store.ts,
+ * owner 20 Nov 2026), inside the claim's transaction: the client's photos and
+ * words, raised by the client, `warranty` true. The design head assigns it.
+ */
+export function createWarrantyClaimSnag(
+  tx: Prisma.TransactionClient,
+  input: { projectId: string; title: string; note: string; photoPaths: string[]; userId: string },
+): Promise<string> {
+  return createSnag(tx, {
+    projectId: input.projectId,
+    title: input.title,
+    room: null,
+    note: input.note,
+    photoPaths: input.photoPaths,
+    raisedById: input.userId,
+    byStudio: false,
+    actor: { type: 'CUSTOMER', id: input.userId },
+    warranty: true,
+  });
+}
+
 // ── The customer ───────────────────────────────────────────────
 
 /**

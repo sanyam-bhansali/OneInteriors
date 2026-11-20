@@ -148,6 +148,8 @@ const PROJECT_APP = [
   '/app/project',
   '/app/site',
   '/app/snags',
+  /* Warranty claims and paid service visits after the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md). */
+  '/app/aftercare',
   '/app/decision',
   '/app/signoff',
   '/app/locker',
