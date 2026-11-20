@@ -201,6 +201,16 @@ describe('one project’s items', () => {
     expect(keys.some((k) => k.startsWith('payment:') || k.startsWith('site'))).toBe(false);
   });
 
+  it('no site steps while the project is in design, for anyone; they are back once design is done (owner, 20 Nov 2026)', () => {
+    const inDesign = { ...p, phase: 'DESIGN' };
+    for (const who of [me('DESIGNER', { memberId: 'm-des' }), me('OWNER'), me('PM'), me('SUPERVISOR')]) {
+      const keys = projectSources(inDesign, who, TODAY).map((s) => s.key);
+      expect(keys.some((k) => k.startsWith('step:'))).toBe(false);
+    }
+    expect(projectSources(inDesign, me('DESIGNER', { memberId: 'm-des' }), TODAY).map((s) => s.key)).toContain('design:d1');
+    expect(projectSources({ ...p, phase: 'PRE_EXECUTION' }, me('DESIGNER', { memberId: 'm-des' }), TODAY).map((s) => s.key)).toContain('step:s1');
+  });
+
   it('a designer who is not THE designer gets none of the design steps', () => {
     const keys = projectSources(p, me('DESIGNER', { memberId: 'm-other' }), TODAY).map((s) => s.key);
     expect(keys.filter((k) => k.startsWith('design:'))).toEqual([]);
