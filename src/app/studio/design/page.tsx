@@ -13,6 +13,7 @@ import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { maySeeClosing } from '@/modules/studio/expected-closing';
 import { newProjectsForMe } from '@/modules/studio-design/new-projects';
 import { NewProjects } from './NewProjects';
+import { applyBoardView, BOARD_CATEGORIES, BOARD_SHOWS, BOARD_SORTS, boardViewQuery, isDefaultView, readBoardView } from '@/modules/studio/board-view';
 import '../projects/projects.css';
 
 export const metadata: Metadata = { title: 'Design', robots: { index: false, follow: false } };
@@ -30,8 +31,8 @@ const muted = 'text-[12.5px] text-[var(--muted)]';
 const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
-export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
-  const [{ tab: rawTab, deleted, designer }, fullBoard, w, member, fresh] = await Promise.all([
+export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string; sort?: string; cat?: string; show?: string }> }) {
+  const [{ tab: rawTab, deleted, designer, sort, cat, show }, fullBoard, w, member, fresh] = await Promise.all([
     searchParams,
     lifecycleBoard().catch(() => null),
     designWorkload(),
@@ -41,7 +42,11 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
   /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head narrow the board to one designer's projects. */
   const choices = fullBoard?.scope === 'studio' ? designerChoices([...fullBoard.design, ...fullBoard.preExecution, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed]) : [];
   const picked = pickDesigner(designer, choices);
-  const board: LifecycleBoard | null = fullBoard && picked ? narrowBoard(fullBoard, picked) : fullBoard;
+  const narrowed: LifecycleBoard | null = fullBoard && picked ? narrowBoard(fullBoard, picked) : fullBoard;
+  /* Sort and filter (owner, 20 Nov 2026; studio/board-view.ts): the numbers above stay on every project, the cards follow the view. */
+  const view = readBoardView({ sort, cat, show });
+  const board: LifecycleBoard | null = narrowed ? applyBoardView(narrowed, view) : null;
+  const viewQ = boardViewQuery(view);
   const designers = w ? w.designers.filter((d) => picked === null || (picked === NO_DESIGNER ? d.id === null : d.id === picked)) : null;
   if (!w && !board) {
     return (
@@ -107,21 +112,67 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
       {/* New projects first (owner, 13 Nov 2026): converted, no designer yet; Assign designer on each. */}
       {fresh ? <NewProjects data={fresh} /> : null}
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
-      <KpiRow label="Design at a glance" items={designKpis({ board, designers: mine ? null : designers, unassigned: board ? board.design.filter((c) => c.designerId === null).length : 0, tab: rawTab ? tab : undefined })} />
+      <KpiRow label="Design at a glance" items={designKpis({ board: narrowed, designers: mine ? null : designers, unassigned: narrowed ? narrowed.design.filter((c) => c.designerId === null).length : 0, tab: rawTab ? tab : undefined })} />
+      {board ? (
+        <form method="get" action="/studio/design" className="hstack" style={{ flexWrap: 'wrap', gap: 8 }} aria-label="Sort and filter" data-testid="board-view">
+          <input type="hidden" name="tab" value={tab} />
+          {picked ? <input type="hidden" name="designer" value={picked} /> : null}
+          <label className="hstack sm" style={{ gap: 6 }}>
+            <span className="muted">Sort</span>
+            <select name="sort" defaultValue={view.sort} className="fld" style={{ width: 'auto', minHeight: 32 }}>
+              {Object.entries(BOARD_SORTS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="hstack sm" style={{ gap: 6 }}>
+            <span className="muted">Category</span>
+            <select name="cat" defaultValue={view.cat ?? ''} className="fld" style={{ width: 'auto', minHeight: 32 }}>
+              <option value="">All</option>
+              {Object.entries(BOARD_CATEGORIES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="hstack sm" style={{ gap: 6 }}>
+            <span className="muted">Show</span>
+            <select name="show" defaultValue={view.show ?? ''} className="fld" style={{ width: 'auto', minHeight: 32 }}>
+              <option value="">Every project</option>
+              {Object.entries(BOARD_SHOWS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn sec sm">
+            Apply
+          </button>
+          {!isDefaultView(view) ? (
+            <Link href={`/studio/design?tab=${tab}${picked ? `&designer=${encodeURIComponent(picked)}` : ''}`} className="btn ghost sm">
+              Clear
+            </Link>
+          ) : null}
+        </form>
+      ) : null}
       {choices.length > 1 ? (
         <nav aria-label="Projects by designer" className="hstack" style={{ flexWrap: 'wrap', gap: 8 }} data-testid="designer-filter">
           <span className="muted sm">Designer:</span>
-          <Link href={`/studio/design?tab=${tab}`} className={`chip${picked ? '' : ' good'}`} aria-current={picked ? undefined : 'true'}>
+          <Link href={`/studio/design?tab=${tab}${viewQ}`} className={`chip${picked ? '' : ' good'}`} aria-current={picked ? undefined : 'true'}>
             Everyone
           </Link>
           {choices.map((c) => (
-            <Link key={c.id} href={`/studio/design?tab=${tab}&designer=${encodeURIComponent(c.id)}`} className={`chip${picked === c.id ? ' good' : ''}`} aria-current={picked === c.id ? 'true' : undefined}>
+            <Link key={c.id} href={`/studio/design?tab=${tab}&designer=${encodeURIComponent(c.id)}${viewQ}`} className={`chip${picked === c.id ? ' good' : ''}`} aria-current={picked === c.id ? 'true' : undefined}>
               {c.name} · {c.projects}
             </Link>
           ))}
         </nav>
       ) : null}
-      {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} keep={picked ? `&designer=${encodeURIComponent(picked)}` : ''} /> : null}
+      {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} keep={`${picked ? `&designer=${encodeURIComponent(picked)}` : ''}${viewQ}`} /> : null}
       {/* The designers' load (Phase 2): owner and PM, under Design. */}
       {w && !mine && tab === 'design' ? (
         <>
