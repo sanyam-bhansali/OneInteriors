@@ -73,7 +73,7 @@ export function QuotePlanUpload({ clientId, leadName }: { clientId: string | nul
       <section className="card" aria-label="Upload a floor plan" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label className="muted sm" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           Note for the quotation (optional)
-          <textarea className="fld" rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Any specific requirement that comes with this plan" disabled={busy} />
+          <textarea className="fld" rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Any specific requirement that comes with this plan" disabled={busy} />
         </label>
         <label className="btn sec sm" style={{ alignSelf: 'flex-start', cursor: busy ? 'progress' : 'pointer' }}>
           {busy ? 'Uploading…' : plans && plans.length > 0 ? 'Upload another floor plan' : 'Upload floor plan (image or PDF)'}

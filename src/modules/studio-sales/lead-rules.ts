@@ -210,7 +210,34 @@ export function editSummary(changed: readonly string[]): string | null {
   return `Changed ${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
 
-/** The note typed with a floor plan (owner, 19 Nov 2026): one line, at most 300 characters, or nothing. */
+/**
+ * A note's guard, not a limit: the owner (20 Nov 2026) wants no word limit
+ * on the note with a floor plan, so nobody types into this; it only stops a
+ * pasted document from being stored as a note.
+ */
+export const PLAN_NOTE_GUARD = 10_000;
+
+/** A long note on one line, for the lead's history: the first 200 characters, line breaks as spaces. The whole note stays with the plan. */
+export function clipLine(note: string, max = 200): string {
+  const one = note.replace(/\s+/g, ' ').trim();
+  return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
+}
+
+/**
+ * The note typed with a floor plan (owner, 19 Nov 2026; no word limit, 20 Nov
+ * 2026), or nothing. Line breaks are kept, so a list of requirements stays a
+ * list; spaces inside a line, and blank lines beyond one, are tidied.
+ */
 export function planNote(v: unknown): string | null {
-  return typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, 300) || null : null;
+  if (typeof v !== 'string') return null;
+  const t = v
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, PLAN_NOTE_GUARD)
+    .trim();
+  return t || null;
 }

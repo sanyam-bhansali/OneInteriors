@@ -44,7 +44,7 @@ export function PlanViewer({ plans, leadName, empty }: { plans: LeadPlan[]; lead
         </span>
       </div>
       {plan.note ? (
-        <p className="qnote hplannote" data-testid="plan-note">
+        <p className="qnote hplannote" data-testid="plan-note" style={{ whiteSpace: 'pre-wrap' }}>
           <b>Note with the plan:</b> {plan.note}
         </p>
       ) : null}

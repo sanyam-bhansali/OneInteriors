@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { planNote } from '@/modules/studio-sales/lead-rules';
+import { PLAN_NOTE_GUARD, clipLine, planNote } from '@/modules/studio-sales/lead-rules';
 import { computeTotals } from '@/modules/studio-quote/pricing';
 
 /**
@@ -12,12 +12,23 @@ import { computeTotals } from '@/modules/studio-quote/pricing';
 const read = (p: string) => readFileSync(p, 'utf8');
 
 describe('the note with a floor plan', () => {
-  it('is one tidy line of at most 300 characters, or nothing', () => {
-    expect(planNote('  no loft in\n kids room  ')).toBe('no loft in kids room');
+  it('has no word limit (owner, 20 Nov 2026), keeps its lines, and is tidied', () => {
+    expect(planNote('  no loft in   kids room  ')).toBe('no loft in kids room');
+    expect(planNote('No loft in kids room\r\n\r\n\r\n  Bar unit   in living  \nBudget near 8 lakh')).toBe('No loft in kids room\n\nBar unit in living\nBudget near 8 lakh');
     expect(planNote('   ')).toBeNull();
     expect(planNote(undefined)).toBeNull();
     expect(planNote(42)).toBeNull();
-    expect(planNote('x'.repeat(400))).toHaveLength(300);
+    // Well past the old 300 characters, kept whole.
+    expect(planNote('word '.repeat(600).trim())).toHaveLength(2999);
+    // Only a pasted document is stopped.
+    expect(planNote('x'.repeat(PLAN_NOTE_GUARD + 50))).toHaveLength(PLAN_NOTE_GUARD);
+  });
+  it('the boxes have no character limit, and a long note shows with its lines', () => {
+    for (const f of ['src/app/studio/clients/[id]/SalesPanels.tsx', 'src/app/studio/quotations/first/FirstQuote.tsx', 'src/app/studio/quotations/[id]/QuotePlanUpload.tsx']) {
+      expect(read(f), f).not.toMatch(/maxLength=\{300\}/);
+    }
+    expect(read('src/modules/studio-quote/quote-request-store.ts')).toMatch(/const note = planNote\(input\.note\);/);
+    expect(clipLine('a '.repeat(300))).toHaveLength(200);
   });
   it('is kept on the file and handed to the quotation request', () => {
     const src = read('src/modules/studio-sales/leads.ts');

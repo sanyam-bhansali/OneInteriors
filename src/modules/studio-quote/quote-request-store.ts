@@ -24,6 +24,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { notify } from '@/modules/notify/service';
 import { record } from '@/modules/studio-practice/events';
+import { planNote } from '@/modules/studio-sales/lead-rules';
 import {
   ACTIVE_REQUEST_STATUSES,
   nextInTurn,
@@ -91,7 +92,8 @@ export async function openQuoteRequest(input: OpenRequestInput): Promise<OpenReq
     if (stale) return { ok: false, error: `${stale.replace(/\.$/, '')}, so there is no quotation to build.` };
     await settleStale(studioId);
 
-    const note = typeof input.note === 'string' ? input.note.trim().replace(/\s+/g, ' ').slice(0, 300) || null : null;
+    /* No word limit (owner, 20 Nov 2026): the same tidying as the floor plan's note. */
+    const note = planNote(input.note);
     const fileId = typeof input.fileId === 'string' && input.fileId ? input.fileId : null;
 
     const run = () =>

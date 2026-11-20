@@ -31,6 +31,7 @@ import { leadFileExists, leadUploadTicket, removeLeadFiles, signedLeadFileLinks 
 import {
   budgetText,
   checkLeadFile,
+  clipLine,
   planNote,
   cleanFileName,
   editSummary,
@@ -419,7 +420,7 @@ export async function attachLeadFile(input: {
       note,
     },
   });
-  await record({ studioId, clientId: found.lead.id, kind: 'FILE', summary: kind === 'FLOOR_PLAN' ? `Floor plan attached: ${name}${note ? `. Note: ${note}` : ''}` : `File attached: ${name}` });
+  await record({ studioId, clientId: found.lead.id, kind: 'FILE', summary: kind === 'FLOOR_PLAN' ? `Floor plan attached: ${name}${note ? `. Note: ${clipLine(note)}` : ''}` : `File attached: ${name}` });
   /* Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
      a floor plan makes the lead's request (or joins the open one), handed to
      whoever builds quotations next in turn. Never fails the attach. */
