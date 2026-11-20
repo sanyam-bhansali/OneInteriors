@@ -32,7 +32,7 @@ import { record } from '@/modules/studio-practice/events';
 import { notify, notifyStudio } from '@/modules/notify/service';
 import { readRevisionLines, readRevisionTerms, revisionLabel } from './revision-rules';
 import { QUOTE_FOR_REVISION, markSalesFinal, restoreRevision, sameAsRevision } from './revisions';
-import { readStages, scheduleAmounts, templateOrDefault } from './payment-template';
+import { projectStages, readStages, scheduleAmounts, templateOrDefault } from './payment-template';
 import { queueConversions } from './conversions';
 import { bookingRefusal } from './booking-rules';
 import { BOOKING_QUOTE, factsFor, firstWonStage } from './booking';
@@ -208,7 +208,7 @@ export async function convertLead(input: { clientId: unknown; quoteId: unknown; 
     {
       leadChecked: true,
       contractPaise: contract,
-      stages: amounts.stages.map((s) => ({ label: s.label, pct: null, amountPaise: s.amountPaise })),
+      stages: projectStages(amounts.stages),
       onCreated: async (tx, project) => {
         /* The handover is what the design tab reads as "From sales" (studio-design/store.ts). */
         await tx.studioQuote.updateMany({ where: { id: q.id, studioId }, data: { salesFinalNotes: handover.value } });

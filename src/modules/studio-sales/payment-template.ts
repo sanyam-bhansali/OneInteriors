@@ -195,6 +195,17 @@ export function scheduleAmounts(stages: readonly PaymentStage[], contractPaise: 
   };
 }
 
+/**
+ * The stages as a project stores them (`HomeProject.paymentPhases`), keeping
+ * each stage's percentage. Marking the Design Final final re-splits on them
+ * (studio-design/restage.ts): without the percentages every stage, the
+ * booking advance too, was scaled to the new total (owner, 20 Nov 2026:
+ * "booking advance 25000").
+ */
+export function projectStages(stages: readonly ScheduledStage[]): { label: string; pct: number | null; amountPaise: Paise }[] {
+  return stages.map((s) => ({ label: s.label, pct: s.kind === 'PCT' ? s.pct : null, amountPaise: s.amountPaise }));
+}
+
 /** The booking advance: the first stage, which is what is paid to book. */
 export function bookingStage(stages: readonly PaymentStage[]): PaymentStage | null {
   return stages[0] ?? null;
