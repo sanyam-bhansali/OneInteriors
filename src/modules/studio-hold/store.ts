@@ -10,6 +10,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { memberOnProject } from '@/modules/studio/access';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
+import { notify } from '@/modules/notify/service';
 import { shiftStepsWithStage } from '@/modules/project/stage-settle';
 import type { RuleStage, StageKind } from '@/modules/project/project-rules';
 import { dayFromDb, dayToDb, istDay } from '@/modules/project/working-days';
@@ -102,6 +103,7 @@ export async function askHold(projectId: string, input: { reason: unknown; note:
     });
     await recordEvent(tx, { projectId, type: approver ? 'project.hold_started' : 'project.hold_asked', actor, refId: row.id, payload: { reason: ok.reason }, at: now });
   });
+  if (!approver) await tellApprovers(member.studioId, member.userId, projectId, HOLD_REASONS[ok.reason]);
   return { ok: true, message: approver ? 'The project is on hold from today. Nothing counts as late until you take it off.' : 'Asked. The design head or the owner approves it; until then the project runs as usual.' };
 }
 
@@ -118,7 +120,47 @@ export async function decideHold(projectId: string, holdId: string, approve: boo
   });
   if (count !== 1) return { ok: false, error: 'That hold is not waiting for approval any more. Reload the page.' };
   await recordEvent(prisma, { projectId, type: approve ? 'project.hold_started' : 'project.hold_declined', actor: { type: 'STUDIO', id: member.userId }, refId: holdId, payload: {}, at: now });
+  await tellAsker(holdId, member.userId, projectId, approve);
   return { ok: true, message: approve ? 'Approved: the project is on hold from today.' : 'Declined: the project runs as usual.' };
+}
+
+async function namesFor(projectId: string, userId: string): Promise<{ client: string; by: string }> {
+  const [p, u] = await Promise.all([
+    prisma.homeProject.findUnique({ where: { id: projectId }, select: { introduction: { select: { brief: { select: { contactName: true, user: { select: { name: true } } } } } } } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+  ]);
+  const b = p?.introduction.brief;
+  return { client: b?.contactName?.trim() || b?.user?.name?.trim() || 'A client', by: u?.name?.trim() || 'Someone' };
+}
+
+/**
+ * A hold asked (owner, 20 Nov 2026: "head isn't told"): the design heads and
+ * the owner hear it, in the app and by email, never the one who asked. Never
+ * fails the ask.
+ */
+async function tellApprovers(studioId: string, askerId: string, projectId: string, reason: string): Promise<void> {
+  try {
+    const approvers = await prisma.studioMember.findMany({
+      where: { studioId, status: 'ACTIVE', userId: { not: askerId }, OR: [{ role: 'OWNER' }, { role: 'DESIGNER', designHead: true }] },
+      select: { userId: true },
+    });
+    const { client, by } = await namesFor(projectId, askerId);
+    await Promise.all(approvers.map((a) => notify(a.userId, { kind: 'hold-asked', projectId, client, by, reason }, { email: true })));
+  } catch (error) {
+    console.error('[hold] approvers not told', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
+/** Approved or declined: the one who asked hears it. Never fails the decision. */
+async function tellAsker(holdId: string, deciderId: string, projectId: string, approved: boolean): Promise<void> {
+  try {
+    const hold = await prisma.homeProjectHold.findUnique({ where: { id: holdId }, select: { askedById: true } });
+    if (!hold || hold.askedById === deciderId) return;
+    const { client, by } = await namesFor(projectId, deciderId);
+    await notify(hold.askedById, { kind: 'hold-decided', projectId, client, by, approved }, { email: true });
+  } catch (error) {
+    console.error('[hold] asker not told', error instanceof Error ? error.name : 'unknown');
+  }
 }
 
 /** The one who asked withdraws a hold not approved yet. */

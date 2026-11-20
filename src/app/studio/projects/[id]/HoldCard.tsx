@@ -33,7 +33,7 @@ export function HoldCard({ view, customer }: { view: HoldView; customer: string 
   if (!o && !view.canAsk && !message) return null;
 
   return (
-    <section aria-label="On hold" className={`card flex flex-col gap-2 p-4 ${o?.status === 'ON' ? 'border border-[var(--warn)] bg-[var(--warn-bg)]' : ''}`} data-testid="hold-card">
+    <section id="hold" aria-label="On hold" className={`card flex flex-col gap-2 p-4 ${o?.status === 'ON' ? 'border border-[var(--warn)] bg-[var(--warn-bg)]' : ''}`} data-testid="hold-card">
       {o?.status === 'ON' ? (
         <>
           <p className="m-0 text-[15px] font-semibold text-[var(--warn)]">
@@ -53,11 +53,17 @@ export function HoldCard({ view, customer }: { view: HoldView; customer: string 
         </>
       ) : o?.status === 'ASKED' ? (
         <>
-          <p className="m-0 text-[14.5px] font-semibold">
-            Hold asked by {o.askedBy} on {dayWords(o.askedOn)}: {o.reason}
+          {/* Not on hold yet (owner, 20 Nov 2026: "the project gunjan asked shows directly on hold"): say so first. */}
+          <p className="m-0 text-[14.5px] font-semibold">Not on hold yet · waiting for approval</p>
+          <p className="m-0 text-[13.5px]">
+            {o.askedBy} asked on {dayWords(o.askedOn)}: {o.reason}
           </p>
           {o.note ? <p className={`m-0 ${muted}`}>Team note: {o.note}</p> : null}
-          <p className={`m-0 ${muted}`}>{view.canApprove ? 'Approve it and the hold starts today.' : 'Waiting for the design head or the owner to approve. Until then the project runs as usual.'}</p>
+          <p className={`m-0 ${muted}`}>
+            {view.canApprove
+              ? 'Approve it and the hold starts today. Until then the project runs as usual and its dates still count.'
+              : 'The design head or the owner approves it; they have been told. Until then the project runs as usual and its dates still count.'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {view.canApprove ? (
               <>

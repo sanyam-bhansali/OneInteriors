@@ -39,6 +39,7 @@ import { ledgerFromRows } from '@/modules/project/snag-window-store';
 import { eventsOrLegacy, snagStatus } from '@/modules/project/snag-status';
 import { addDays, calendarOf, dayFromDb, dayToDb, isWorkingDay, istDay, istMinutesOfDay } from '@/modules/project/working-days';
 import { chainLocks } from '@/modules/studio-design/rules';
+import { HOLD_REASONS, isHoldReason, mayApproveHold } from '@/modules/studio-hold/rules';
 import { meetingLabel } from '@/modules/studio-sales/lead-rules';
 import { openTasksDue } from '@/modules/studio-sales/tasks';
 import { buildToday, istDayBounds, type TodaySection } from '@/modules/studio-sales/today-rules';
@@ -357,6 +358,50 @@ async function changeOrderWork(m: WorkMember, me: Me): Promise<WorkSource[]> {
   }
 }
 
+/**
+ * Holds waiting for approval (owner, 20 Nov 2026: "designer can ask for hold
+ * and then design head approves it ... head isn't told"): for the owner and
+ * the design head, every project of the studio with a hold asked. Due the day
+ * it was asked, so it reads as Today and then Missed until decided.
+ */
+async function holdWork(m: WorkMember & { designHead?: boolean | null }): Promise<WorkSource[]> {
+  if (!mayApproveHold(m)) return [];
+  try {
+    const rows = await prisma.homeProjectHold.findMany({
+      where: { status: 'ASKED', project: { cancelledAt: null, introduction: { studioId: m.studioId } } },
+      orderBy: { askedAt: 'asc' },
+      take: 50,
+      select: {
+        id: true,
+        reason: true,
+        askedById: true,
+        askedAt: true,
+        projectId: true,
+        project: { select: { introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } } } } } },
+      },
+    });
+    const ids = [...new Set(rows.map((r) => r.askedById))];
+    const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
+    const nameOf = new Map(users.map((u) => [u.id, u.name?.trim() || 'A designer']));
+    return rows.map((r) => {
+      const b = r.project.introduction.brief;
+      const reason = isHoldReason(r.reason) ? HOLD_REASONS[r.reason] : r.reason;
+      return {
+        key: `hold:${r.id}`,
+        kind: 'hold' as const,
+        title: `Hold asked: ${reason}`,
+        place: `${b.contactName?.trim() || b.user?.name?.trim() || 'Client'} · ${siteLabel(b)}`,
+        due: istDay(r.askedAt),
+        detail: `${nameOf.get(r.askedById) ?? 'A designer'} asks · approve or decline`,
+        href: `/studio/projects/${r.projectId}#hold`,
+      };
+    });
+  } catch (error) {
+    console.error('[my-work] holds read failed', error instanceof Error ? error.name : 'unknown');
+    return [];
+  }
+}
+
 export interface WorkRun {
   work: MyWork;
   /** Every source before the lists were cut (the reminders read these). */
@@ -374,12 +419,13 @@ export async function workFor(m: WorkMember, now = new Date()): Promise<WorkRun 
       console.error(`[my-work] ${what} read failed`, error instanceof Error ? error.name : 'unknown');
       return empty;
     });
-  const [projects, leads, extras] = await Promise.all([
+  const [projects, leads, extras, holds] = await Promise.all([
     safe(projectWork(m, me, now, today), [] as WorkSource[], 'projects'),
     safe(leadWork(m, now), { sources: [] as WorkSource[], hidden: {} }, 'leads'),
     changeOrderWork(m, me),
+    holdWork(m),
   ]);
-  const sources = [...projects, ...extras, ...leads.sources];
+  const sources = [...holds, ...projects, ...extras, ...leads.sources];
   return { work: buildMyWork(sources, today, { hidden: leads.hidden }), sources };
 }
 
@@ -402,6 +448,8 @@ async function people() {
       userId: true,
       role: true,
       status: true,
+      /* The design head approves holds (holdWork). */
+      designHead: true,
       studio: { select: { tradeName: true, fullSoftware: true, softwarePlan: true } },
       user: { select: { email: true, name: true, phone: true } },
     },
