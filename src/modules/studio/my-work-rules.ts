@@ -31,6 +31,7 @@ import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
 
 export type WorkKind =
   | 'design'
+  | 'hold'
   | 'step'
   | 'payment'
   | 'decision'
@@ -48,6 +49,7 @@ export const KIND_TITLE: Record<WorkKind, string> = {
   site: 'Site updates',
   step: 'Site steps',
   design: 'Design steps',
+  hold: 'Holds to approve',
   snag: 'Snags',
   decision: 'Client decisions',
   payment: 'Payments',
@@ -59,7 +61,7 @@ export const KIND_TITLE: Record<WorkKind, string> = {
   task: 'Tasks',
 };
 
-export const KIND_ORDER: readonly WorkKind[] = ['design', 'site', 'step', 'snag', 'decision', 'payment', 'closure', 'change-order', 'sign-off', 'meeting', 'follow-up', 'task'];
+export const KIND_ORDER: readonly WorkKind[] = ['hold', 'design', 'site', 'step', 'snag', 'decision', 'payment', 'closure', 'change-order', 'sign-off', 'meeting', 'follow-up', 'task'];
 
 /** One thing to do, before it is placed in a list. */
 export interface WorkSource {
