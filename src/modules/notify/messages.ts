@@ -77,7 +77,11 @@ export type ProjectEvent =
   | { kind: 'quote-request-done'; clientId: string; name: string; by: string | null; number: string | null }
   // Office meetings (owner, 27 Oct 2026; docs/studio-os/OFFICE-MEETINGS.md), to studio staff only, never a customer:
   // asked to one, an answer to the organiser, the meeting moved or cancelled.
-  | { kind: 'office-meeting'; what: 'asked' | 'accepted' | 'proposed' | 'moved' | 'cancelled'; by: string; meetingId: string; title: string; when: string };
+  | { kind: 'office-meeting'; what: 'asked' | 'accepted' | 'proposed' | 'moved' | 'cancelled'; by: string; meetingId: string; title: string; when: string }
+  // A project hold (owner, 20 Nov 2026: "head isn't told"), studio staff only: asked, to the design head and the owner;
+  // approved or declined, back to the one who asked.
+  | { kind: 'hold-asked'; projectId: string; client: string; by: string; reason: string }
+  | { kind: 'hold-decided'; projectId: string; client: string; by: string; approved: boolean };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer'];
@@ -429,5 +433,19 @@ export function messageFor(e: ProjectEvent): Message {
         url: `/studio/calendar/meetings#m-${e.meetingId}`,
       };
     }
+    case 'hold-asked':
+      return {
+        template: 'hold.asked',
+        title: `${e.by} asks to put ${e.client} on hold`,
+        body: clip(`${e.reason}. Approve or decline it on the project.`, 160),
+        url: `/studio/projects/${e.projectId}#hold`,
+      };
+    case 'hold-decided':
+      return {
+        template: e.approved ? 'hold.approved' : 'hold.declined',
+        title: e.approved ? `${e.client} is on hold` : `Hold declined for ${e.client}`,
+        body: e.approved ? `${e.by} approved it. Nothing counts as late until it is taken off.` : `${e.by} declined it. The project runs as usual.`,
+        url: `/studio/projects/${e.projectId}#hold`,
+      };
   }
 }
