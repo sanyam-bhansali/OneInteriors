@@ -11,6 +11,7 @@ import {
   holidayWorkPaidDays,
   leaveBalance,
   mayMarkHalfDay,
+  mayManageHolidays,
   typeOfLeave,
   type CountedLeave,
 } from '@/modules/studio-leave/rules';
@@ -147,6 +148,23 @@ describe('half days', () => {
     expect(mayMarkHalfDay({ role: 'SALES' }, 'REP')).toBe(false);
     expect(mayMarkHalfDay({ role: 'DESIGNER', designHead: false }, null)).toBe(false);
     expect(mayMarkHalfDay({ role: 'PM' }, null)).toBe(false);
+  });
+});
+
+/* Owner, 21 Nov 2026: "admin should have an option to mark any day as holiday on the calendar". */
+describe('marking holidays', () => {
+  it('the owner, the design head and a sales admin keep the holiday list; a sales head or rep does not', () => {
+    expect(mayManageHolidays({ role: 'OWNER' }, null)).toBe(true);
+    expect(mayManageHolidays({ role: 'DESIGNER', designHead: true }, null)).toBe(true);
+    expect(mayManageHolidays({ role: 'SALES' }, 'ADMIN')).toBe(true);
+    expect(mayManageHolidays({ role: 'SALES' }, 'HEAD')).toBe(false);
+    expect(mayManageHolidays({ role: 'SALES' }, 'REP')).toBe(false);
+  });
+
+  it('the month grid offers it on every day', () => {
+    const ui = readFileSync('src/app/studio/calendar/leave/LeaveUi.tsx', 'utf8');
+    expect(ui).toContain('view.canMarkHoliday ?');
+    expect(ui).toContain('addHolidayAction(d, name)');
   });
 });
 

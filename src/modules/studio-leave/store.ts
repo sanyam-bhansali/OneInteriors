@@ -24,6 +24,7 @@ import {
   checkLeaveAsk,
   countLeave,
   mayMarkHalfDay,
+  mayManageHolidays,
   LEAVE_TYPES,
   allowanceStart,
   ALLOWANCE_FROM,
@@ -182,7 +183,7 @@ async function applyHoliday(studioId: string, day: string, name: string, byId: s
 
 async function saveHolidays(rows: { day: string; name: string }[], now: Date): Promise<LeaveResult> {
   const member = await currentMember();
-  if (!writer(member) || !mayApproveHold(member)) return { ok: false, error: NOT_ALLOWED };
+  if (!writer(member) || !mayManageHolidays(member, await salesSystemOf(member.id))) return { ok: false, error: NOT_ALLOWED };
   if (rows.length === 0) return { ok: false, error: 'Add at least one holiday.' };
   const existing = new Set((await prisma.studioHoliday.findMany({ where: { studioId: member.studioId }, select: { day: true } })).map((h) => dayFromDb(h.day)));
   for (const r of rows) {
@@ -222,7 +223,7 @@ export async function addHolidayList(text: unknown, now = new Date()): Promise<L
 /** Takes a holiday off the list. Nothing moves back (owner's rule, 13 Nov 2026): the dates it moved stay. */
 export async function removeHoliday(day: unknown): Promise<LeaveResult> {
   const member = await currentMember();
-  if (!writer(member) || !mayApproveHold(member)) return { ok: false, error: NOT_ALLOWED };
+  if (!writer(member) || !mayManageHolidays(member, await salesSystemOf(member.id))) return { ok: false, error: NOT_ALLOWED };
   if (!isDay(day)) return { ok: false, error: 'That holiday is not on the list. Reload the page.' };
   const { count } = await prisma.studioHoliday.deleteMany({ where: { studioId: member.studioId, day: dayToDb(day) } });
   if (count === 0) return { ok: false, error: 'That holiday is not on the list any more. Reload the page.' };
@@ -272,6 +273,8 @@ export interface LeaveView {
   canAsk: boolean;
   /** The owner, the design head or a sales head: may mark someone's half day (owner, 21 Nov 2026). */
   canMarkHalfDay: boolean;
+  /** The owner, the design head or a sales admin: may mark any day as a holiday on the calendar. */
+  canMarkHoliday: boolean;
   meId: string;
   /** For an approver entering leave for someone. */
   team: { id: string; name: string }[];
@@ -327,7 +330,8 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
   ]);
   if (!studio) return null;
   const cal = calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays });
-  const marker = mayMarkHalfDay(member, await salesSystemOf(member.id));
+  const salesSystem = await salesSystemOf(member.id);
+  const marker = mayMarkHalfDay(member, salesSystem);
   /* Holiday work (owner, 21 Nov 2026) shares the table but is never leave. */
   const leaves = allRows.filter((l) => l.type !== HOLIDAY_WORK);
   const workRows = allRows.filter((l) => l.type === HOLIDAY_WORK);
@@ -405,6 +409,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
     canApprove: writer(member) && approver,
     canAsk: writer(member),
     canMarkHalfDay: writer(member) && marker,
+    canMarkHoliday: writer(member) && mayManageHolidays(member, salesSystem),
     meId: member.id,
     team: approver || marker ? members.map((m) => ({ id: m.id, name: m.user.name?.trim() || 'Someone' })).sort((a, b) => a.name.localeCompare(b.name)) : [],
     kinds: (Object.keys(LEAVE_KINDS) as LeaveKind[]).map((key) => ({ key, label: LEAVE_KINDS[key] })),

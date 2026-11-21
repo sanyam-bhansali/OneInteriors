@@ -232,6 +232,11 @@ export interface CountedLeave {
   halfDay?: boolean;
 }
 
+/** Who keeps the holiday list (owner, 21 Nov 2026: "admin should have an option to mark any day as holiday"): the owner, the design head, a sales admin. */
+export function mayManageHolidays(m: { role: string; designHead?: boolean | null }, salesSystem: string | null | undefined): boolean {
+  return m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true) || (m.role === 'SALES' && salesSystem === 'ADMIN');
+}
+
 /** Who may mark a half day (owner, 21 Nov 2026: "for sales head and design head"): the owner, the design head, a sales head or admin. */
 export function mayMarkHalfDay(m: { role: string; designHead?: boolean | null }, salesSystem: string | null | undefined): boolean {
   return m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true) || (m.role === 'SALES' && (salesSystem === 'HEAD' || salesSystem === 'ADMIN'));

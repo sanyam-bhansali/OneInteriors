@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { dayWords, muted } from '../../vendors/format';
 import type { LeaveRowView, LeaveView } from '@/modules/studio-leave/store';
 import { askHolidayWorkAction, askLeaveAction, decideLeaveAction, withdrawLeaveAction } from './actions';
+import { addHolidayAction, removeHolidayAction } from '../../settings/holidays/actions';
 import { Message, useRun } from './run';
 
 const STATUS_CHIP: Record<LeaveRowView['status'], string> = { ASKED: 'chip warn', APPROVED: 'chip good', DECLINED: 'chip', WITHDRAWN: 'chip' };
@@ -345,8 +346,21 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** The month, Monday first: holidays, the weekly day off, and who is on leave (waiting leave dashed). */
 export function MonthGrid({ view }: { view: LeaveView }) {
+  const router = useRouter();
+  const { pending, message, run } = useRun();
+  const refresh = () => router.refresh();
+  /* Owner, 21 Nov 2026: "admin should have an option to mark any day as holiday on the calendar". */
+  const mark = (d: string) => {
+    const name = window.prompt(`Holiday on ${dayWords(d)}: what is it called?`, 'Holiday');
+    if (name === null) return;
+    run(() => addHolidayAction(d, name), refresh);
+  };
+  const unmark = (d: string, name: string) => {
+    if (window.confirm(`Take ${name} off the list? Design dates it moved stay where they are.`)) run(() => removeHolidayAction(d), refresh);
+  };
   return (
     <div className="card overflow-x-auto p-2">
+      <Message m={message} />
       <table className="w-full table-fixed border-collapse text-[12.5px]" aria-label="Leave and holidays this month">
         <thead>
           <tr>
@@ -368,6 +382,17 @@ export function MonthGrid({ view }: { view: LeaveView }) {
                   <td key={d} className={`h-[4.5rem] border border-[var(--line)] p-1 align-top ${closed ? 'bg-[var(--soft)]' : ''}`} aria-current={d === view.today ? 'date' : undefined}>
                     <div className={`text-[12px] ${d === view.today ? 'font-semibold' : 'muted'}`}>{Number(d.slice(8))}</div>
                     {info?.holiday ? <div className="truncate font-medium text-[var(--warn)]">{info.holiday}</div> : info?.off ? <div className="muted">Day off</div> : null}
+                    {view.canMarkHoliday ? (
+                      info?.holiday ? (
+                        <button type="button" className="text-[11.5px] underline muted" disabled={pending} onClick={() => unmark(d, info.holiday!)}>
+                          Not a holiday
+                        </button>
+                      ) : (
+                        <button type="button" className="text-[11.5px] underline muted" disabled={pending} onClick={() => mark(d)}>
+                          Mark holiday
+                        </button>
+                      )
+                    ) : null}
                     {(info?.leave ?? []).map((l, i) => (
                       <div key={i} className={`truncate rounded px-1 ${l.status === 'APPROVED' ? 'bg-[var(--soft)]' : 'border border-dashed border-[var(--line)]'}`} title={l.status === 'APPROVED' ? `${l.who}: on leave` : `${l.who}: asked, waiting`}>
                         {l.who}
