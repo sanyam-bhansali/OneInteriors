@@ -11,7 +11,7 @@ import {
   trackerToPlan,
   type PlanQuoteLine,
 } from '@/modules/portal/quote-to-plan';
-import { EXECUTION_DAYS, STEP_TEMPLATE, executionSheetDays, templateFor } from '@/modules/project/step-template';
+import { EXECUTION_DAYS, STEP_TEMPLATE, templateFor } from '@/modules/project/step-template';
 import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { STARTER_CATALOGUE } from '@/modules/studio-quote/starter-catalogue';
 import { computeTotals } from '@/modules/studio-quote/pricing';
