@@ -22,6 +22,7 @@ import { TotalsTable } from './HTotals';
 import { AddLine, DiscountPicker, FinalCompare, ProposeForm, Sec } from './HPanels';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { CLIENT_TITLES, titleOf, withTitle, withoutTitle } from '@/modules/studio-quote/client-title';
+import { docStages } from '@/modules/studio-quote/document';
 import { QuotePlanUpload } from './QuotePlanUpload';
 
 /**
@@ -203,6 +204,12 @@ export function QuoteBuilder({
         phases: live.phases,
       }),
     [priced, live],
+  );
+  /* A design quotation's stages as the PDF prints them and the project is
+     restaged on it (owner, 21 Nov 2026): the Design Final rule. */
+  const designStages = useMemo(
+    () => (doc?.schedule && doc.salesTotalPaise ? docStages(doc.schedule, totals, doc.salesTotalPaise).map((s) => ({ label: s.label, amountPaise: s.amountPaise })) : null),
+    [doc, totals],
   );
   /* Hauspire's "Original" for the Final tab: the quotation as it was
      opened, until "Snapshot current as Original" (22 Oct 2026). A Design
@@ -825,6 +832,7 @@ export function QuoteBuilder({
                 onDiscountPct={(v) => setTerms({ ...terms, discountPct: v })}
                 ownSchedule={(quote.phases?.length ?? 0) > 0}
                 readOnly={locked}
+                stages={designStages}
               />
             </fieldset>
           </>

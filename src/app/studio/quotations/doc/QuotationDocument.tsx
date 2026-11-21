@@ -68,6 +68,8 @@ export interface QuotationDocProps {
   onSpotLabel: string | null;
   /** The studio's payment stages with their end deliverables; null uses `totals.stages`. */
   schedule: PaymentStage[] | null;
+  /** A design quotation's sales final total: its stages follow the Design Final rule. */
+  salesTotalPaise?: number | null;
   spec: DocSpecRow[];
   terms: string | null;
   welcomeNote?: string | null;
@@ -276,7 +278,7 @@ export function QuotationDocument(props: QuotationDocProps) {
           </div>
         ))}
 
-        <DocSummary rooms={rooms} studio={studio} totals={totals} feeBps={props.feeBps} discountBps={props.discountBps} gstBps={props.gstBps} onSpotLabel={props.onSpotLabel} schedule={props.schedule} spec={props.spec} />
+        <DocSummary rooms={rooms} studio={studio} totals={totals} feeBps={props.feeBps} discountBps={props.discountBps} gstBps={props.gstBps} onSpotLabel={props.onSpotLabel} schedule={props.schedule} salesTotalPaise={props.salesTotalPaise ?? null} spec={props.spec} />
 
         {props.extra}
 
@@ -316,6 +318,7 @@ export function DocSummary({
   gstBps,
   onSpotLabel,
   schedule,
+  salesTotalPaise = null,
   spec,
   compare = null,
 }: {
@@ -327,13 +330,14 @@ export function DocSummary({
   gstBps: number;
   onSpotLabel: string | null;
   schedule: PaymentStage[] | null;
+  salesTotalPaise?: number | null;
   spec: DocSpecRow[];
   /** The Final (Original vs Revised): the initial and final value under the totals (owner, 14 Nov 2026). */
   compare?: { initialLabel: string; initialPaise: number; finalLabel: string; finalPaise: number } | null;
 }) {
   const shares = roomShares(rooms);
   const palette = donutPalette(studio?.accentHex ?? null, shares.length);
-  const stages = docStages(schedule, totals);
+  const stages = docStages(schedule, totals, salesTotalPaise);
   const gstOn = totals.gstPaise > 0;
   return (
     <>

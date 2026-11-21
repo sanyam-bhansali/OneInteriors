@@ -13,7 +13,8 @@
  * amounts from `scheduleAmounts` (payment-template.ts).
  */
 
-import { scheduleAmounts, type PaymentStage } from '@/modules/studio-sales/payment-template';
+import { projectStages, scheduleAmounts, type PaymentStage } from '@/modules/studio-sales/payment-template';
+import { restageOnTotal } from '@/modules/studio-design/restage';
 import { BOOKING_DETAIL, HAUSPIRE_STAGES, type QuoteTotals, type QuoteUnitName, type WorkCodeName } from './pricing';
 import { discountedPaise, orderedRooms } from './rooms';
 
@@ -192,11 +193,12 @@ export interface DocStage {
  * there is no schedule, or it cannot split this total (the fixed amounts are
  * more than the whole), the stages `computeTotals` already worked out.
  */
-export function docStages(schedule: readonly PaymentStage[] | null, totals: Pick<QuoteTotals, 'totalPaise' | 'stages'>): DocStage[] {
+export function docStages(schedule: readonly PaymentStage[] | null, totals: Pick<QuoteTotals, 'totalPaise' | 'stages'>, salesTotalPaise: number | null = null): DocStage[] {
   if (schedule && schedule.length > 0 && totals.totalPaise > 0) {
     const split = scheduleAmounts(schedule, totals.totalPaise);
     if (split.ok) {
-      return split.stages.map((s) => {
+      const amounts = designFinalAmounts(schedule, totals.totalPaise, salesTotalPaise) ?? split.stages.map((s) => s.amountPaise);
+      return split.stages.map((s, i) => {
         const words = hauspireWords(s.label, s.note);
         return {
           label:
@@ -206,12 +208,27 @@ export function docStages(schedule: readonly PaymentStage[] | null, totals: Pick
                 ? `${words.label} (Fully refundable within ${s.refundDays} ${s.refundDays === 1 ? 'day' : 'days'})`
                 : words.label,
           deliverable: words.note,
-          amountPaise: s.amountPaise,
+          amountPaise: amounts[i]!,
         };
       });
     }
   }
   return totals.stages.map((s) => ({ label: s.pct ? `${s.label} (${trimPct(s.pct)}%)` : s.label, deliverable: s.detail, amountPaise: s.amountPaise }));
+}
+
+/**
+ * A design quotation's stages as the project's are restaged on the Design
+ * Final (owner, 21 Nov 2026, from Hauspire's quotation sheet): the booking and
+ * the design advance as on the sales final, design closure takes the advance's
+ * catch-up, and the later stages are their percent of this total after the
+ * booking. Null when there is no sales total, or it cannot be split.
+ */
+export function designFinalAmounts(schedule: readonly PaymentStage[], totalPaise: number, salesTotalPaise: number | null): number[] | null {
+  if (salesTotalPaise === null || salesTotalPaise <= 0) return null;
+  const sales = scheduleAmounts(schedule, salesTotalPaise);
+  if (!sales.ok) return null;
+  const r = restageOnTotal(projectStages(sales.stages), totalPaise, salesTotalPaise);
+  return r.ok ? r.stages.map((s) => s.amountPaise) : null;
 }
 
 /**

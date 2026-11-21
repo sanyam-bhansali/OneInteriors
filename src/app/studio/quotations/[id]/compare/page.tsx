@@ -253,6 +253,7 @@ export default async function ComparePage({
               gstBps={current.gstBps}
               onSpotLabel={current.onSpotLabel}
               schedule={ctx.schedule}
+              salesTotalPaise={ctx.salesTotalPaise}
               spec={ctx.spec}
               compare={{ initialLabel: left, initialPaise: was.totalPaise, finalLabel: right, finalPaise: now.totalPaise }}
             />

@@ -14,6 +14,7 @@ export interface DocPreviewStatics {
   studio: DocStudio | null;
   brandPages: string[];
   schedule: PaymentStage[] | null;
+  salesTotalPaise?: number | null;
   spec: DocSpecRow[];
   terms: string | null;
   validDays: number;
@@ -102,6 +103,7 @@ export function DocumentPreview({
         gstBps={quote.gstBps}
         onSpotLabel={quote.onSpotLabel}
         schedule={doc?.schedule ?? null}
+        salesTotalPaise={doc?.salesTotalPaise ?? null}
         spec={doc?.spec ?? []}
         terms={doc?.terms ?? null}
         welcomeNote={quote.welcomeNote}

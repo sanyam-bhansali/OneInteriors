@@ -74,6 +74,7 @@ export default async function SignoffPage({
           gstBps={d.doc.gstBps}
           onSpotLabel={d.doc.onSpotLabel}
           schedule={d.doc.schedule}
+          salesTotalPaise={d.doc.salesTotalPaise}
           spec={d.doc.spec}
           terms={d.doc.terms}
           welcomeNote={d.doc.welcomeNote}

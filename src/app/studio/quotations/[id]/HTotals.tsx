@@ -38,6 +38,8 @@ export function TotalsTable({
   onDiscountPct?: (pct: string) => void;
   ownSchedule: boolean;
   readOnly?: boolean;
+  /** A design quotation's stages on the Design Final rule, labels with their percent; else `totals.stages`. */
+  stages?: { label: string; amountPaise: number }[] | null;
 }) {
   const feePct = feeBps > 0 ? feeBps / 100 : 7;
   return (
@@ -113,7 +115,18 @@ export function TotalsTable({
       </table>
 
       <h3 className="hsec">Payment stages{gstOn ? ' (incl. GST)' : ''}</h3>
-      {totals.stages.length > 0 ? (
+      {stages && stages.length > 0 ? (
+        <table className="htable htot hstages">
+          <tbody>
+            {stages.map((s) => (
+              <tr key={s.label}>
+                <th scope="row">{s.label}</th>
+                <td className="mono">{formatINR(s.amountPaise)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : totals.stages.length > 0 ? (
         <table className="htable htot hstages">
           <tbody>
             {totals.stages.map((s) => (

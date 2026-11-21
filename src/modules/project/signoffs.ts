@@ -44,6 +44,7 @@ import {
   type DocStudio,
 } from "@/modules/studio-quote/document";
 import { readMaterialSpec } from "@/modules/studio-quote/store";
+import { salesFinalTotalInStudio } from "@/modules/studio-quote/quotes";
 import { roomsOfLines } from "@/modules/studio-quote/rooms";
 import {
   readRevisionLines,
@@ -485,6 +486,8 @@ export interface SignoffDocument {
     gstBps: number;
     onSpotLabel: string | null;
     schedule: PaymentStage[] | null;
+    /** A Design Final's sales final total: its stages follow the Design Final rule. */
+    salesTotalPaise: number | null;
     spec: DocSpecRow[];
     terms: string | null;
     welcomeNote: string | null;
@@ -573,6 +576,9 @@ export async function signoffDocument(
         welcomeNote: true,
         terms: true,
         salesFinalSchedule: true,
+        stage: true,
+        basedOnId: true,
+        scopeForProjectId: true,
         studio: { select: { tradeName: true } },
       },
     }),
@@ -583,6 +589,18 @@ export async function signoffDocument(
     signedQuoteLogoUrl(branding?.logoPath ?? null, studioId),
     signedBrandPageUrls(branding?.brandPages ?? [], studioId),
   ]);
+  /* A Design Final's stages as the project is restaged on it: the sales
+     final's schedule and total, the Design Final rule (owner, 21 Nov 2026). */
+  const salesFinalId =
+    s.kind === "DESIGN_FINAL" && quote.stage === "DESIGN" && quote.basedOnId && !quote.scopeForProjectId
+      ? quote.basedOnId
+      : null;
+  const [salesFinal, salesTotalPaise] = salesFinalId
+    ? await Promise.all([
+        prisma.studioQuote.findFirst({ where: { id: salesFinalId, studioId }, select: { salesFinalSchedule: true } }),
+        salesFinalTotalInStudio(salesFinalId, studioId).catch(() => null),
+      ])
+    : [null, null];
   const lines = readRevisionLines(s.revision.lines);
   const terms = readRevisionTerms(s.revision.terms);
   const totals = computeTotals(
@@ -679,7 +697,12 @@ export async function signoffDocument(
       gstBps: terms.gstBps,
       onSpotLabel: terms.onSpotLabel,
       schedule:
-        s.kind === "SALES_FINAL" ? readStages(quote.salesFinalSchedule) : null,
+        s.kind === "SALES_FINAL"
+          ? readStages(quote.salesFinalSchedule)
+          : salesFinalId
+            ? readStages(salesFinal?.salesFinalSchedule)
+            : null,
+      salesTotalPaise,
       spec: readMaterialSpec(branding?.materialSpec ?? null),
       terms: termsText,
       welcomeNote: quote.welcomeNote,
