@@ -115,6 +115,11 @@ const OPERATOR_ROUTES = ['src/app/ops/'];
  */
 const ALLOWED: { file: string; model: string; why: string }[] = [
   {
+    file: 'src/modules/agreement/store.ts',
+    model: 'clientAgreement',
+    why: "The eSign provider's redirect and webhook (docs/studio-os/CLIENT-AGREEMENT.md) have no session: completeFromProvider finds the one agreement by its unique provider request id, then asks the provider itself for the result before filing anything. The studio and client reads are scoped by the member's studio or the client's own project.",
+  },
+  {
     file: 'src/modules/aftercare/store.ts',
     model: 'serviceRequest',
     why: "Razorpay's paid notice (docs/studio-os/AFTERCARE.md) has no session: markServicePaid finds the one visit by its unique payment link id, and only after the redirect's or the webhook's signature was checked. Every other aftercare query is scoped by the client's own project or the member's studioId.",

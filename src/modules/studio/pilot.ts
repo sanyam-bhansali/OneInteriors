@@ -25,7 +25,7 @@
  */
 
 import type { MemberRole } from './roles';
-import { CREWS_HOME, CREW_SETTINGS_PATH, DESIGN_HOME, DESIGN_STEPS_PATH, DOCUMENTS_HOME, HOLIDAYS_PATH, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_CREW_PATH, SITE_HOME, SOCIETIES_PATH, homeFor, isFullSoftwarePath, mayOpen, needsFullSoftware } from './surfaces';
+import { AGREEMENT_PATH, CREWS_HOME, CREW_SETTINGS_PATH, DESIGN_HOME, DESIGN_STEPS_PATH, DOCUMENTS_HOME, HOLIDAYS_PATH, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_CREW_PATH, SITE_HOME, SOCIETIES_PATH, homeFor, isFullSoftwarePath, mayOpen, needsFullSoftware } from './surfaces';
 
 /** The closed areas, each with its own "coming soon". */
 export type PilotArea = 'projects' | 'design' | 'site' | 'money' | 'vendors' | 'team' | 'listing' | 'societies';
@@ -85,6 +85,8 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   [DESIGN_STEPS_PATH, 'design'],
   /* Holidays move design plans (owner, 13 Nov 2026). */
   [HOLIDAYS_PATH, 'design'],
+  /* The client agreement is signed at design closure (owner, 21 Nov 2026). */
+  [AGREEMENT_PATH, 'design'],
   [DOCUMENTS_HOME, 'design'],
   [SITE_HOME, 'site'],
   [SITE_CREW_PATH, 'site'],

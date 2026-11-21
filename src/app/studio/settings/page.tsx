@@ -89,6 +89,20 @@ export default async function SettingsPage() {
         {warranty && full ? <WarrantyForm months={warranty.months} snagDays={warranty.snagDays} canEdit={warranty.canEdit} /> : null}
         {/* Paid service visits after the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md). */}
         {service && full ? <ServiceChargesForm charges={service.charges} visits={service.visits} canEdit={service.canEdit} /> : null}
+        {/* The client agreement, signed at design closure (owner, 21 Nov 2026). */}
+        {full && (member?.role === 'OWNER' || member?.role === 'PM') ? (
+          <div className="card mt-6 max-w-[52rem]" data-testid="agreement-link">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                <b>Client agreement</b>
+                <span className="muted block text-[13.5px]">The agreement your client e-signs with Aadhaar at design closure. Kept apart from the quotation&rsquo;s terms.</span>
+              </span>
+              <Link href="/studio/settings/agreement" className="btn sec sm">
+                Open the agreement
+              </Link>
+            </div>
+          </div>
+        ) : null}
         {/* The owner's setup quiz, again (owner, 14 Oct 2026). */}
         {member?.role === 'OWNER' ? (
           <div className="card mt-6 max-w-[52rem]" data-testid="setup-again">

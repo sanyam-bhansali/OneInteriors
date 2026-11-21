@@ -1,3 +1,4 @@
+import { agreementWords } from './agreement';
 import { aftercareWords } from './aftercare';
 import { decision } from './decision';
 import { designWords } from './design';
@@ -53,5 +54,6 @@ export const NATIVE = {
   ...discoverWords,
   ...itemWords,
   ...lifecycleWords,
+  ...agreementWords,
   ...aftercareWords,
 };

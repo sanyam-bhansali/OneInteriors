@@ -175,6 +175,17 @@ export interface Aftercare {
   claims: { id: string; at: string; covered: boolean; area: string; snagId: string | null }[];
 }
 
+/** GET /agreement (src/modules/agreement/store.ts `ClientAgreementView`). */
+export interface AgreementView {
+  state: 'none' | 'sent' | 'signed';
+  studio: string;
+  owner: boolean;
+  pdfUrl: string | null;
+  signedUrl: string | null;
+  signUrl: string | null;
+  signedAt: string | null;
+}
+
 export const api = {
   /** A booked site visit or meeting: "I'll be there", or ask for another day with why (1 Nov 2026). */
   answerVisit: (visitId: string, answer: 'confirm' | 'move', reason?: string) => call<{ message?: string | null }>('POST', `/visits/${encodeURIComponent(visitId)}`, { answer, reason: reason ?? '' }),
@@ -248,6 +259,8 @@ export const api = {
   /** Change orders (15 Oct 2026): approve extra work, or decline it with a reason. Owner only. */
   answerExtra: (extraId: string, approve: boolean, reason?: string) =>
     call<{ message?: string | null }>('POST', `/extras/${encodeURIComponent(extraId)}`, approve ? { approve: true } : { approve: false, reason: reason ?? '' }),
+  /** The client agreement e-signed at design closure (owner, 21 Nov 2026). */
+  agreement: (projectId: string) => call<AgreementView>('GET', `/agreement?projectId=${encodeURIComponent(projectId)}`),
   registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
   removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
   notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),
