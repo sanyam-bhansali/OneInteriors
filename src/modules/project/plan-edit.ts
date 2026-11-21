@@ -486,6 +486,9 @@ export interface StudioPlan {
   /** The in-scope weights as set, added up: the editor shows it against 100%. */
   weightTotalPct: number;
   overall: OverallDelay;
+  /** False while design is under way: execution dates are not planned yet, no handover is given. */
+  executionPlanned: boolean;
+  executionPlannedAt: string | null;
   current: ReturnType<typeof currentStatus>;
   moves: PlanMoveView[];
   /** The customer's decisions, for "waiting on their decision". */
@@ -536,6 +539,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
       },
       decisions: { orderBy: { dueOn: 'asc' }, select: { id: true, title: true, dueOn: true, chosenIndex: true } },
       holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
+      executionPlannedAt: true,
     },
   });
   if (!p) return { ok: false, error: 'That project is not one of yours.' };
@@ -613,7 +617,10 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
           milestones: items.filter((it) => it.inScope && it.customerMilestone).length,
         };
       }),
-      overall: overallDelay(stages, changes, today, cal),
+      overall: overallDelay(stages, changes, today, cal, p.executionPlannedAt),
+      /* Execution is planned, and the handover given, once design is complete (owner, 21 Nov 2026). */
+      executionPlanned: p.executionPlannedAt !== null,
+      executionPlannedAt: p.executionPlannedAt?.toISOString() ?? null,
       current: currentStatus(statuses),
       moves: movesOf(changes, names, handoverStage(stages)?.id ?? null).map((m) => ({ ...m, note: notes.get(Date.parse(m.at)) ?? null })),
       decisions: p.decisions.map((d) => ({ id: d.id, title: d.title, dueOn: istDay(d.dueOn), picked: d.chosenIndex !== null })),

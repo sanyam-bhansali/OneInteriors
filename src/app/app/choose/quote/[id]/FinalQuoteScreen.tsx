@@ -121,7 +121,8 @@ export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
           <ul className="oa-bullets">
             <li>The price of every line above</li>
             <li>The materials named on each line</li>
-            <li>Handover in about {Math.round(q.handoverDays / 7)} weeks from signing</li>
+            {/* The handover date is given once the design is complete (owner, 21 Nov 2026). */}
+            <li>A handover date as soon as your design is complete</li>
           </ul>
         </section>
 

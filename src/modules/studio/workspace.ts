@@ -94,6 +94,7 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
       introduction: { select: { source: true, brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
       stages: STAGE_SELECT,
       dateChanges: DATE_CHANGES_SELECT,
+      executionPlannedAt: true,
       updates: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       /* Phase 2: the latest post from site mode counts as today's update too. */
       siteLogs: { orderBy: { postedAt: 'desc' }, take: 1, select: { postedAt: true } },
@@ -124,6 +125,7 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
           decisions: p.decisions,
           planStages: p.stages,
           dateChanges: p.dateChanges,
+          executionPlannedAt: p.executionPlannedAt,
           calendar: p.introduction.studio,
         },
         now,
@@ -210,6 +212,7 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       teamNotes: true,
       introduction: { select: { source: true, brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
       dateChanges: DATE_CHANGES_SELECT,
+      executionPlannedAt: true,
       stages: {
         orderBy: { sortOrder: 'asc' },
         select: {
@@ -260,6 +263,7 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       decisions: p.decisions,
       planStages: p.stages,
       dateChanges: p.dateChanges,
+          executionPlannedAt: p.executionPlannedAt,
       calendar: p.introduction.studio,
     },
     now,

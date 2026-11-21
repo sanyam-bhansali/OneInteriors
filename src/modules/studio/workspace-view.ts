@@ -68,11 +68,13 @@ export interface WorkspaceInput {
   planStages?: { id: string; kind: string; name: string; plannedStart: Date; plannedEnd: Date; actualEnd: Date | null }[];
   dateChanges?: { stageId: string | null; field: string; fromDate: Date; toDate: Date; reason: string; decisionId: string | null; at: Date }[];
   calendar?: { workingDays?: unknown; holidays?: { day: Date }[] };
+  /** Null while in design: no handover yet (owner, 21 Nov 2026). Left out: as before. */
+  executionPlannedAt?: Date | null;
 }
 
 /** Planned vs forecast handover, and the customer's share of the delay (project-rules.ts `overallDelay`); null without a plan. */
 export function overallOf(
-  p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar'>,
+  p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar' | 'executionPlannedAt'>,
   now: Date,
 ): { lateDays: number; customerDays: number; plannedHandover: string | null; forecastHandover: string | null; handedOver: boolean } | null {
   if (!p.planStages || p.planStages.length === 0 || p.planStages.some((s) => !s.id || !s.plannedEnd)) return null;
@@ -96,6 +98,7 @@ export function overallOf(
     })),
     istDayOf(now),
     calendarOf({ workingDays: p.calendar?.workingDays, holidays: p.calendar?.holidays ?? [] }),
+    p.executionPlannedAt,
   );
   return { lateDays: o.lateDays, customerDays: o.customerDays, plannedHandover: o.plannedHandover, forecastHandover: o.forecastHandover, handedOver: o.handedOver };
 }

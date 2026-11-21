@@ -63,6 +63,7 @@ import { signFinalQuote, type FinalQuoteView } from '@/modules/portal/choose';
 import { PLAN_KINDS } from '@/modules/portal/tracker';
 import { templateFor } from '@/modules/project/step-template';
 import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
+import { EXECUTION_DAYS } from '@/modules/project/step-template';
 
 import { FILED_CONTENT_TYPE, generatedDocLink } from '@/modules/portal/documents';
 
@@ -116,7 +117,9 @@ describe('signing builds the plan', () => {
     await signFinalQuote(view, 'assured');
     expect(ops('tx.studioQuote.update')[0]!.args).toMatchObject({ where: { id: 'q1' }, data: { status: 'ACCEPTED' } });
     const created = ops('tx.homeProject.create')[0]!.args as { data: Record<string, unknown> };
-    expect(created.data).toMatchObject({ introductionId: 'i1', totalDays: 90, signedQuoteId: 'q1', contractPaise: BigInt(TOTAL) });
+    expect(created.data).toMatchObject({ introductionId: 'i1', signedQuoteId: 'q1', contractPaise: BigInt(TOTAL) });
+    // The stored days are the plan's own: design, then the execution sheet (owner, 21 Nov 2026).
+    expect(typeof created.data.totalDays).toBe('number');
     expect(created.data.assuredRequestedAt).toBeInstanceOf(Date);
     expect(ops('tx.quoteDecision.upsert')).toHaveLength(1);
     expect(ops('tx.auditLog.create')[0]!.args).toMatchObject({ data: { action: 'quote.signed', entityId: 'q1' } });
@@ -144,10 +147,11 @@ describe('signing builds the plan', () => {
     const all = stages.flatMap((s) => s.items.create);
     expect(all.reduce((a, i) => a + i.weightBp, 0)).toBe(10_000);
     expect(all.every((i) => i.inScope && i.quoteLineId === null && i.plannedOn instanceof Date)).toBe(true);
-    // The handover stage ends on the planned handover, 90 days from today.
-    const last = ops('tx.homeProjectStage.create').at(-1)!.args as { data: { plannedStart: Date; plannedEnd: Date } };
-    const first = ops('tx.homeProjectStage.create')[0]!.args as { data: { plannedStart: Date } };
-    expect(last.data.plannedEnd.getTime() - first.data.plannedStart.getTime()).toBe(90 * 86_400_000);
+    // Execution follows the sheet from the day design ends (owner, 21 Nov 2026), and the project's days end on handover.
+    const rows = ops('tx.homeProjectStage.create').map((c) => (c.args as { data: { plannedStart: Date; plannedEnd: Date } }).data);
+    expect(rows.at(-1)!.plannedEnd.getTime() - rows[0]!.plannedEnd.getTime()).toBe(EXECUTION_DAYS * 86_400_000);
+    const days = (ops('tx.homeProject.create')[0]!.args as { data: { totalDays: number } }).data.totalDays;
+    expect(rows.at(-1)!.plannedEnd.getTime() - rows[0]!.plannedStart.getTime()).toBe(days * 86_400_000);
   });
 
   it('copies the materials, leaving out the service line', async () => {

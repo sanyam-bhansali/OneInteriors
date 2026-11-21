@@ -49,7 +49,7 @@ export function targetDay(raw: string | undefined | null, today: string): string
   return raw && isDay(raw) ? raw : `${today.slice(0, 4)}-12-31`;
 }
 
-export interface ClosingInput extends Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar'> {
+export interface ClosingInput extends Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar' | 'executionPlannedAt'> {
   id: string;
   client: string;
   home: string;

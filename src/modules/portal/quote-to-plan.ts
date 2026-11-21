@@ -74,11 +74,11 @@
  */
 
 import { splitAcross } from '@/lib/money';
-import { templateFor } from '@/modules/project/step-template';
+import { executionSheetDays, templateFor } from '@/modules/project/step-template';
 import { designSteps } from '@/modules/studio-design/rules';
 import { designLengthFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
 import { spreadStepDays } from '@/modules/project/step-rules';
-import { dayToDb, istDay, onWorkingDay, shiftWorkingDays, type StudioCalendar } from '@/modules/project/working-days';
+import { addDays, dayToDb, istDay, onWorkingDay, shiftWorkingDays, type StudioCalendar } from '@/modules/project/working-days';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, TRACKER_STAGES, type PlanKind } from './tracker';
 
 export type { PlanKind } from './tracker';
@@ -236,8 +236,9 @@ export function kindWeights(): number[] {
 export function stageDates(startOn: Date, totalDays: number, designDays: number | null = null, cal: StudioCalendar | null = null): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
   const total = Math.max(0, Math.round(totalDays));
   const weights = kindWeights();
-  const fixed = designDays !== null && Number.isInteger(designDays) && designDays > 0 && total - designDays >= PLAN_KINDS.length - 1;
-  const days = fixed ? [designDays, ...splitAcross(total - designDays, weights.slice(1))] : splitAcross(total, weights);
+  const fixed = designDays !== null && Number.isInteger(designDays) && designDays > 0;
+  if (fixed) return designThenSheet(startOn, designDays, cal);
+  const days = splitAcross(total, weights);
   if (cal) {
     // Working days (owner, 13 Nov 2026: "planned as per the working days, Monday being our weekly off").
     let day = onWorkingDay(istDay(startOn), cal);
@@ -252,6 +253,44 @@ export function stageDates(startOn: Date, totalDays: number, designDays: number 
     const plannedStart = new Date(at);
     at += days[i]! * DAY;
     return { kind, plannedStart, plannedEnd: new Date(at) };
+  });
+}
+
+/**
+ * Design for its own days, then each execution stage for its length on
+ * Hauspire's sheet, back to back from the day design ends (owner, 21 Nov 2026:
+ * before this, execution got whatever was left of the project's days after
+ * design, often under three weeks). The sheet's lengths are calendar days;
+ * with the studio's calendar each stage still ends on a working day.
+ */
+export function designThenSheet(startOn: Date, designDays: number, cal: StudioCalendar | null = null): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
+  let day = cal ? onWorkingDay(istDay(startOn), cal) : istDay(startOn);
+  const designEnd = cal ? shiftWorkingDays(day, designDays, cal) : addDays(day, designDays);
+  const out: { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] = [{ kind: 'DESIGN', plannedStart: cal ? dayToDb(day) : startOn, plannedEnd: dayToDb(designEnd) }];
+  day = designEnd;
+  for (const s of executionSheetDays()) {
+    const end = cal ? onWorkingDay(addDays(day, s.days), cal) : addDays(day, s.days);
+    out.push({ kind: s.kind, plannedStart: dayToDb(day), plannedEnd: dayToDb(end) });
+    day = end;
+  }
+  return out;
+}
+
+/** Days from the start to the last stage's end (the planned handover), or null with no stages. */
+export function planSpanDays(startOn: Date, stages: readonly { plannedEnd: Date }[]): number | null {
+  const last = stages[stages.length - 1];
+  if (!last) return null;
+  return Math.max(1, Math.round((Date.parse(`${istDay(last.plannedEnd)}T00:00:00Z`) - Date.parse(`${istDay(startOn)}T00:00:00Z`)) / DAY));
+}
+
+/** Execution stages re-planned from the day design ends, on the sheet's lengths: for projects planned before 21 Nov 2026. */
+export function executionFrom(designEnd: string, cal: StudioCalendar | null = null): { kind: Exclude<PlanKind, 'DESIGN'>; start: string; end: string }[] {
+  let day = designEnd;
+  return executionSheetDays().map((s) => {
+    const end = cal ? onWorkingDay(addDays(day, s.days), cal) : addDays(day, s.days);
+    const row = { kind: s.kind, start: day, end };
+    day = end;
+    return row;
   });
 }
 
@@ -284,12 +323,26 @@ export interface QuotePlanInput {
   design?: DesignPlanInput | null;
 }
 
+/**
+ * Each step's day inside its stage's window, from the sheet's days, moved to
+ * the next working day with the studio's calendar (never past the stage's end,
+ * which is a working day): no step planned on the weekly off.
+ */
+export function executionStepDays(sheetDays: readonly string[], stage: { start: string; end: string }, cal: StudioCalendar | null = null): string[] {
+  return spreadStepDays(sheetDays, stage).map((d) => {
+    if (!cal) return d;
+    const w = onWorkingDay(d, cal);
+    return w > stage.end ? stage.end : w;
+  });
+}
+
 /** A stage's template steps, each with its planned day inside the stage's window. */
-export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): PlanItem[] {
+export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date, cal: StudioCalendar | null = null): PlanItem[] {
   const template = templateFor(kind);
-  const days = spreadStepDays(
+  const days = executionStepDays(
     template.map((t) => t.sheetDay),
     { start: istDay(plannedStart), end: istDay(plannedEnd) },
+    cal,
   );
   return template.map((t, i) => ({
     room: t.group,
@@ -352,7 +405,7 @@ export function templateStages(startOn: Date, totalDays: number, design?: (Desig
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null, cal, category) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null, cal, category) : stepsFor(d.kind, d.plannedStart, d.plannedEnd, cal),
   }));
 }
 

@@ -12,6 +12,7 @@ import type { Prisma } from '@prisma/client';
 import { recordEvent, type ProjectActor } from './events';
 import { isPhase, movePhase, provisionalStepOf, readWarrantyMonths, warrantyEndFrom, type LifecycleEvent, type Move } from './lifecycle-rules';
 import { dayToDb } from './working-days';
+import { planExecutionAfterDesign } from './execution-plan';
 
 type Db = Prisma.TransactionClient;
 
@@ -35,6 +36,8 @@ export async function applyPhaseEvent(db: Db, projectId: string, event: Lifecycl
   }
   await db.homeProject.update({ where: { id: projectId }, data });
   await recordEvent(db, { projectId, type: 'phase.changed', actor, at: now, payload: { from: p.phase, to: m.phase } });
+  // Design complete: execution is planned from today, and the handover given (owner, 21 Nov 2026).
+  if (p.phase === 'DESIGN') await planExecutionAfterDesign(db, projectId, now);
   return m;
 }
 

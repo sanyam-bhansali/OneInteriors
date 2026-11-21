@@ -241,12 +241,21 @@ const NONE: OverallDelay = { plannedHandover: null, forecastHandover: null, hand
 /** Planned handover against forecast handover, and whose days the difference is. See the header. */
 export function overallDelay(
   stages: readonly RuleStage[],
-  changes: readonly RuleChange[],
+  allChanges: readonly RuleChange[],
   today: string,
   cal: StudioCalendar = DEFAULT_CALENDAR,
+  /**
+   * When execution was planned, the day design was complete (owner, 21 Nov
+   * 2026: the handover is given only after design). Null: still in design, no
+   * handover yet. Moves made before it (design running late, the old plan)
+   * do not count: the handover is planned from this plan. Undefined: as
+   * before, every move counts (a plan made before this rule).
+   */
+  executionPlannedAt?: Date | null,
 ): OverallDelay {
   const h = handoverStage(stages);
-  if (!h) return NONE;
+  if (!h || executionPlannedAt === null) return NONE;
+  const changes = executionPlannedAt ? allChanges.filter((c) => c.at.getTime() >= executionPlannedAt.getTime()) : allChanges;
   const planned = originalEnd(h, changes, true);
   const handedOver = h.actualEnd !== null;
   const overrun = handedOver ? 0 : overrunDays(stages, today, cal);

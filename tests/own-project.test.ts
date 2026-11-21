@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { EXECUTION_DAYS } from '@/modules/project/step-template';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CATEGORY_ERRORS } from '@/modules/studio-quote/category-rules';
 
@@ -355,7 +356,9 @@ describe('startOwnProject: the plan, by the same code as signing', () => {
 
     const contract = quoteTotals(ownQuote() as never).totalPaise;
     const created = ops('tx.homeProject.create')[0]!.args as { data: Record<string, unknown> & { paymentPhases: { amountPaise: number; label: string }[] } };
-    expect(created.data).toMatchObject({ introductionId: 'i-own', signedQuoteId: 'q1', contractPaise: BigInt(contract), assuredRequestedAt: null, totalDays: 100 });
+    expect(created.data).toMatchObject({ introductionId: 'i-own', signedQuoteId: 'q1', contractPaise: BigInt(contract), assuredRequestedAt: null });
+    // The plan's own days (design, then the execution sheet; owner, 21 Nov 2026), not the 100 typed.
+    expect(created.data.totalDays).toBeGreaterThan(EXECUTION_DAYS);
     expect((created.data.startOn as Date).toISOString()).toBe('2026-10-14T00:00:00.000Z');
     expect(created.data.paymentPhases.reduce((a, s) => a + s.amountPaise, 0)).toBe(contract);
     expect(created.data.paymentPhases.map((s) => s.label)).toEqual(['Booking', 'Design sign-off', 'Carpentry done', 'Handover']);

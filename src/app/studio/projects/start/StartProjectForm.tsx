@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
 import { startOwnProjectAction } from './actions';
+import { EXECUTION_DAYS } from '@/modules/project/step-template';
 
 /**
  * The short form: which quotation, when work starts, and the client's
  * mobile number. Nothing is retyped — picking a quotation fills the client's
  * name, number and email from the client record (or the quotation), and the
- * date is today. The handover days are the studio's own whole-home figure,
- * under "Change the handover".
+ * date is today. Design lasts its own days; execution then follows the
+ * execution sheet (owner, 21 Nov 2026), so the handover is not typed.
  */
 
 type Quote = {
@@ -45,7 +46,6 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
   const [designDays, setDesignDays] = useState(String(first.defaultDesignDays));
   /* Search the quotations by client, number or society (27 Oct 2026: sixty of them in one list). */
   const [find, setFind] = useState('');
-  const [showDays, setShowDays] = useState(false);
   const [name, setName] = useState(first.customer.name);
   const [phone, setPhone] = useState(first.customer.phone);
   const [email, setEmail] = useState(first.customer.email);
@@ -129,22 +129,12 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
           <p className={hint}>From the design steps for this flat size; the client never sees it. The steps spread across it by their hours.</p>
         </div>
         <div>
-          {showDays ? (
-            <div className="mt-3">
-              <label htmlFor="totalDays" className={label}>
-                Handover after (days)
-              </label>
-              <input id="totalDays" name="totalDays" type="number" min={7} max={730} required value={days} onChange={(e) => setDays(e.target.value)} className={field} />
-            </div>
-          ) : (
-            <p className={hint}>
-              Whole project handed over in {days} days.{' '}
-              <button type="button" onClick={() => setShowDays(true)} className="text-[12.5px] acc-t underline">
-                Change the handover
-              </button>
-              <input type="hidden" name="totalDays" value={days} />
-            </p>
-          )}
+          {/* Execution follows Hauspire's sheet after design (owner, 21 Nov 2026), so the handover is not typed. */}
+          <p className={hint}>
+            Execution follows the execution sheet once design is done: about {EXECUTION_DAYS} days (civil, carpentry, finishing, handover). Handover is planned for around{' '}
+            {Number(designDays) > 0 ? Number(designDays) + EXECUTION_DAYS : EXECUTION_DAYS} days from today; move any stage later on the project&apos;s Plan tab.
+            <input type="hidden" name="totalDays" value={days} />
+          </p>
         </div>
         <div>
           <label htmlFor="name" className={label}>

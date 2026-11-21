@@ -153,6 +153,8 @@ export interface TrackerInputRow {
     at?: Date;
   }[] | null;
   studio?: { workingDays?: unknown; holidays?: readonly { day: Date }[] | null } | null;
+  /** Null while in design: no handover yet (owner, 21 Nov 2026). Left out: as before. */
+  executionPlannedAt?: Date | null;
 }
 
 export interface TrackerOut {
@@ -229,7 +231,7 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
   const designMoveAt = designMoveInstants(rules, changes);
   const shownChanges = changes.filter((c) => !designMoveAt.has(c.at.getTime()));
   const statuses = stageStatuses(rules, changes, today, cal);
-  const overall = overallDelay(rules, changes, today, cal);
+  const overall = overallDelay(rules, changes, today, cal, row.executionPlannedAt);
   const cur = currentStatus(statuses);
   const names = new Map(rules.map((r) => [r.id, r.name]));
   const handover = handoverStage(rules);
@@ -258,8 +260,8 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       forecastEnd: s.forecastEnd,
       state: s.state,
       /* The client never reads the design as late (owner and Hauspire's design team, 27 Oct 2026): it has no timeline for them. */
-      status: s.kind === 'DESIGN' && s.status === 'late' ? 'on-track' : s.status,
-      lateDays: s.kind === 'DESIGN' ? 0 : s.lateDays,
+      status: (s.kind === 'DESIGN' || row.executionPlannedAt === null) && s.status === 'late' ? 'on-track' : s.status,
+      lateDays: s.kind === 'DESIGN' || row.executionPlannedAt === null ? 0 : s.lateDays,
       earlyDays: s.earlyDays,
       checklist: { done: c.done, total: c.total },
       // A stage with no step in scope is as done as the stage itself.
@@ -270,7 +272,8 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
         pct: bpToPct(progress.weights.get(it.key) ?? 0),
         done: it.doneAt !== null,
         doneOn: it.doneAt && !processDesign(i) ? day(it.doneAt) : null,
-        plannedOn: it.plannedOn && !processDesign(i) ? dayFromDb(it.plannedOn) : null,
+        // Execution steps have no day until design is complete (owner, 21 Nov 2026).
+        plannedOn: it.plannedOn && !processDesign(i) && row.executionPlannedAt !== null ? dayFromDb(it.plannedOn) : null,
       })),
       moved: m
         ? {
