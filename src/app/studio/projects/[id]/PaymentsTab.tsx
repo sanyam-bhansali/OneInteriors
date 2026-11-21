@@ -4,7 +4,7 @@ import { MODE_LABEL, type LedgerStage } from '@/modules/project/payment-ledger';
 import { studioPayments, type StudioPaymentRow, type StudioPayments } from '@/modules/project/payments-flow';
 import { istDay } from '@/modules/project/working-days';
 import { CustomerSees } from '../marks';
-import { CorrectPayment, DueDate, RecordPayment } from './PaymentsClient';
+import { CorrectPayment, DueDate, GstBox, RecordPayment } from './PaymentsClient';
 
 /**
  * The Payments tab of the project workspace (studio workspace Phase 5,
@@ -69,6 +69,9 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
           </div>
         ))}
       </dl>
+
+      {/* GST on part of the project (owner, 21 Nov 2026). */}
+      <GstBox projectId={data.projectId} pct={data.gst.pct} gstPaise={data.gst.gstPaise} canSet={data.gst.canSet} />
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left text-[14px]">

@@ -8,7 +8,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
-import { correctPayment, recordPayment } from '@/modules/project/payments-flow';
+import { correctPayment, recordPayment, setProjectGst } from '@/modules/project/payments-flow';
 import { removeDocument, setMaterialCode, shareDocument, uploadDocument } from '@/modules/project/locker';
 import { setPaymentStage } from '@/modules/portal/project-store';
 
@@ -31,6 +31,14 @@ export async function recordPaymentAction(form: FormData): Promise<MoneyActionRe
   );
   if (r.ok) refresh(projectId);
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+/** GST on part of the project (owner, 21 Nov 2026): the tick and the % of the value. */
+export async function setProjectGstAction(projectId: string, on: boolean, pct: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const p = id(projectId);
+  const r = await setProjectGst(p, { on, pct: pct.slice(0, 8) });
+  if (r.ok) refresh(p);
+  return r.ok ? { ok: true, message: r.message } : { ok: false, error: r.error };
 }
 
 export async function correctPaymentAction(projectId: string, paymentId: string, amount: string): Promise<MoneyActionResult> {
