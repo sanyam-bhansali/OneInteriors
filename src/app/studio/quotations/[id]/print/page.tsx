@@ -73,6 +73,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         gstBps={quote.gstBps}
         onSpotLabel={quote.onSpotLabel}
         schedule={ctx.schedule}
+        salesTotalPaise={ctx.salesTotalPaise}
         spec={ctx.spec}
         terms={ctx.terms}
         welcomeNote={quote.welcomeNote}

@@ -19,12 +19,14 @@ import { readStages, templateOrDefault, type PaymentStage } from '@/modules/stud
 import { myBranding, myStudioProfile, myTier, type BrandingRow } from './store';
 import { showsOurMark, MARK_TEXT } from './mark';
 import { coverFacts, type DocSpecRow, type DocStudio } from './document';
-import type { QuoteRow } from './quotes';
+import { salesFinalTotalInStudio, type QuoteRow } from './quotes';
 
 export interface DocContext {
   studio: DocStudio | null;
   brandPages: string[];
   schedule: PaymentStage[] | null;
+  /** A design quotation's sales final total: its stages follow the Design Final rule (document.ts designFinalAmounts). */
+  salesTotalPaise: number | null;
   spec: DocSpecRow[];
   terms: string | null;
   validDays: number;
@@ -39,7 +41,10 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
   const [row, logoUrl, brandPages] = await Promise.all([
     studioId
       ? prisma.studioQuote
-          .findFirst({ where: { id: quote.id, studioId }, select: { salesFinalSchedule: true, studio: { select: { paymentTemplate: true } } } })
+          .findFirst({
+            where: { id: quote.id, studioId },
+            select: { salesFinalSchedule: true, stage: true, basedOnId: true, scopeForProjectId: true, studio: { select: { paymentTemplate: true } } },
+          })
           .catch(() => null)
       : Promise.resolve(null),
     signedQuoteLogoUrl(branding?.logoPath ?? null, studioId),
@@ -49,7 +54,21 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
   /* The sales final's own copy of the stages when it has one; else the
      studio's (Settings → Payment stages), unless the quotation carries the
      studio's older percentage schedule, which `computeTotals` already uses. */
-  const schedule = readStages(row?.salesFinalSchedule) ?? ((quote.phases?.length ?? 0) > 0 ? null : row ? templateOrDefault(row.studio.paymentTemplate) : null);
+  /* A design quotation (the Design Final and its drafts) prints its stages as
+     the project is restaged on it: on the sales final's schedule and total
+     (owner, 21 Nov 2026). Not an extra-scope quotation on a running project. */
+  const design = row && studioId && row.stage === 'DESIGN' && row.basedOnId && !row.scopeForProjectId ? row.basedOnId : null;
+  const [salesFinal, salesTotalPaise] = design
+    ? await Promise.all([
+        prisma.studioQuote.findFirst({ where: { id: design, studioId: studioId! }, select: { salesFinalSchedule: true } }).catch(() => null),
+        salesFinalTotalInStudio(design, studioId!).catch(() => null),
+      ])
+    : [null, null];
+
+  const schedule =
+    readStages(row?.salesFinalSchedule) ??
+    readStages(salesFinal?.salesFinalSchedule) ??
+    ((quote.phases?.length ?? 0) > 0 && !design ? null : row ? templateOrDefault(row.studio.paymentTemplate) : null);
 
   const studio: DocStudio | null = branding
     ? {
@@ -72,6 +91,7 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
     studio,
     brandPages,
     schedule,
+    salesTotalPaise,
     spec: branding?.materialSpec ?? [],
     /* A quotation keeps the terms it was made with. One saved without any
        (made before the studio wrote its terms) prints the studio's current

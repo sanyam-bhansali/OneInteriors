@@ -228,6 +228,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             studio: docCtx.studio,
             brandPages: docCtx.brandPages,
             schedule: docCtx.schedule,
+            salesTotalPaise: docCtx.salesTotalPaise,
             spec: docCtx.spec,
             terms: docCtx.terms,
             validDays: docCtx.validDays,
