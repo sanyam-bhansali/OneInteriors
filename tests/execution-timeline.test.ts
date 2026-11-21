@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { overallDelay, type RuleChange, type RuleStage } from '@/modules/project/project-rules';
 import { executionStartDay } from '@/modules/project/execution-plan';
 import { designThenSheet, executionFrom, executionStepDays, planSpanDays, stepsFor, templateStages } from '@/modules/portal/quote-to-plan';
-import { EXECUTION_DAYS, executionDaysFor, executionSheetDays, executionStageDays, templateFor } from '@/modules/project/step-template';
+import { EXECUTION_DAYS, STEP_TEMPLATE, executionDaysFor, executionSheetDays, executionStageDays, executionStepOffset, templateFor } from '@/modules/project/step-template';
 import { dayToDb, istDay, isoWeekday, type StudioCalendar } from '@/modules/project/working-days';
 
 /* Owner, 21 Nov 2026: "Execution timeline is not proper". Execution got whatever was left of 60 days after design
@@ -38,15 +38,29 @@ describe('execution days by flat size and category', () => {
     expect(executionDaysFor(3, null)).toBe(72);
   });
 
-  it("split across the stages in the sheet's shares, adding up exactly", () => {
+  it("split as Hauspire's client trackers split it, adding up exactly", () => {
     for (const total of [30, 45, 54, 60, 63, 72, 75, 84, 90, 105]) {
       const parts = executionStageDays(total);
       expect(parts.map((p) => p.kind)).toEqual(['CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER']);
       expect(parts.reduce((a, p) => a + p.days, 0)).toBe(total);
       expect(parts.every((p) => p.days >= 1)).toBe(true);
     }
-    expect(executionStageDays(60).map((p) => p.days)).toEqual([11, 36, 8, 5]);
-    expect(executionStageDays(110).map((p) => p.days)).toEqual([20, 67, 14, 9]);
+    // The trackers' own three templates, exactly.
+    expect(executionStageDays(45).map((p) => p.days)).toEqual([11, 17, 7, 10]);
+    expect(executionStageDays(60).map((p) => p.days)).toEqual([11, 24, 12, 13]);
+    expect(executionStageDays(70).map((p) => p.days)).toEqual([15, 25, 16, 14]);
+    // A 4 BHK Essential: the 70-day tracker, stretched.
+    expect(executionStageDays(75).map((p) => p.days)).toEqual([16, 27, 17, 15]);
+  });
+
+  it("each step on its tracker day: the 60-day tracker's carcass on carpentry's 8th day, handover on the last", () => {
+    expect(executionStepOffset('CARPENTRY', 'Carcass complete with hardware', 60)).toBe(7);
+    expect(executionStepOffset('FINISH', 'Painting complete', 60)).toBe(7);
+    expect(executionStepOffset('HANDOVER', 'Provisional handover', 60)).toBe(13);
+    expect(executionStepOffset('HANDOVER', 'Provisional handover', 75)).toBe(15);
+    expect(executionStepOffset('CIVIL', 'A step the studio added', 60)).toBeNull();
+    // Every execution step in the template has its tracker day.
+    for (const t of STEP_TEMPLATE.filter((s) => s.kind !== 'DESIGN')) expect(executionStepOffset(t.kind as 'CIVIL', t.label, 60)).not.toBeNull();
   });
 });
 
@@ -79,6 +93,7 @@ describe('stage dates: design, then execution', () => {
   it('planning from a design end: execution for the given days', () => {
     const e = executionFrom('2027-01-16', null, 60);
     expect(e[0]).toEqual({ kind: 'CIVIL', start: '2027-01-16', end: '2027-01-27' });
+    expect(e[1]).toEqual({ kind: 'CARPENTRY', start: '2027-01-27', end: '2027-02-20' });
     expect(e.at(-1)!.end).toBe('2027-03-17');
   });
 });
@@ -135,7 +150,7 @@ describe('the handover is given only once design is complete', () => {
     expect(lifecycle).toMatch(/if \(p\.phase === 'DESIGN'\) await planExecutionAfterDesign\(db, projectId, now\);/);
     const plan = readFileSync('src/modules/project/execution-plan.ts', 'utf8');
     expect(plan).toMatch(/executionPlannedAt: now/);
-    expect(plan).toMatch(/executionFrom\(start, cal, executionDaysFor\(/);
+    expect(plan).toMatch(/executionReplan\(exec, start, cal, days\)/);
   });
 
   it('no handover date and nothing to move on execution until the project exits design (owner, 21 Nov 2026)', () => {

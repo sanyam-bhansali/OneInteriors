@@ -6,11 +6,12 @@
  * (every design step ticked, or the design signed off), inside that
  * transaction.
  *
- * Execution then runs Hauspire's execution sheet (portal/quote-to-plan.ts
- * `executionFrom`: civil 20, carpentry 67, finishing 14, handover 9 days) from
- * the day design was complete, or after the last pre-execution step still
- * open, whichever is later. Its steps are spread inside each stage, off the
- * studio's weekly off, and their "first planned" day is this one. The
+ * Execution then runs for the flat's size and category (step-template.ts
+ * `executionDaysFor`), split and stepped as Hauspire's client trackers plan it
+ * (`executionStageDays`, `executionStepOffset`), from the day design was
+ * complete, or after the last pre-execution step still open, whichever is
+ * later. Steps fall off the studio's weekly off, and their "first planned"
+ * day is this one. The
  * project's days end on the new handover, and `executionPlannedAt` marks the
  * plan: until it is set no handover date is shown anywhere, and the planned
  * handover counts from it (project-rules.ts `overallDelay`).
@@ -20,12 +21,12 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import { executionFrom, executionStepDays, planSpanDays } from '@/modules/portal/quote-to-plan';
+import { executionFrom, planSpanDays, trackerStepDays } from '@/modules/portal/quote-to-plan';
 import { bhkOf } from '@/modules/studio-design/template';
-import { executionDaysFor, STEP_TEMPLATE } from './step-template';
+import { executionDaysFor, executionStepOffset } from './step-template';
 import { propertyTypeFrom } from './own-project-rules';
 import { shiftStepDay } from './step-rules';
-import { calendarOf, dayToDb, EVERY_DAY, istDay, onWorkingDay } from './working-days';
+import { calendarOf, dayToDb, EVERY_DAY, istDay, onWorkingDay, type StudioCalendar } from './working-days';
 
 type Db = Prisma.TransactionClient;
 
@@ -68,22 +69,37 @@ export async function planExecutionAfterDesign(db: Db, projectId: string, now: D
   const cal = studio ? calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays }) : EVERY_DAY;
   const openDays = design.items.filter((i) => i.inScope && !i.doneAt && i.plannedOn).map((i) => istDay(i.plannedOn!));
   const start = onWorkingDay(executionStartDay(istDay(now), openDays), cal);
-  const windows = executionFrom(start, cal, executionDaysFor(await projectBhk(db, p.signedQuoteId, p.introduction?.brief?.propertyType ?? null), p.category));
+  const days = executionDaysFor(await projectBhk(db, p.signedQuoteId, p.introduction?.brief?.propertyType ?? null), p.category);
+  const plan = executionReplan(exec, start, cal, days);
 
   if (istDay(design.plannedEnd) !== start) await db.homeProjectStage.update({ where: { id: design.id }, data: { plannedEnd: dayToDb(start) } });
+  for (const s of plan.stages) await db.homeProjectStage.update({ where: { id: s.id }, data: { plannedStart: dayToDb(s.start), plannedEnd: dayToDb(s.end) } });
+  for (const st of plan.steps) await db.homeChecklistItem.update({ where: { id: st.id }, data: { plannedOn: dayToDb(st.day), firstPlannedOn: dayToDb(st.day) } });
+  const span = planSpanDays(p.startOn, [{ plannedEnd: dayToDb(plan.end) }]);
+  await db.homeProject.update({ where: { id: projectId }, data: { executionPlannedAt: now, ...(span ? { totalDays: span } : {}) } });
+}
+
+type ExecStage = { id: string; kind: string; plannedStart: Date; plannedEnd: Date; items: readonly { id: string; label: string; plannedOn: Date | null }[] };
+
+/**
+ * The execution stages' new dates from `start` for `days` of execution, and
+ * every step's day: on its day in Hauspire's trackers (step-template.ts), a
+ * step the studio added moved with its stage. Pure: the caller writes.
+ */
+export function executionReplan(exec: readonly ExecStage[], start: string, cal: StudioCalendar | null, days: number): { stages: { id: string; start: string; end: string }[]; steps: { id: string; day: string }[]; end: string } {
+  const windows = executionFrom(start, cal, days);
+  const stages: { id: string; start: string; end: string }[] = [];
+  const steps: { id: string; day: string }[] = [];
   for (const s of exec) {
     const w = windows.find((x) => x.kind === s.kind);
     if (!w) continue;
-    await db.homeProjectStage.update({ where: { id: s.id }, data: { plannedStart: dayToDb(w.start), plannedEnd: dayToDb(w.end) } });
-    const sheet = s.items.map((i) => STEP_TEMPLATE.find((t) => t.kind === s.kind && t.label.toLowerCase() === i.label.trim().toLowerCase())?.sheetDay ?? null);
-    const known = s.items.map((i, k) => ({ id: i.id, d: sheet[k] })).filter((x): x is { id: string; d: string } => x.d !== null);
-    const spread = executionStepDays(known.map((x) => x.d), { start: w.start, end: w.end }, cal);
-    const dayOf = new Map(known.map((x, k) => [x.id, spread[k]!]));
-    for (const i of s.items) {
-      const d = dayOf.get(i.id) ?? shiftStepDay(i.plannedOn ? istDay(i.plannedOn) : null, { start: istDay(s.plannedStart), end: istDay(s.plannedEnd) }, w) ?? w.end;
-      await db.homeChecklistItem.update({ where: { id: i.id }, data: { plannedOn: dayToDb(d), firstPlannedOn: dayToDb(d) } });
-    }
+    stages.push({ id: s.id, start: w.start, end: w.end });
+    const tracked = trackerStepDays(w.kind, s.items.map((i) => i.label), { start: w.start, end: w.end }, days, cal);
+    s.items.forEach((i, k) => {
+      const known = executionStepOffset(w.kind, i.label, days) !== null;
+      const day = known ? tracked[k]! : (shiftStepDay(i.plannedOn ? istDay(i.plannedOn) : null, { start: istDay(s.plannedStart), end: istDay(s.plannedEnd) }, w) ?? w.end);
+      steps.push({ id: i.id, day });
+    });
   }
-  const span = planSpanDays(p.startOn, [{ plannedEnd: dayToDb(windows.at(-1)!.end) }]);
-  await db.homeProject.update({ where: { id: projectId }, data: { executionPlannedAt: now, ...(span ? { totalDays: span } : {}) } });
+  return { stages, steps, end: windows.at(-1)!.end };
 }

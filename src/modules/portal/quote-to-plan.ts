@@ -74,7 +74,7 @@
  */
 
 import { splitAcross } from '@/lib/money';
-import { executionDaysFor, executionStageDays, templateFor } from '@/modules/project/step-template';
+import { executionDaysFor, executionStageDays, executionStepOffset, templateFor } from '@/modules/project/step-template';
 import { designSteps } from '@/modules/studio-design/rules';
 import { designLengthFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
 import { spreadStepDays } from '@/modules/project/step-rules';
@@ -336,14 +336,34 @@ export function executionStepDays(sheetDays: readonly string[], stage: { start: 
   });
 }
 
+/**
+ * Each step's day in its stage from Hauspire's trackers (project/step-template.ts
+ * `executionStepOffset`) for this execution length: the stage's start plus the
+ * step's day in the stage, kept inside the stage and off the weekly off. A step
+ * the trackers do not have goes on the stage's last day.
+ */
+export function trackerStepDays(kind: Exclude<PlanKind, 'DESIGN'>, labels: readonly string[], stage: { start: string; end: string }, executionDays: number, cal: StudioCalendar | null = null): string[] {
+  return labels.map((label) => {
+    const off = executionStepOffset(kind, label, executionDays);
+    let d = off === null ? stage.end : addDays(stage.start, off);
+    if (d > stage.end) d = stage.end;
+    if (cal) {
+      const w = onWorkingDay(d, cal);
+      d = w > stage.end ? stage.end : w;
+    }
+    return d;
+  });
+}
+
 /** A stage's template steps, each with its planned day inside the stage's window. */
-export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date, cal: StudioCalendar | null = null): PlanItem[] {
+export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date, cal: StudioCalendar | null = null, executionDays: number | null = null): PlanItem[] {
   const template = templateFor(kind);
-  const days = executionStepDays(
-    template.map((t) => t.sheetDay),
-    { start: istDay(plannedStart), end: istDay(plannedEnd) },
-    cal,
-  );
+  const window = { start: istDay(plannedStart), end: istDay(plannedEnd) };
+  // With the execution's length, each step on its day in Hauspire's trackers (owner, 21 Nov 2026); else spread by the sheet.
+  const days =
+    executionDays !== null && kind !== 'DESIGN'
+      ? trackerStepDays(kind, template.map((t) => t.label), window, executionDays, cal)
+      : executionStepDays(template.map((t) => t.sheetDay), window, cal);
   return template.map((t, i) => ({
     room: t.group,
     label: t.label,
@@ -405,7 +425,7 @@ export function templateStages(startOn: Date, totalDays: number, design?: (Desig
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null, cal, category) : stepsFor(d.kind, d.plannedStart, d.plannedEnd, cal),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null, cal, category) : stepsFor(d.kind, d.plannedStart, d.plannedEnd, cal, design ? executionDaysFor(design.bhk ?? null, category) : null),
   }));
 }
 

@@ -156,14 +156,17 @@ describe('quoteToPlan', () => {
     expect(design.items[0]!.tasks).toEqual(['Send the requirement form with the mood board']);
   });
 
-  it('plans each step’s day inside its stage’s window, first on its start and last on its end', () => {
+  it('plans each step’s day inside its stage’s window, in order, first on its start; handover on the last day', () => {
     for (const s of plan.stages) {
       const days = s.items.map((i) => i.plannedOn!.getTime());
       expect(days).toEqual([...days].sort((a, b) => a - b));
       expect(Math.min(...days)).toBeGreaterThanOrEqual(s.plannedStart.getTime());
-      expect(Math.max(...days)).toBe(s.plannedEnd.getTime());
+      expect(Math.max(...days)).toBeLessThanOrEqual(s.plannedEnd.getTime());
       if (s.items.length > 1) expect(days[0]).toBe(s.plannedStart.getTime());
     }
+    // Execution steps sit on their days in Hauspire's trackers (owner, 21 Nov 2026), so the handover is the last day.
+    const hand = plan.stages.at(-1)!;
+    expect(hand.items.at(-1)!.plannedOn!.getTime()).toBe(hand.plannedEnd.getTime());
     // Design (with pre-execution) lasts its steps' 43 days: material procurement on its last day.
     expect(day(plan.stages[0]!.items.at(-1)!.plannedOn!)).toBe('2026-12-14');
   });
