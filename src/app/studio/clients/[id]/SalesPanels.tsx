@@ -35,6 +35,7 @@ const primaryClass = 'btn pri sm';
 const quietClass = 'btn sec sm';
 import { buildFromPlanAction, planJobsAction } from '../../quotations/actions';
 import type { PlanJobView } from '@/modules/studio-quote/from-plan-rules';
+import { ADDRESS_MAX } from '@/modules/studio-sales/convert-rules';
 
 const box = 'card';
 const h2 = 'h';
@@ -263,7 +264,7 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
           <SocietyNames />
         </Field>
         <Field label="Address">
-          <input name="address" defaultValue={v.address} placeholder="Flat number, wing, road, area" maxLength={300} className={inputClass} />
+          <input name="address" defaultValue={v.address} placeholder="Flat number, wing, road, area" maxLength={ADDRESS_MAX}className={inputClass} />
         </Field>
         <Field label="BHK">
           <input name="config" defaultValue={v.config} placeholder="3 BHK" className={inputClass} />
