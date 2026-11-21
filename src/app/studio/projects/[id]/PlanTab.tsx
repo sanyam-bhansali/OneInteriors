@@ -18,7 +18,7 @@ import {
 } from '@/modules/project/project-rules';
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
 import { doneLabel, parsePercent } from '@/modules/project/step-rules';
-import { isProjectClosureStep } from '@/modules/project/step-template';
+import { EXECUTION_DAYS, isProjectClosureStep } from '@/modules/project/step-template';
 import type { ClosureDue } from '@/modules/project/closure-due';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
@@ -124,7 +124,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
   const c = plan.current;
   const stageLine = c ? `${c.name} · ${c.status === 'late' ? `${days(c.lateDays)} late` : 'on track'}` : 'Handed over';
   /* The client's days are not our delay (owner, 12 Nov 2026): "late" is the studio's days only; theirs are explained below. */
-  const overallLine = o.studioDays > 0 ? `Overall · ${days(o.studioDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
+  const overallLine = !plan.executionPlanned ? 'Overall · handover after design' : o.studioDays > 0 ? `Overall · ${days(o.studioDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
   return (
     <div className="card oi-overall">
       <div className="flex w-full flex-col gap-1.5">
@@ -147,7 +147,13 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
             </>
           )}
         </div>
-        {o.plannedHandover && o.forecastHandover ? (
+        {!plan.executionPlanned ? (
+          /* Owner, 21 Nov 2026: execution is planned, and the handover given, only once design is complete. */
+          <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
+            Handover is planned once design is complete: execution then runs the execution sheet (about {EXECUTION_DAYS} days) from that day. The execution dates below are a first estimate until then.
+          </p>
+        ) : null}
+        {plan.executionPlanned && o.plannedHandover && o.forecastHandover ? (
           <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
             Handover planned <b className="mono font-medium">{dayWords(o.plannedHandover)}</b>
             {o.forecastHandover !== o.plannedHandover ? (
@@ -999,7 +1005,7 @@ function MoveDialog({
     });
     const at = new Date();
     const changes: RuleChange[] = [...plan.changes, ...rows.map((r) => ({ ...r, reason, decisionId: linked, at }))];
-    return { sentence, overall: overallDelay(after, changes, plan.today, cal), later: result.plan.stages.length - 1 };
+    return { sentence, overall: overallDelay(after, changes, plan.today, cal, plan.executionPlannedAt ? new Date(plan.executionPlannedAt) : null), later: result.plan.stages.length - 1 };
   })();
 
   const shift = daysBetween(field === 'PLANNED_START' ? stage.plannedStart : stage.plannedEnd, to);

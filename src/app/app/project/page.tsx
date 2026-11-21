@@ -176,7 +176,8 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
             </div>
             <div>
               <span className="oa-meta">Handover</span>
-              <b>{handover ? shortDate(handover.targetOn) : '—'}</b>
+              {/* Given once design is complete (owner, 21 Nov 2026). */}
+              <b>{project.handoverKnown === false ? 'After design' : handover ? shortDate(handover.targetOn) : '—'}</b>
             </div>
           </div>
         );
@@ -266,7 +267,7 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
                 <li key={s.key} className={`oa-tl ${s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next'}`}>
                   <h3 style={s.state === 'next' || s.state === 'later' ? { color: 'var(--ink-2)' } : undefined}>{s.state === 'now' ? `${s.label}, now` : s.label}</h3>
                   <p style={MONO}>
-                    {s.state === 'done' ? 'Done' : `Planned ${shortDate(s.targetOn)}`}
+                    {s.state === 'done' ? 'Done' : project.handoverKnown === false && s.key !== 'DESIGN' ? 'Planned once design is complete' : `Planned ${shortDate(s.targetOn)}`}
                     {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
                     {tracked?.[i] ? ` · ${tracked[i]!.progressPct}% done` : ''}
                   </p>

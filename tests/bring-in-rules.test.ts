@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { templateStages } from '@/modules/portal/quote-to-plan';
+import { EXECUTION_DAYS } from '@/modules/project/step-template';
 import { dayToDb } from '@/modules/project/working-days';
 import { anchorDays, broughtInLine, checkPayments, doneSteps, shiftedStart, stepChoices, stepKey } from '@/modules/studio-bring-in/rules';
 import { hauspireConfig, importOpenFor, readHauspire, searchHauspire } from '@/modules/studio-bring-in/hauspire-source';
@@ -98,7 +99,8 @@ describe('dates from today', () => {
     const r = doneSteps(draft, 'WARRANTY', null);
     if (!r.ok) throw new Error(r.error);
     const a = anchorDays(draft, r.done, TODAY, '2026-09-01');
-    expect(a.ok && a.days).toBe(120 + 49);
+    // A 2 BHK designs in 43 days, then execution runs the sheet's 110 (owner, 21 Nov 2026).
+    expect(a.ok && a.days).toBe(43 + EXECUTION_DAYS + 49);
   });
 
   it('more than three years back is refused', () => {

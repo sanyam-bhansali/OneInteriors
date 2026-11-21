@@ -1889,6 +1889,11 @@ model HomeProject {
   /// with no open snag -> WARRANTY; past warrantyEndsOn it reads as CLOSED.
   phase                 ProjectPhase         @default(DESIGN)
   phaseAt               DateTime?
+  /// When execution was planned from the day design was complete (owner,
+  /// 21 Nov 2026: the handover is worked out and given only after design).
+  /// Null while in design: no handover date is shown anywhere. The planned
+  /// handover counts from this plan, not from moves made during design.
+  executionPlannedAt    DateTime?
   provisionalHandoverAt DateTime?
   closedOutAt           DateTime?
   handoverSignedAt      DateTime?

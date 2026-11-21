@@ -9,7 +9,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { FILED_CONTENT_TYPE, signedQuoteDocs } from './documents';
-import { quoteToPlan, type DesignPlanInput, type PlanMaterial, type PlanPayment, type PlanQuoteLine, type PlanStage, type SignedStageInput } from './quote-to-plan';
+import { planSpanDays, quoteToPlan, type DesignPlanInput, type PlanMaterial, type PlanPayment, type PlanQuoteLine, type PlanStage, type SignedStageInput } from './quote-to-plan';
 
 export type PlanDb = Pick<Prisma.TransactionClient, 'homeProjectStage' | 'homeMaterial' | 'homeDocument'>;
 
@@ -165,7 +165,8 @@ export async function createSignedProject(db: SignedProjectDb, input: SignedProj
       // Essential, Premium or Luxe, as the quotation was priced (DESIGN-PROCESS-PLAN.md §4.3).
       category: signed?.category ?? null,
       startOn: input.startOn,
-      totalDays: input.totalDays,
+      // Start to the last stage's end: design, then execution on the sheet's days (owner, 21 Nov 2026).
+      totalDays: planSpanDays(input.startOn, built.stages) ?? input.totalDays,
       signedAt: input.signedAt,
       signedQuoteId: input.quote.id,
       contractPaise: BigInt(input.contractPaise),

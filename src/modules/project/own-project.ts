@@ -285,7 +285,6 @@ export async function startOwnProject(
   const design = await designPlanInput(member.studioId, { propertyType: propertyTypeFrom(q.config ?? q.client?.config) });
   const designDays = parseDesignDays(input.designDays, null);
   if (designDays === false) return { ok: false, error: 'Design done in 3 to 365 days, please.' };
-  if (designDays !== null && designDays > totalDays - 4) return { ok: false, error: `Design in ${designDays} days leaves too little of ${totalDays} days for the rest. Make the handover later or the design shorter.` };
   design.days = designDays;
   try {
     const started = await prisma.$transaction(

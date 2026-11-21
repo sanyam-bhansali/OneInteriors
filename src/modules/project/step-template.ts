@@ -132,6 +132,28 @@ export const STEP_TEMPLATE: readonly TemplateStep[] = [
   step('HANDOVER', HAND, 'Provisional handover', 2, SHEET_HANDOVER),
 ];
 
+const dayNo = (d: string) => Date.parse(`${d}T00:00:00Z`) / 86_400_000;
+
+/**
+ * How long each execution stage lasts on the sheet, in calendar days (owner,
+ * 21 Nov 2026: "Execution timeline is not proper"; execution follows Hauspire's
+ * sheet after design ends, ~110 days, instead of what was left of the
+ * project's days after design). A stage runs from its first step's day to the
+ * next stage's first step's day; handover ends on the sheet's handover.
+ * Civil 20, carpentry 67, finishing 14, handover 9.
+ */
+export function executionSheetDays(): { kind: Exclude<PlanKind, 'DESIGN'>; days: number }[] {
+  const kinds = ['CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER'] as const;
+  const firstDay = (k: PlanKind) => STEP_TEMPLATE.filter((s) => s.kind === k).reduce((a, s) => (s.sheetDay < a ? s.sheetDay : a), '9999-12-31');
+  return kinds.map((kind, i) => {
+    const next = i + 1 < kinds.length ? firstDay(kinds[i + 1]!) : SHEET_HANDOVER;
+    return { kind, days: Math.max(1, dayNo(next) - dayNo(firstDay(kind))) };
+  });
+}
+
+/** Execution's whole length on the sheet, in days (110). */
+export const EXECUTION_DAYS = executionSheetDays().reduce((a, s) => a + s.days, 0);
+
 /** The template's steps of one stage kind, in order. */
 export function templateFor(kind: PlanKind): TemplateStep[] {
   return STEP_TEMPLATE.filter((s) => s.kind === kind);

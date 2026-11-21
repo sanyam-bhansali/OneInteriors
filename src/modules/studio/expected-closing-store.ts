@@ -38,6 +38,7 @@ export async function expectedClosing(rawBy: string | undefined, now = new Date(
       holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
       stages: { orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true } },
       dateChanges: { orderBy: [{ at: 'asc' }, { id: 'asc' }], select: { stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, at: true } },
+      executionPlannedAt: true,
       introduction: {
         select: {
           studio: { select: { workingDays: true, holidays: { select: { day: true } } } },
@@ -61,6 +62,7 @@ export async function expectedClosing(rawBy: string | undefined, now = new Date(
         onSiteCarcass: p.onSiteCarcass,
         planStages: p.stages,
         dateChanges: p.dateChanges,
+          executionPlannedAt: p.executionPlannedAt,
         calendar: p.introduction.studio,
       },
       now,

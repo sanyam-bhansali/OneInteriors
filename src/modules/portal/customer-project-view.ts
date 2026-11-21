@@ -162,6 +162,12 @@ export interface CustomerProject {
   plan: PlanName;
   studio: string;
   startOn: string;
+  /**
+   * False while design is under way: execution is planned, and the handover
+   * given, only once design is complete (owner, 21 Nov 2026). The app then
+   * shows no handover date and no execution dates, only "After design".
+   */
+  handoverKnown: boolean;
   stages: StageView[];
   /** The payment plan as signed; the studio's filed one only on a project never signed in the app. */
   phases: PaymentPhase[] | null;
@@ -242,6 +248,8 @@ export const CUSTOMER_PROJECT_SELECT = {
   plan: true,
   /* The project lifecycle: the phase and the warranty's end. Never who signed off (handoverSignedById) or the closure's lines and notes. */
   phase: true,
+  /* The handover is given only once design is complete (owner, 21 Nov 2026). */
+  executionPlannedAt: true,
   warrantyEndsOn: true,
   /* The snag window (project/snag-window.ts): the closure day only, to place the window; never sent. */
   closedOutAt: true,
@@ -401,9 +409,10 @@ export function customerPhases(signedRaw: unknown, studioRaw: unknown): PaymentP
 /** One project, as the customer (or their family) sees it. Field by field; never a spread row. */
 export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Date, links: CustomerProjectLinks = NO_LINKS): CustomerProject {
   const names = new Map(p.family.map((f) => [f.userId, f.name]));
-  const stages = projectStages(p, now);
+  /* While design is under way, execution has no dates yet (owner, 21 Nov 2026): none of its stages reads as late. */
+  const stages = projectStages(p, now).map((s) => (p.executionPlannedAt !== null || s.key === 'DESIGN' ? s : { ...s, late: false }));
   const ledgerOf = customerLedger(p);
-  const tracked = customerTracker({ stages: p.stages, dateChanges: p.dateChanges, studio: p.introduction.studio }, stages, now);
+  const tracked = customerTracker({ stages: p.stages, dateChanges: p.dateChanges, studio: p.introduction.studio, executionPlannedAt: p.executionPlannedAt }, stages, now);
   const owner = p.introduction.brief.userId === userId;
   const snags: CustomerSnag[] = p.snags.map((s, i) => ({
     id: s.id,
@@ -508,6 +517,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     plan: planName(p.plan),
     studio: p.introduction.studio.tradeName,
     startOn: p.startOn.toISOString(),
+    handoverKnown: p.executionPlannedAt !== null,
     stages,
     phases: customerPhases(p.paymentPhases, p.introduction.studio.paymentPhases),
     /* Phase 5: from the payment rows and the recorded quote changes, never from what was marked. */

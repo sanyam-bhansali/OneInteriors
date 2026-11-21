@@ -109,7 +109,8 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
           </div>
           <div className="row">
             <span>Handover</span>
-            <span className="amt">About {Math.round(q.handoverDays / 7)} weeks from signing</span>
+            {/* Given once the design is complete (owner, 21 Nov 2026). */}
+            <span className="amt">Dated once your design is complete</span>
           </div>
           <div className="row">
             <span>Site updates</span>
