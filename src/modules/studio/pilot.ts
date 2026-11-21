@@ -25,7 +25,7 @@
  */
 
 import type { MemberRole } from './roles';
-import { AGREEMENT_PATH, CREWS_HOME, CREW_SETTINGS_PATH, DESIGN_HOME, DESIGN_STEPS_PATH, DOCUMENTS_HOME, HOLIDAYS_PATH, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_CREW_PATH, SITE_HOME, SOCIETIES_PATH, homeFor, isFullSoftwarePath, mayOpen, needsFullSoftware } from './surfaces';
+import { AGREEMENT_PATH, CREWS_HOME, INVOICE_SETTINGS_PATH, CREW_SETTINGS_PATH, DESIGN_HOME, DESIGN_STEPS_PATH, DOCUMENTS_HOME, HOLIDAYS_PATH, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_CREW_PATH, SITE_HOME, SOCIETIES_PATH, homeFor, isFullSoftwarePath, mayOpen, needsFullSoftware } from './surfaces';
 
 /** The closed areas, each with its own "coming soon". */
 export type PilotArea = 'projects' | 'design' | 'site' | 'money' | 'vendors' | 'team' | 'listing' | 'societies';
@@ -91,6 +91,8 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   [SITE_HOME, 'site'],
   [SITE_CREW_PATH, 'site'],
   [PAYMENTS_HOME, 'money'],
+  /* Invoices are for the project's payment stages (owner, 21 Nov 2026). */
+  [INVOICE_SETTINGS_PATH, 'money'],
   [CREWS_HOME, 'vendors'],
   [CREW_SETTINGS_PATH, 'vendors'],
   ['/studio/listing', 'listing'],

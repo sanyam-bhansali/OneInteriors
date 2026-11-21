@@ -5,6 +5,7 @@ import { projectStatement } from '@/modules/project/statement';
 import type { StatementOrder } from '@/modules/project/statement-rules';
 import { nameWord } from '@/modules/studio-design/documents';
 import { PrintStatement } from './PrintStatement';
+import { DocFooter, DocHeader, PaymentNote, SignBlock, longDay } from '../MoneyDoc';
 
 export const metadata: Metadata = { title: 'Statement', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -15,62 +16,59 @@ export const dynamic = 'force-dynamic';
  * the total, paid and remaining"). One page to print or save as a PDF; the
  * figures are the payment ledger's, the same as the Payments tab
  * (project/statement-rules.ts).
+ *
+ * Restyled to the approved sample-statement.html (owner, 21 Nov 2026): the
+ * studio's header, Client and Summary boxes, the stage table, Total, Paid and
+ * Remaining, and the signature. No "GST included" wording, and no line for
+ * money recorded but not confirmed yet: Paid is confirmed plus recorded
+ * before confirmations started, as on the Payments tab.
  */
 
-const cell = 'border-b border-[#e5e5e5] px-2 py-1.5 align-top';
-const head = 'border-b border-[#999] px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-[#555]';
-const num = 'mono text-right whitespace-nowrap';
 const signed = (p: number) => `${p < 0 ? '−' : ''}${formatINR(Math.abs(p))}`;
+
+/** Paid / Part paid / Not paid: money waiting for the client's yes is not shown here (owner, 21 Nov 2026). */
+const paidWord = (o: StatementOrder) => (o.amountPaise <= 0 ? '—' : o.paidPaise >= o.amountPaise ? 'Paid' : o.paidPaise > 0 ? 'Part paid' : 'Not paid');
 
 function Orders({ title, orders, note }: { title: string; orders: StatementOrder[]; note?: string }) {
   if (orders.length === 0) return null;
   const sum = (k: 'amountPaise' | 'paidPaise' | 'remainingPaise') => orders.reduce((n, o) => n + o[k], 0);
   return (
-    <section className="break-inside-avoid">
-      <h2 className="m-0 mt-6 text-[16px] font-semibold">{title}</h2>
-      {note ? <p className="m-0 mt-1 text-[12.5px] text-[#555]">{note}</p> : null}
+    <section>
+      <h2 className="mdoc-h2">{title}</h2>
+      {note ? <p className="mdoc-notes">{note}</p> : null}
       {orders.map((o) => (
-        <div key={o.id} className="mt-3 break-inside-avoid">
-          <p className="m-0 text-[14px] font-semibold">
-            <span className="mono">{o.number}</span> · {o.title} <span className="font-normal text-[#555]">· {o.paidLabel}</span>
-          </p>
-          <table className="mt-1 w-full border-collapse text-[13px]">
-            <thead>
-              <tr>
-                <th className={head}>Room</th>
-                <th className={head}>Item</th>
-                <th className={`${head} text-right`}>Amount</th>
+        <table key={o.id} className="mdoc-items mdoc-keep" style={{ marginTop: 10 }}>
+          <thead>
+            <tr>
+              <th colSpan={2}>
+                {o.number} · {o.title} <span style={{ fontWeight: 400 }}>· {paidWord(o)}</span>
+              </th>
+              <th className="r" style={{ width: 110 }}>
+                Amount
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {o.lines.map((x, i) => (
+              <tr key={i}>
+                <td style={{ width: 150 }}>{x.room || 'Whole home'}</td>
+                <td>{x.product}</td>
+                <td className="r">{formatINR(x.amountPaise)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {o.lines.map((x, i) => (
-                <tr key={i}>
-                  <td className={cell}>{x.room || 'Whole home'}</td>
-                  <td className={cell}>{x.product}</td>
-                  <td className={`${cell} ${num}`}>{formatINR(x.amountPaise)}</td>
-                </tr>
-              ))}
-              <tr>
-                <td className={cell} colSpan={2}>
-                  <b>Total (GST included)</b>
-                  {o.paidPaise > 0 || o.waitingPaise > 0 ? (
-                    <span className="text-[#555]">
-                      {' '}
-                      · paid {formatINR(o.paidPaise)}
-                      {o.waitingPaise > 0 ? ` · ${formatINR(o.waitingPaise)} waiting for confirmation` : ''}
-                    </span>
-                  ) : null}
-                </td>
-                <td className={`${cell} ${num} font-semibold`}>{formatINR(o.amountPaise)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            ))}
+            <tr className="mdoc-grand">
+              <td colSpan={2}>
+                Total
+                {o.paidPaise > 0 ? <span style={{ fontWeight: 400, fontSize: 13 }}> · paid {formatINR(o.paidPaise)}</span> : null}
+              </td>
+              <td className="r">{formatINR(o.amountPaise)}</td>
+            </tr>
+          </tbody>
+        </table>
       ))}
       {orders.length > 1 ? (
-        <p className="m-0 mt-2 text-right text-[13px]">
-          {title}: <b className="mono">{formatINR(sum('amountPaise'))}</b> · paid <span className="mono">{formatINR(sum('paidPaise'))}</span> · remaining{' '}
-          <span className="mono">{formatINR(sum('remainingPaise'))}</span>
+        <p className="mdoc-notes" style={{ textAlign: 'right' }}>
+          {title}: <b>{formatINR(sum('amountPaise'))}</b> · paid {formatINR(sum('paidPaise'))} · remaining {formatINR(sum('remainingPaise'))}
         </p>
       ) : null}
     </section>
@@ -83,115 +81,150 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   if (!view) notFound();
   const s = view.statement;
   const filename = `Statement_${nameWord(view.client, 'Client')}_${nameWord(view.studio, 'Studio')}_${view.on}`;
-  const day = new Date(`${view.on}T12:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  const day = longDay(view.on);
+  const stages = s.quotation.stages;
+  const total = (k: 'signedPaise' | 'owedPaise' | 'paidPaise' | 'remainingPaise') => stages.reduce((n, st) => n + st[k], 0);
+  const changed = stages.some((st) => st.owedPaise !== st.signedPaise);
+  const q = view.quotes;
+  const quotation = q.signed && q.designFinal && q.signed !== q.designFinal ? `${q.signed} (Design Final ${q.designFinal})` : q.designFinal ? `${q.designFinal} (Design Final)` : q.signed;
 
   return (
-    <main className="px-4 py-6">
+    <main className="mdoc-wrap px-4 py-6" style={{ background: '#ebe9ee' }}>
       <PrintStatement filename={filename} backHref={`/studio/projects/${id}?tab=payments`} />
-      <article className="mx-auto max-w-[820px] rounded-[12px] bg-white p-6 text-[#111] shadow-sm print:p-0 print:shadow-none" data-testid="statement">
-        <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[#111] pb-3">
-          <div>
-            <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#555]">{view.studio}</p>
-            <h1 className="m-0 text-[22px] font-semibold">Statement of account</h1>
-            <p className="m-0 mt-1 text-[14px]">
-              {view.client} · {view.home}
-            </p>
-          </div>
-          <p className="m-0 text-[13px] text-[#555]">As on {day}</p>
-        </header>
+      <div className="mdoc">
+        <article className="mdoc-page" data-testid="statement">
+          <DocHeader
+            issuer={view.issuer}
+            title="STATEMENT OF ACCOUNT"
+            meta={[
+              { label: 'As on', value: <b>{day}</b> },
+              ...(quotation ? [{ label: 'Quotation', value: quotation }] : []),
+              { label: 'Project value', value: formatINR(s.quotation.signedPaise) },
+            ]}
+          />
 
-        <section className="break-inside-avoid">
-          <h2 className="m-0 mt-5 text-[16px] font-semibold">Quotation{s.quotation.number ? <span className="mono font-normal"> {s.quotation.number}</span> : null}</h2>
-          <table className="mt-2 w-full border-collapse text-[13px]">
+          <div className="mdoc-parties">
+            <div className="mdoc-box">
+              <h3>Client</h3>
+              <b>{view.client}</b>
+              <br />
+              {view.home}
+            </div>
+            <div className="mdoc-box">
+              <h3>Summary</h3>
+              Paid: <b className="paid">{formatINR(s.totals.paidPaise)}</b>
+              <br />
+              Remaining: <b>{formatINR(s.totals.remainingPaise)}</b>
+            </div>
+          </div>
+
+          <table className="mdoc-items">
             <thead>
               <tr>
-                <th className={head}>Payment stage</th>
-                <th className={`${head} text-right`}>As signed</th>
-                <th className={`${head} text-right`}>Owed now</th>
-                <th className={`${head} text-right`}>Paid</th>
-                <th className={`${head} text-right`}>Remaining</th>
+                <th>Payment stage</th>
+                <th className="r" style={{ width: 110 }}>
+                  As signed
+                </th>
+                <th className="r" style={{ width: 110 }}>
+                  Owed now
+                </th>
+                <th className="r" style={{ width: 100 }}>
+                  Paid
+                </th>
+                <th className="r" style={{ width: 110 }}>
+                  Remaining
+                </th>
               </tr>
             </thead>
             <tbody>
-              {s.quotation.stages.map((st, i) => (
+              {stages.map((st, i) => (
                 <tr key={i}>
-                  <td className={cell}>
-                    {st.label}
-                    {st.pct !== null ? <span className="text-[#555]"> · {st.pct}%</span> : null}
+                  <td>
+                    <b>{st.label}</b>
+                    {st.pct !== null ? (
+                      <>
+                        {' '}
+                        · <span className="m">{st.pct}%</span>
+                      </>
+                    ) : null}
                   </td>
-                  <td className={`${cell} ${num}`}>{formatINR(st.signedPaise)}</td>
-                  <td className={`${cell} ${num}`}>{formatINR(st.owedPaise)}</td>
-                  <td className={`${cell} ${num}`}>{formatINR(st.paidPaise)}</td>
-                  <td className={`${cell} ${num}`}>{formatINR(st.remainingPaise)}</td>
+                  <td className="r">{formatINR(st.signedPaise)}</td>
+                  <td className="r">{formatINR(st.owedPaise)}</td>
+                  <td className={`r${st.paidPaise > 0 ? ' paid' : ''}`}>{formatINR(st.paidPaise)}</td>
+                  <td className="r">{formatINR(st.remainingPaise)}</td>
                 </tr>
               ))}
-              <tr>
-                <td className={`${cell} font-semibold`}>Quotation total (GST included)</td>
-                <td className={`${cell} ${num} font-semibold`}>{formatINR(s.quotation.signedPaise)}</td>
-                <td className={cell} colSpan={3} />
+              <tr className="mdoc-grand">
+                <td>Quotation total</td>
+                <td className="r">{formatINR(s.quotation.signedPaise)}</td>
+                <td className="r">{formatINR(total('owedPaise'))}</td>
+                <td className="r">{formatINR(total('paidPaise'))}</td>
+                <td className="r">{formatINR(total('remainingPaise'))}</td>
               </tr>
             </tbody>
           </table>
-          <p className="m-0 mt-1 text-[12px] text-[#555]">&ldquo;Owed now&rdquo; includes the extra work and changes below, which land on the last stage.</p>
-        </section>
+          <p className="mdoc-notes">&ldquo;Owed now&rdquo; includes extra work and changes, which land on the last stage.{changed ? '' : ' None on this project.'}</p>
 
-        <Orders title="Electrical" orders={s.electrical} />
-        <Orders title="Additional items" orders={s.additional} note="Extra work agreed after the design was signed off, paid in full before the work." />
+          <Orders title="Electrical" orders={s.electrical} />
+          <Orders title="Additional items" orders={s.additional} note="Extra work agreed after the design was signed off, paid in full before the work." />
 
-        {s.otherChanges.length ? (
-          <section className="break-inside-avoid">
-            <h2 className="m-0 mt-6 text-[16px] font-semibold">Other changes</h2>
-            <table className="mt-2 w-full border-collapse text-[13px]">
-              <tbody>
-                {s.otherChanges.map((c, i) => (
-                  <tr key={i}>
-                    <td className={cell}>{c.label}</td>
-                    <td className={`${cell} ${num}`}>{signed(c.deltaPaise)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
+          {s.otherChanges.length ? (
+            <section>
+              <h2 className="mdoc-h2">Other changes</h2>
+              <table className="mdoc-items">
+                <tbody>
+                  {s.otherChanges.map((c, i) => (
+                    <tr key={i}>
+                      <td>{c.label}</td>
+                      <td className="r">{signed(c.deltaPaise)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
 
-        <section className="mt-6 break-inside-avoid border-t border-[#111] pt-3">
-          <table className="ml-auto w-full max-w-[360px] border-collapse text-[14px]">
+          <table className="mdoc-totals mdoc-keep">
             <tbody>
               <tr>
-                <td className="py-1">Total</td>
-                <td className={`py-1 ${num} font-semibold`}>{formatINR(s.totals.totalPaise)}</td>
+                <td>Total</td>
+                <td className="r">
+                  <b>{formatINR(s.totals.totalPaise)}</b>
+                </td>
               </tr>
               <tr>
-                <td className="py-1">Paid</td>
-                <td className={`py-1 ${num}`}>{formatINR(s.totals.paidPaise)}</td>
+                <td>Paid</td>
+                <td className="r paid">{formatINR(s.totals.paidPaise)}</td>
               </tr>
-              {s.totals.waitingPaise > 0 ? (
-                <tr>
-                  <td className="py-1 text-[#555]">Recorded, waiting for confirmation</td>
-                  <td className={`py-1 ${num} text-[#555]`}>{formatINR(s.totals.waitingPaise)}</td>
-                </tr>
-              ) : null}
-              <tr>
-                <td className="border-t border-[#111] py-1 font-semibold">Remaining</td>
-                <td className={`border-t border-[#111] py-1 ${num} font-semibold`}>{formatINR(s.totals.remainingPaise)}</td>
+              <tr className="rem">
+                <td>Remaining</td>
+                <td className="r">{formatINR(s.totals.remainingPaise)}</td>
               </tr>
             </tbody>
           </table>
-        </section>
 
-        {s.pending.length ? (
-          <section className="mt-6 break-inside-avoid">
-            <h2 className="m-0 text-[14px] font-semibold">Sent, not approved yet (not in the total)</h2>
-            <ul className="m-0 mt-1 pl-5 text-[13px]">
-              {s.pending.map((o) => (
-                <li key={o.id}>
-                  <span className="mono">{o.number}</span> · {o.title}: {formatINR(o.amountPaise)}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </article>
+          {s.pending.length ? (
+            <section className="mdoc-keep">
+              <h2 className="mdoc-h2">Sent, not approved yet (not in the total)</h2>
+              <ul className="mdoc-notes" style={{ paddingLeft: 18 }}>
+                {s.pending.map((o) => (
+                  <li key={o.id}>
+                    {o.number} · {o.title}: {formatINR(o.amountPaise)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <div className="mdoc-notes">
+            <PaymentNote issuer={view.issuer} />
+            <p>This is a computer-generated statement from the project&rsquo;s Payments tab.</p>
+          </div>
+
+          <SignBlock issuer={view.issuer} />
+          <DocFooter issuer={view.issuer} right={`Statement as on ${day}`} />
+        </article>
+      </div>
     </main>
   );
 }
