@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
 import { startOwnProjectAction } from './actions';
-import { EXECUTION_DAYS } from '@/modules/project/step-template';
+import { EXECUTION_DAYS_BY_BHK } from '@/modules/project/step-template';
 
 /**
  * The short form: which quotation, when work starts, and the client's
@@ -131,8 +131,7 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
         <div>
           {/* Execution follows Hauspire's sheet after design (owner, 21 Nov 2026), so the handover is not typed. */}
           <p className={hint}>
-            Execution follows the execution sheet once design is done: about {EXECUTION_DAYS} days (civil, carpentry, finishing, handover). Handover is planned for around{' '}
-            {Number(designDays) > 0 ? Number(designDays) + EXECUTION_DAYS : EXECUTION_DAYS} days from today; move any stage later on the project&apos;s Plan tab.
+            Execution is planned the day design is complete, by flat size and the quotation&apos;s category: a 2 BHK takes {EXECUTION_DAYS_BY_BHK[2]} days, a 3 BHK {EXECUTION_DAYS_BY_BHK[3]}, a 4 BHK {EXECUTION_DAYS_BY_BHK[4]} (Essential; Premium 20% more, Luxe 40% more). The handover is given then.
             <input type="hidden" name="totalDays" value={days} />
           </p>
         </div>

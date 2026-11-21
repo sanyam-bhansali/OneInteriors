@@ -11,7 +11,7 @@ import {
   trackerToPlan,
   type PlanQuoteLine,
 } from '@/modules/portal/quote-to-plan';
-import { EXECUTION_DAYS, STEP_TEMPLATE, templateFor } from '@/modules/project/step-template';
+import { STEP_TEMPLATE, executionDaysFor, templateFor } from '@/modules/project/step-template';
 import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { STARTER_CATALOGUE } from '@/modules/studio-quote/starter-catalogue';
 import { computeTotals } from '@/modules/studio-quote/pricing';
@@ -187,7 +187,7 @@ describe('quoteToPlan', () => {
       const d = p.stages[0]!;
       expect((d.plannedEnd.getTime() - d.plannedStart.getTime()) / DAY).toBe(days);
       // Execution follows the sheet after design (owner, 21 Nov 2026): handover is design + 110 days, whatever the total.
-      expect(p.stages.at(-1)!.plannedEnd.getTime()).toBe(START.getTime() + (days + EXECUTION_DAYS) * DAY);
+      expect(p.stages.at(-1)!.plannedEnd.getTime()).toBe(START.getTime() + (days + executionDaysFor(bhk, null)) * DAY);
       const by = (label: string) => d.items.find((i) => i.label === label)!;
       expect(by('First draft (3D)').gatePayment).toBe(1);
       expect(by('Site visit with electrician & carpenter').gatePayment).toBe(2);

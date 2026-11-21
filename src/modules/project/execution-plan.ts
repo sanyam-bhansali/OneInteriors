@@ -21,11 +21,19 @@
 
 import type { Prisma } from '@prisma/client';
 import { executionFrom, executionStepDays, planSpanDays } from '@/modules/portal/quote-to-plan';
-import { STEP_TEMPLATE } from './step-template';
+import { bhkOf } from '@/modules/studio-design/template';
+import { executionDaysFor, STEP_TEMPLATE } from './step-template';
+import { propertyTypeFrom } from './own-project-rules';
 import { shiftStepDay } from './step-rules';
 import { calendarOf, dayToDb, EVERY_DAY, istDay, onWorkingDay } from './working-days';
 
 type Db = Prisma.TransactionClient;
+
+/** The flat's size: the signed quotation's BHK, else the brief's property type (null when neither says). */
+export async function projectBhk(db: Db, signedQuoteId: string | null, briefPropertyType: string | null): Promise<number | null> {
+  const q = signedQuoteId ? await db.studioQuote.findUnique({ where: { id: signedQuoteId }, select: { config: true, client: { select: { config: true } } } }) : null;
+  return bhkOf(propertyTypeFrom(q?.config ?? q?.client?.config) ?? briefPropertyType);
+}
 
 /** The day execution starts: design complete today, or after the last open pre-execution step's planned day. */
 export function executionStartDay(today: string, openDesignStepDays: readonly string[]): string {
@@ -38,7 +46,9 @@ export async function planExecutionAfterDesign(db: Db, projectId: string, now: D
     select: {
       startOn: true,
       executionPlannedAt: true,
-      introduction: { select: { studio: { select: { workingDays: true, holidays: { select: { day: true } } } } } },
+      category: true,
+      signedQuoteId: true,
+      introduction: { select: { studio: { select: { workingDays: true, holidays: { select: { day: true } } } }, brief: { select: { propertyType: true } } } },
       stages: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, kind: true, plannedStart: true, plannedEnd: true, actualEnd: true, items: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, label: true, plannedOn: true, doneAt: true, inScope: true } } },
@@ -58,7 +68,7 @@ export async function planExecutionAfterDesign(db: Db, projectId: string, now: D
   const cal = studio ? calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays }) : EVERY_DAY;
   const openDays = design.items.filter((i) => i.inScope && !i.doneAt && i.plannedOn).map((i) => istDay(i.plannedOn!));
   const start = onWorkingDay(executionStartDay(istDay(now), openDays), cal);
-  const windows = executionFrom(start, cal);
+  const windows = executionFrom(start, cal, executionDaysFor(await projectBhk(db, p.signedQuoteId, p.introduction?.brief?.propertyType ?? null), p.category));
 
   if (istDay(design.plannedEnd) !== start) await db.homeProjectStage.update({ where: { id: design.id }, data: { plannedEnd: dayToDb(start) } });
   for (const s of exec) {
