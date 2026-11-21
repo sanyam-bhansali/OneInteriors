@@ -252,6 +252,7 @@ export interface EditLeadInput {
   phone: unknown;
   email: unknown;
   society: unknown;
+  address?: unknown;
   config: unknown;
   budget: unknown;
   /** One of ours ("FACEBOOK"), or "own:<id>" for the studio's own name. */
@@ -293,7 +294,7 @@ export async function editLeadDetails(input: EditLeadInput): Promise<EditResult>
 
   const before = await prisma.studioClient.findFirst({
     where: { ...scope.leads, id: found.lead.id, studioId, deletedAt: null },
-    select: { name: true, phone: true, email: true, society: true, config: true, budgetPaise: true, source: true, leadSourceId: true },
+    select: { name: true, phone: true, email: true, society: true, address: true, config: true, budgetPaise: true, source: true, leadSourceId: true },
   });
   if (!before) return { ok: false, error: NOT_YOURS };
   // A lead One Interiors introduced keeps that source; nobody can mark their own as ours.
@@ -318,6 +319,8 @@ export async function editLeadDetails(input: EditLeadInput): Promise<EditResult>
     phone: phoneDigits,
     email,
     society: text(input.society, 120),
+    /* Left as it is when the form did not send it. */
+    address: input.address === undefined ? before.address : text(input.address, 300),
     config: text(input.config, 20),
     budgetPaise: budget.paise === null ? null : toDb(budget.paise),
     source,

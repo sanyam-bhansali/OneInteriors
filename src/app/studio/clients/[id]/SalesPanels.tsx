@@ -35,6 +35,7 @@ const primaryClass = 'btn pri sm';
 const quietClass = 'btn sec sm';
 import { buildFromPlanAction, planJobsAction } from '../../quotations/actions';
 import type { PlanJobView } from '@/modules/studio-quote/from-plan-rules';
+import { ADDRESS_MAX } from '@/modules/studio-sales/convert-rules';
 
 const box = 'card';
 const h2 = 'h';
@@ -156,6 +157,7 @@ export interface DetailValues {
   phone: string;
   email: string;
   society: string;
+  address: string;
   config: string;
   budgetPaise: number | null;
   source: string;
@@ -174,6 +176,7 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
     ['Phone', v.phone || null],
     ['Email', v.email || null],
     ['Society', v.society || v.locality],
+    ['Address', v.address || null],
     ['BHK', v.config || null],
     ['Carpet area', v.carpetSqft ? `${v.carpetSqft.toLocaleString('en-IN')} sq ft` : null],
     ['Budget', v.budgetPaise ? formatINR(v.budgetPaise) : null],
@@ -190,6 +193,7 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
           phone: get('phone'),
           email: get('email'),
           society: get('society'),
+          address: get('address'),
           config: get('config'),
           budget: get('budget'),
           source: get('source'),
@@ -258,6 +262,9 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
         <Field label="Society">
           <input name="society" defaultValue={v.society} className={inputClass} list={SOCIETY_LIST_ID} autoComplete="off" />
           <SocietyNames />
+        </Field>
+        <Field label="Address">
+          <input name="address" defaultValue={v.address} placeholder="Flat number, wing, road, area" maxLength={ADDRESS_MAX}className={inputClass} />
         </Field>
         <Field label="BHK">
           <input name="config" defaultValue={v.config} placeholder="3 BHK" className={inputClass} />

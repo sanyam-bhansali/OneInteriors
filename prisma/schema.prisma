@@ -4177,6 +4177,9 @@ model StudioClient {
   city       String  @default("Pune")
   config     String?
   carpetSqft Int?
+  /// The property's address: flat, wing, road, area. Required, with the
+  /// building (`society`), to convert the lead (owner, 20 Nov 2026).
+  address    String?
 
   source     ClientSource @default(OTHER)
   sourceNote String?
