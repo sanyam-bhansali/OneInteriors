@@ -11,7 +11,7 @@ import {
   trackerToPlan,
   type PlanQuoteLine,
 } from '@/modules/portal/quote-to-plan';
-import { EXECUTION_DAYS, STEP_TEMPLATE, templateFor } from '@/modules/project/step-template';
+import { STEP_TEMPLATE, executionDaysFor, templateFor } from '@/modules/project/step-template';
 import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { STARTER_CATALOGUE } from '@/modules/studio-quote/starter-catalogue';
 import { computeTotals } from '@/modules/studio-quote/pricing';
@@ -156,14 +156,17 @@ describe('quoteToPlan', () => {
     expect(design.items[0]!.tasks).toEqual(['Send the requirement form with the mood board']);
   });
 
-  it('plans each step’s day inside its stage’s window, first on its start and last on its end', () => {
+  it('plans each step’s day inside its stage’s window, in order, first on its start; handover on the last day', () => {
     for (const s of plan.stages) {
       const days = s.items.map((i) => i.plannedOn!.getTime());
       expect(days).toEqual([...days].sort((a, b) => a - b));
       expect(Math.min(...days)).toBeGreaterThanOrEqual(s.plannedStart.getTime());
-      expect(Math.max(...days)).toBe(s.plannedEnd.getTime());
+      expect(Math.max(...days)).toBeLessThanOrEqual(s.plannedEnd.getTime());
       if (s.items.length > 1) expect(days[0]).toBe(s.plannedStart.getTime());
     }
+    // Execution steps sit on their days in Hauspire's trackers (owner, 21 Nov 2026), so the handover is the last day.
+    const hand = plan.stages.at(-1)!;
+    expect(hand.items.at(-1)!.plannedOn!.getTime()).toBe(hand.plannedEnd.getTime());
     // Design (with pre-execution) lasts its steps' 43 days: material procurement on its last day.
     expect(day(plan.stages[0]!.items.at(-1)!.plannedOn!)).toBe('2026-12-14');
   });
@@ -187,7 +190,7 @@ describe('quoteToPlan', () => {
       const d = p.stages[0]!;
       expect((d.plannedEnd.getTime() - d.plannedStart.getTime()) / DAY).toBe(days);
       // Execution follows the sheet after design (owner, 21 Nov 2026): handover is design + 110 days, whatever the total.
-      expect(p.stages.at(-1)!.plannedEnd.getTime()).toBe(START.getTime() + (days + EXECUTION_DAYS) * DAY);
+      expect(p.stages.at(-1)!.plannedEnd.getTime()).toBe(START.getTime() + (days + executionDaysFor(bhk, null)) * DAY);
       const by = (label: string) => d.items.find((i) => i.label === label)!;
       expect(by('First draft (3D)').gatePayment).toBe(1);
       expect(by('Site visit with electrician & carpenter').gatePayment).toBe(2);

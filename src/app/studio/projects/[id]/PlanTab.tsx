@@ -18,7 +18,7 @@ import {
 } from '@/modules/project/project-rules';
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
 import { doneLabel, parsePercent } from '@/modules/project/step-rules';
-import { EXECUTION_DAYS, isProjectClosureStep } from '@/modules/project/step-template';
+import { isProjectClosureStep } from '@/modules/project/step-template';
 import type { ClosureDue } from '@/modules/project/closure-due';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
@@ -150,7 +150,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
         {!plan.executionPlanned ? (
           /* Owner, 21 Nov 2026: execution is planned, and the handover given, only once design is complete. */
           <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
-            Handover is planned once design is complete: execution then runs the execution sheet (about {EXECUTION_DAYS} days) from that day. The execution dates below are a first estimate until then.
+            Handover is planned once design is complete: execution then runs from that day, for the flat&rsquo;s size and category (2 BHK Essential 45 days, 3 BHK 60, 4 BHK 75; Premium 20% more, Luxe 40% more). Until then execution has no dates and only the design&rsquo;s can be moved.
           </p>
         ) : null}
         {plan.executionPlanned && o.plannedHandover && o.forecastHandover ? (
@@ -246,6 +246,8 @@ function StageRow({
   const moved = s.moveHidden ? null : s.lastMove;
   const hasSteps = s.groups.some((g) => g.steps.length > 0);
   const pct = s.progressPct ?? (s.state === 'done' ? 100 : 0);
+  /* Owner, 21 Nov 2026: no execution or handover dates, and nothing to move, until the project exits design. */
+  const undated = !plan.executionPlanned && s.kind !== 'DESIGN';
 
   const mark = (done: boolean) => {
     if (!done && !window.confirm(`Reopen ${s.name}? ${customer} will see it as not done again.`)) return;
@@ -284,19 +286,28 @@ function StageRow({
             </span>
           ) : null}
         </div>
-        <span className="mono text-[13px] text-[var(--text2)]">
-          <span className="md:hidden">Planned </span>
-          {dayWords(s.plannedStart)} – {dayWords(s.plannedEnd)}
-          {s.originalEnd !== s.plannedEnd ? <span className={`block ${muted}`}>first {dayWords(s.originalEnd)}</span> : null}
-        </span>
-        <span className="mono text-[13px] text-[var(--text2)]">
-          <span className="md:hidden">{s.actualEnd ? 'Done ' : 'Forecast '}</span>
-          {s.actualEnd ? dayWords(s.actualEnd) : dayWords(s.forecastEnd)}
-          {!s.actualEnd ? <span className={`block ${muted}`}>forecast</span> : null}
-        </span>
+        {undated ? (
+          <>
+            <span className="text-[13px] text-[var(--text2)]">Dated when design is complete</span>
+            <span className="mono text-[13px] text-[var(--text2)]">—</span>
+          </>
+        ) : (
+          <>
+            <span className="mono text-[13px] text-[var(--text2)]">
+              <span className="md:hidden">Planned </span>
+              {dayWords(s.plannedStart)} – {dayWords(s.plannedEnd)}
+              {s.originalEnd !== s.plannedEnd ? <span className={`block ${muted}`}>first {dayWords(s.originalEnd)}</span> : null}
+            </span>
+            <span className="mono text-[13px] text-[var(--text2)]">
+              <span className="md:hidden">{s.actualEnd ? 'Done ' : 'Forecast '}</span>
+              {s.actualEnd ? dayWords(s.actualEnd) : dayWords(s.forecastEnd)}
+              {!s.actualEnd ? <span className={`block ${muted}`}>forecast</span> : null}
+            </span>
+          </>
+        )}
         <span className="text-[13.5px]">
-          <span className="font-medium" style={{ color: line.tone }}>
-            {line.text}
+          <span className="font-medium" style={{ color: undated ? 'var(--muted)' : line.tone }}>
+            {undated ? (s.state === 'next' ? 'Next' : 'Later') : line.text}
           </span>
           {moved ? (
             <span className={`block ${muted}`}>
@@ -313,7 +324,7 @@ function StageRow({
             {open ? 'Hide steps' : s.completion.open ? `Show steps (${s.completion.open} to do)` : 'Show steps'}
           </button>
         ) : null}
-        {plan.canEdit && s.state !== 'done' ? (
+        {plan.canEdit && s.state !== 'done' && !undated ? (
           <button type="button" className="btn ghost sm" onClick={onMove}>
             Move a date
           </button>
@@ -955,7 +966,8 @@ function MoveDialog({
   say: (r: PlanEditResult) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const open = plan.stages.filter((s) => s.state !== 'done');
+  // During design only the design's dates move: execution and the handover are planned when design is complete (owner, 21 Nov 2026).
+  const open = plan.stages.filter((s) => s.state !== 'done' && (plan.executionPlanned || s.kind === 'DESIGN'));
   const [stageId, setStageId] = useState(open.some((s) => s.id === initialStage) ? initialStage : (open[0]?.id ?? initialStage));
   const stage = plan.stages.find((s) => s.id === stageId)!;
   const [field, setField] = useState<'PLANNED_START' | 'PLANNED_END'>('PLANNED_END');

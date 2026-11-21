@@ -89,9 +89,10 @@ export const STEP_TEMPLATE: readonly TemplateStep[] = [
   step('CIVIL', S1, 'Civil work', 4, '2026-08-04'),
 
   step('CARPENTRY', S2A, 'Site inspection of POP and civil work by the designer', 1, '2026-08-06'),
+  // In Hauspire's client trackers (owner, 21 Nov 2026) the factory delivers on carpentry's first day, before the carpenters start.
+  step('CARPENTRY', S2A, 'Materials delivered from the factory', 3, '2026-08-06'),
   step('CARPENTRY', S2A, 'Material at site: moulding, safety-door jali, ply', 2, '2026-08-09'),
   step('CARPENTRY', S2A, 'Site discussion and carpentry started', 1, '2026-08-10'),
-  step('CARPENTRY', S2A, 'Materials delivered from the factory', 3, '2026-08-26'),
   step('CARPENTRY', S2A, 'Hardware stage 1 ordered (tandems, channels, folding mechanisms)', 1, '2026-09-05'),
   step('CARPENTRY', S2A, 'CNC work and PU material ordered', 1, '2026-09-05'),
   step('CARPENTRY', S2A, 'Carcass complete with hardware', 10, '2026-09-15'),
@@ -151,8 +152,145 @@ export function executionSheetDays(): { kind: Exclude<PlanKind, 'DESIGN'>; days:
   });
 }
 
-/** Execution's whole length on the sheet, in days (110). */
+/** Execution's whole length on the sheet, in days (110): the stages' shares, not a project's length. */
 export const EXECUTION_DAYS = executionSheetDays().reduce((a, s) => a + s.days, 0);
+
+/**
+ * How long execution takes (owner, 21 Nov 2026): "2 Bhk - 45 Days, 3 Bhk 60
+ * Days, 4 Bhk 75 Days Essential increase premium by 20 % and luxe by 40%".
+ * Essential is the base. 1 BHK (not given) is 30, 15 less as each size
+ * steps; bigger than 4 BHK is a 4 BHK's. A flat of unknown size is a 2 BHK
+ * and a project with no category Premium, as the design days are
+ * (studio-design/template.ts).
+ */
+export const EXECUTION_DAYS_BY_BHK: Readonly<Record<1 | 2 | 3 | 4, number>> = { 1: 30, 2: 45, 3: 60, 4: 75 };
+export const EXECUTION_CATEGORY_FACTOR: Readonly<Record<string, number>> = { ESSENTIAL: 1, PREMIUM: 1.2, LUXURY: 1.4 };
+
+export function executionDaysFor(bhk: number | null | undefined, category: string | null | undefined): number {
+  const size = (bhk ? Math.min(4, Math.max(1, Math.round(bhk))) : 2) as 1 | 2 | 3 | 4;
+  const factor = EXECUTION_CATEGORY_FACTOR[category ?? 'PREMIUM'] ?? EXECUTION_CATEGORY_FACTOR.PREMIUM!;
+  return Math.round(EXECUTION_DAYS_BY_BHK[size] * factor);
+}
+
+/*
+ * Hauspire's client execution trackers (owner, 21 Nov 2026: 57 of them, "analyze
+ * to properly update it"). They are planned on three templates, 45, 60 and 70
+ * days; the 110-day sheet above was a one-off. Each step's day from the start
+ * of execution in each, the median across the trackers (the 43/58/68-day ones
+ * are the same templates starting framing a day or two earlier):
+ *
+ *   stages      45-day   60-day   70-day
+ *   civil       0–11     0–11     0–15
+ *   carpentry   11–28    11–35    15–40
+ *   finishing   28–35    35–47    40–56
+ *   handover    35–45    47–60    56–70
+ */
+export const TRACKER_LENGTHS = [45, 60, 70] as const;
+type ExecKind = Exclude<PlanKind, 'DESIGN'>;
+const EXEC_KINDS: readonly ExecKind[] = ['CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER'];
+/** The day each stage starts in each tracker. */
+const TRACKER_STAGE_FROM: Readonly<Record<ExecKind, readonly [number, number, number]>> = {
+  CIVIL: [0, 0, 0],
+  CARPENTRY: [11, 11, 15],
+  FINISH: [28, 35, 40],
+  HANDOVER: [35, 47, 56],
+};
+/** Each step's day from the start of execution in the 45-, 60- and 70-day trackers, by the step's name here. */
+const TRACKER_STEP_DAYS: Readonly<Record<string, readonly [number, number, number]>> = {
+  'pop, civil, fabrication and electrical work started': [0, 0, 0],
+  'pop framing': [2, 2, 2],
+  'pop wiring': [4, 4, 4],
+  'pop sheets': [5, 6, 6],
+  'pop lights': [6, 7, 9],
+  'pvc pop work': [7, 7, 10],
+  'fabrication work': [9, 9, 12],
+  'civil work': [10, 10, 13],
+  'site inspection of pop and civil work by the designer': [11, 11, 15],
+  'material at site: moulding, safety-door jali, ply': [11, 11, 15],
+  'site discussion and carpentry started': [12, 12, 16],
+  'materials delivered from the factory': [11, 11, 15],
+  'hardware stage 1 ordered (tandems, channels, folding mechanisms)': [15, 16, 22],
+  'cnc work and pu material ordered': [15, 16, 22],
+  'carcass complete with hardware': [16, 18, 25],
+  'shutters measured and ordered': [16, 18, 25],
+  'hardware stage 2 ordered (hinges, handles, push magnets, hydraulics)': [17, 19, 26],
+  'handles, knobs and locks ordered': [17, 19, 26],
+  'site inspection at carcass stage by the designer': [17, 19, 26],
+  'name plate ordered': [17, 19, 26],
+  'temple acrylic and small items ordered': [17, 19, 26],
+  'manual carpentry work complete': [19, 21, 30],
+  'painting putty started': [21, 24, 35],
+  'shutters delivered': [24, 28, 35],
+  'hardware stage 2 delivered': [24, 28, 35],
+  'profile door, mirror, headboard and wallpaper ordered': [24, 28, 35],
+  'handles and locks installed': [26, 32, 37],
+  'site inspection at shutter stage by the designer': [26, 32, 37],
+  'safety door installed': [27, 34, 38],
+  'carpentry complete and site cleaned': [28, 35, 40],
+  // Ours (owner, 13 Nov 2026): the project closure falls with carpentry complete.
+  'project closure': [28, 35, 40],
+  'profile door and mirror installed': [28, 35, 40],
+  'painting started': [28, 35, 41],
+  'painting complete': [31, 42, 49],
+  'cleaning started': [32, 43, 50],
+  'cleaning complete': [34, 46, 55],
+  'name plate installed': [35, 47, 56],
+  'headboard and wallpaper installed': [35, 47, 56],
+  'snags listed': [36, 48, 57],
+  'snag list closed': [38, 51, 60],
+  'site inspection by the designer': [39, 53, 61],
+  'final inspection with the client': [40, 55, 63],
+  'final snags closed': [42, 58, 68],
+  'provisional handover': [45, 60, 70],
+};
+
+/** The tracker a project's execution length is planned on (the nearest), and how much it is stretched. */
+function trackerFor(total: number): { i: 0 | 1 | 2; f: number } {
+  const t = Math.max(EXEC_KINDS.length, Math.round(total));
+  let i: 0 | 1 | 2 = 0;
+  TRACKER_LENGTHS.forEach((L, k) => {
+    if (Math.abs(L - t) < Math.abs(TRACKER_LENGTHS[i] - t)) i = k as 0 | 1 | 2;
+  });
+  return { i, f: t / TRACKER_LENGTHS[i] };
+}
+
+/** Each stage's first day from the start of execution, for this length (whole days, each stage at least one day). */
+function stageStarts(total: number): number[] {
+  const t = Math.max(EXEC_KINDS.length, Math.round(total));
+  const { i, f } = trackerFor(t);
+  const starts = EXEC_KINDS.map((k) => Math.round(TRACKER_STAGE_FROM[k][i] * f));
+  for (let k = 1; k < starts.length; k++) if (starts[k]! <= starts[k - 1]!) starts[k] = starts[k - 1]! + 1;
+  for (let k = starts.length - 1; k >= 1; k--) if (starts[k]! > t - (starts.length - k)) starts[k] = t - (starts.length - k);
+  return starts;
+}
+
+/**
+ * Each execution stage's days for a project's execution length, as Hauspire's
+ * trackers split it: the nearest tracker (45, 60 or 70 days) stretched to the
+ * length, in whole days that add up to exactly `total`, each at least one.
+ */
+export function executionStageDays(total: number): { kind: ExecKind; days: number }[] {
+  const t = Math.max(EXEC_KINDS.length, Math.round(total));
+  const starts = stageStarts(t);
+  return EXEC_KINDS.map((kind, k) => ({ kind, days: (k + 1 < starts.length ? starts[k + 1]! : t) - starts[k]! }));
+}
+
+/**
+ * A step's day inside its stage (0 = the stage's first day) for this execution
+ * length, from the trackers; null for a step the trackers do not have (one the
+ * studio added), which the caller places itself.
+ */
+export function executionStepOffset(kind: ExecKind, label: string, total: number): number | null {
+  const d = TRACKER_STEP_DAYS[label.trim().toLowerCase()];
+  if (!d) return null;
+  const t = Math.max(EXEC_KINDS.length, Math.round(total));
+  const { i, f } = trackerFor(t);
+  const k = EXEC_KINDS.indexOf(kind);
+  const starts = stageStarts(t);
+  const from = starts[k]!;
+  const to = k + 1 < starts.length ? starts[k + 1]! : t;
+  return Math.min(to - from, Math.max(0, Math.round(d[i] * f) - from));
+}
 
 /** The template's steps of one stage kind, in order. */
 export function templateFor(kind: PlanKind): TemplateStep[] {
