@@ -24,6 +24,7 @@ export function TotalsTable({
   onDiscountPct,
   ownSchedule,
   readOnly = false,
+  stages = null,
 }: {
   totals: QuoteTotals;
   /** The quotation's own fee (7%, or an older quotation's figure). */
