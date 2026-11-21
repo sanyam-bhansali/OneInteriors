@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { overallDelay, type RuleChange, type RuleStage } from '@/modules/project/project-rules';
 import { executionStartDay } from '@/modules/project/execution-plan';
-import { designThenSheet, executionFrom, executionStepDays, planSpanDays, stepsFor, templateStages } from '@/modules/portal/quote-to-plan';
+import { designThenSheet, executionFrom, executionStepDays, planSpanDays, stepsFor, templateStages, trackerStepDays } from '@/modules/portal/quote-to-plan';
 import { EXECUTION_DAYS, STEP_TEMPLATE, executionDaysFor, executionSheetDays, executionStageDays, executionStepOffset, templateFor } from '@/modules/project/step-template';
-import { dayToDb, istDay, isoWeekday, type StudioCalendar } from '@/modules/project/working-days';
+import { dayToDb, istDay, isoWeekday, workingDaysBetween, type StudioCalendar } from '@/modules/project/working-days';
 
 /* Owner, 21 Nov 2026: "Execution timeline is not proper". Execution got whatever was left of 60 days after design
    (often under three weeks, some stages 0 days). It now follows Hauspire's execution sheet from the day design ends. */
@@ -72,6 +72,18 @@ describe('stage dates: design, then execution', () => {
       for (let i = 1; i < s.length; i++) expect(day(s[i]!.plannedStart)).toBe(day(s[i - 1]!.plannedEnd));
       expect(planSpanDays(dayToDb('2026-11-17'), s)).toBe(designDays + 60);
     }
+  });
+
+  it('counts working days only: Mondays and holidays are skipped (owner, 21 Nov 2026)', () => {
+    const cal: StudioCalendar = { workingDays: [2, 3, 4, 5, 6, 7], holidays: new Set(['2027-01-26']) };
+    const e = executionFrom('2027-01-16', cal, 60);
+    for (const [k, days] of [11, 24, 12, 13].entries()) expect(workingDaysBetween(e[k]!.start, e[k]!.end, cal)).toBe(days);
+    // Civil from Sat 16 Jan: 11 working days skip Mon 18 and Mon 25 Jan and Republic Day (Tue 26 Jan).
+    expect(e[0]).toEqual({ kind: 'CIVIL', start: '2027-01-16', end: '2027-01-30' });
+    // Steps: no step on a Monday or the holiday.
+    const days = trackerStepDays('CIVIL', templateFor('CIVIL').map((t) => t.label), e[0]!, 60, cal);
+    expect(days.every((d) => isoWeekday(d) !== 1 && d !== '2027-01-26')).toBe(true);
+    expect(days[1]).toBe('2027-01-19'); // POP framing: 2 working days after Sat 16 (Sun 17, Tue 19)
   });
 
   it('with Monday off, every stage starts and ends on a working day', () => {
