@@ -715,6 +715,8 @@ model Studio {
   coverageRules     WarrantyCoverageRule[]
   serviceRequests   ServiceRequest[]
   clientAgreements  ClientAgreement[]
+  /// Invoice numbers, one per project payment stage (owner, 21 Nov 2026).
+  invoices          StudioInvoice[]
 
   /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
   /// (projects, design, site mode, the payments desk, crews, team) is open
@@ -1913,6 +1915,9 @@ model HomeProject {
 
   /// The client agreement, e-signed at design closure (owner, 21 Nov 2026).
   clientAgreements ClientAgreement[]
+
+  /// One invoice number per payment stage, given the first time it is opened (owner, 21 Nov 2026).
+  invoices StudioInvoice[]
 
   /// Brought onto One Interiors while already running ("Add an existing
   /// project", owner 20 Oct 2026; docs/studio-os/BRING-IN-PROJECTS.md): when,
@@ -3658,6 +3663,24 @@ model StudioBranding {
   /// partners — printed before every quotation (owner, 13 Oct 2026). Empty:
   /// the PDF draws a cover from the studio's details.
   brandPages String[] @default([])
+
+  /// Invoices and the statement (owner, 21 Nov 2026; modules/project/
+  /// invoice-rules.ts). Who signs them, and the stamp beside the signature:
+  /// storage paths in the private logo bucket (studio_<id>/sign/…), shown
+  /// through short signed links on the document pages only.
+  signatoryName        String?
+  signatoryDesignation String?
+  signaturePath        String?
+  stampPath            String?
+  /// "HPL" in HPL/26-27/0001. Null: the legal name's initials.
+  invoicePrefix        String?
+  /// Null: 998391.
+  sacCode              String?
+  /// Printed only when filled.
+  bankAccountName      String?
+  bankAccountNumber    String?
+  bankIfsc             String?
+  bankName             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6746,4 +6769,28 @@ model ClientAgreement {
   @@index([projectId, status])
   @@index([studioId, status])
   @@map("client_agreements")
+}
+
+/// One invoice per project payment stage (owner, 21 Nov 2026; modules/
+/// project/invoice-rules.ts). Only the number is kept: the figures are read
+/// from the payment ledger each time it is opened. The number is given the
+/// first time the stage's invoice is opened, counting up within the studio
+/// and the Indian financial year (April to March) it was issued in.
+model StudioInvoice {
+  id         String      @id @default(cuid())
+  studioId   String
+  studio     Studio      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  projectId  String
+  project    HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stageIndex Int
+  /// "HPL/26-27/0001", as printed.
+  number     String
+  /// The financial year's first calendar year: 2026 for April 2026 to March 2027.
+  fyStart    Int
+  seq        Int
+  issuedAt   DateTime    @default(now())
+
+  @@unique([projectId, stageIndex])
+  @@unique([studioId, fyStart, seq])
+  @@map("studio_invoices")
 }

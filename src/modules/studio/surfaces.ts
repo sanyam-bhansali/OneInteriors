@@ -72,7 +72,8 @@ export const PAYMENTS_HOME = '/studio/payments';
 /** Money due (owner, 13 Nov 2026: "who owes how much"): the owner, accounts and the design head. */
 export const MONEY_DUE_PATH = '/studio/payments/due';
 /** A project's statement (owner, 13 Nov 2026): whoever reads its money; which project is checked on the page. */
-const isStatementPath = (path: string): boolean => /^\/studio\/projects\/[^/?#]+\/statement\/?$/.test(path);
+/** The project statement and a payment stage's invoice (owner, 21 Nov 2026): accounts opens both. */
+const isStatementPath = (path: string): boolean => /^\/studio\/projects\/[^/?#]+\/(statement|invoice\/\d{1,2})\/?$/.test(path);
 export const TEAM_PATH = '/studio/settings/team';
 /** The unassigned leads (closed on Pro Solo). */
 export const POOL_PATH = '/studio/clients/pool';
@@ -94,6 +95,8 @@ export const SITE_CREW_PATH = '/studio/settings/crew';
 export const HOLIDAYS_PATH = '/studio/settings/holidays';
 /** The client agreement signed at design closure (owner, 21 Nov 2026; docs/studio-os/CLIENT-AGREEMENT.md). */
 export const AGREEMENT_PATH = '/studio/settings/agreement';
+/** Settings → Invoices (owner, 21 Nov 2026): who signs invoices and the statement, the stamp, prefix, SAC, bank. Owner only. */
+export const INVOICE_SETTINGS_PATH = '/studio/settings/invoices';
 /** Paid service visits after the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md): the office, accounts and the design head. */
 export const SERVICE_VISITS_PATH = '/studio/service-visits';
 /** The team's leave (owner, 13 Nov 2026): under the calendar, so every role opens it. */
@@ -119,6 +122,7 @@ export const FULL_SOFTWARE_PATHS: readonly string[] = [
   /* Holidays move design plans (owner, 13 Nov 2026). */
   HOLIDAYS_PATH,
   AGREEMENT_PATH,
+  INVOICE_SETTINGS_PATH,
   SERVICE_VISITS_PATH,
   DOCUMENTS_HOME,
   SITE_HOME,
@@ -258,6 +262,8 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   if (under(path, CHATS_HOME)) return member.role !== 'SALES' && member.role !== 'ACCOUNTS';
   /* The setup quiz sets the studio's settings up: the owner's alone. */
   if (under(path, SETUP_PATH)) return member.role === 'OWNER';
+  /* Invoice settings (owner, 21 Nov 2026): the owner's alone. */
+  if (under(path, INVOICE_SETTINGS_PATH)) return member.role === 'OWNER';
   /* Holidays (owner, 13 Nov 2026): the owner and the design head, as for approving a hold (studio-hold/rules.ts `mayApproveHold`). */
   if (under(path, HOLIDAYS_PATH)) return member.role === 'OWNER' || (member.role === 'DESIGNER' && member.designHead === true);
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME) || calendarForAll(path);

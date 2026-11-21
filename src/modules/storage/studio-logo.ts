@@ -26,7 +26,7 @@ import 'server-only';
 import { supabaseConfig } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { myStudioId } from '@/modules/studio/tenancy';
-import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO, MAX_BRAND_PAGE_BYTES, MAX_BRAND_PAGE_MB } from './logo-limits';
+import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO, MAX_BRAND_PAGE_BYTES, MAX_BRAND_PAGE_MB, MAX_SIGN_BYTES, MAX_SIGN_MB, SIGN_TYPES as SIGN_TYPE_LIST, ACCEPTED_SIGN } from './logo-limits';
 
 const BUCKET = 'studio-logos';
 const SIGNED_URL_SECONDS = 300;
@@ -36,6 +36,7 @@ const SIGNED_URL_SECONDS = 300;
 const MAX_BYTES = MAX_LOGO_BYTES;
 
 const ALLOWED = new Map(Object.entries(LOGO_TYPES));
+const SIGN_TYPES: ReadonlySet<string> = new Set(SIGN_TYPE_LIST);
 
 /* Re-exported so server callers have one import for the whole feature. */
 export { ACCEPTED_LOGO, MAX_LOGO_MB } from './logo-limits';
@@ -71,7 +72,27 @@ export async function storeBrandPage(studioId: string, file: File): Promise<Logo
   );
 }
 
-async function storeImage(studioId: string, file: File, folder: '' | 'brand/', maxBytes: number, tooBig: string, what: string): Promise<LogoResult> {
+/**
+ * The signature and the stamp for invoices and the statement (owner, 21 Nov
+ * 2026). The same private bucket, under the studio's `sign/` folder, PNG or
+ * JPEG only, at most 2 MB. Never a public link: the document pages sign them
+ * for five minutes (`signedSignUrls`), and nothing else does.
+ */
+export async function storeSignImage(studioId: string, file: File): Promise<LogoResult> {
+  if (!SIGN_TYPES.has(file.type)) return { ok: false, error: `We can take ${ACCEPTED_SIGN}. Scan or photograph it on white paper.` };
+  return storeImage(studioId, file, 'sign/', MAX_SIGN_BYTES, `Over ${MAX_SIGN_MB} MB. Crop it to just the signature or the stamp.`, 'Uploading a signature');
+}
+
+/**
+ * Short links to a studio's signature and stamp, for its invoices and
+ * statement only. The caller passes the studio its project query was scoped
+ * to; only that studio's own `sign/` folder is signed.
+ */
+export async function signedSignUrls(paths: readonly (string | null)[], studioId: string | null): Promise<(string | null)[]> {
+  return Promise.all(paths.map((p) => (p && studioId && p.startsWith(`studio_${studioId}/sign/`) ? signPath(p) : Promise.resolve(null))));
+}
+
+async function storeImage(studioId: string, file: File, folder: '' | 'brand/' | 'sign/', maxBytes: number, tooBig: string, what: string): Promise<LogoResult> {
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key) {
