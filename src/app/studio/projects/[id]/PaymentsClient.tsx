@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
 import { MODE_LABEL, parseRupees, PAYMENT_MODES, type PaymentModeName } from '@/modules/project/payment-ledger';
-import { correctPaymentAction, recordPaymentAction, setDueAction } from './money-actions';
+import { correctPaymentAction, recordPaymentAction, setDueAction, setProjectGstAction } from './money-actions';
 
 /**
  * Marking money received (studio workspace Phase 5): the stage and its open
@@ -291,5 +291,64 @@ export function DueDate({ projectId, index, value, label }: { projectId: string;
         </span>
       ) : null}
     </span>
+  );
+}
+
+/**
+ * GST on part of the project (owner, 21 Nov 2026: "18% GST on 30% of project … one tickbox if GST applicable or
+ * not"): the tick, the % of the project value, Save. The GST goes onto the stages after the design advance.
+ */
+export function GstBox({ projectId, pct, gstPaise, canSet }: { projectId: string; pct: number | null; gstPaise: number; canSet: boolean }) {
+  const [on, setOn] = useState(pct !== null);
+  const [share, setShare] = useState(String(pct ?? 30));
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const now = pct !== null ? `18% GST on ${pct}% of the project value: ${formatINR(gstPaise)}, in the stages after the design advance.` : 'No GST on this project.';
+  if (!canSet) return <p className="m-0 text-[12.5px] text-[var(--muted)]" data-testid="gst-line">{now}</p>;
+  const changed = on !== (pct !== null) || (on && share.trim() !== String(pct ?? ''));
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-[10px] bg-[var(--fill)] p-3"
+      data-testid="gst-box"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setMsg(null);
+        start(async () => {
+          const r = await setProjectGstAction(projectId, on, share);
+          setMsg(r.ok ? { ok: true, text: r.message ?? 'Saved.' } : { ok: false, text: r.error ?? 'That did not save.' });
+        });
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-3 text-[14px]">
+        <label className="flex items-center gap-2 font-semibold">
+          <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /> GST applicable
+        </label>
+        <label className="flex items-center gap-2">
+          18% GST on
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={share}
+            disabled={!on}
+            onChange={(e) => setShare(e.target.value)}
+            className="fld"
+            style={{ width: 72 }}
+            aria-label="Percent of the project value GST is on"
+          />
+          % of the project value
+        </label>
+        <button type="submit" className="btn sec sm" disabled={pending || !changed}>
+          {pending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      <p className="m-0 text-[12.5px] text-[var(--muted)]">{now} Booking and design advance carry no GST; when the Design Final changes the stages, the GST is worked out again on its value.</p>
+      {msg ? (
+        <p role={msg.ok ? 'status' : 'alert'} className="m-0 text-[13px]" style={{ color: msg.ok ? 'var(--good)' : 'var(--bad)' }}>
+          {msg.text}
+        </p>
+      ) : null}
+    </form>
   );
 }

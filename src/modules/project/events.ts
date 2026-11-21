@@ -79,6 +79,8 @@ export const PROJECT_EVENT_TYPES = [
   'payment.corrected',
   'payment.confirmed',
   'payment.disputed',
+  // GST on part of the project set or changed (owner, 21 Nov 2026; project/project-gst.ts)
+  'payment.gst_set',
   'document.filed',
   'document.shared',
   'document.superseded',

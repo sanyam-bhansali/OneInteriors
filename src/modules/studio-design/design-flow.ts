@@ -42,6 +42,7 @@ import { calendarOf, dayFromDb, dayToDb, daysBetween, isDay, istDay, istTime, on
 import { readSignedStages } from '@/modules/portal/payments';
 import { formatINR } from '@/lib/money';
 import { restageOnTotal } from './restage';
+import { restageKeepingGst } from '@/modules/project/project-gst';
 import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
 import { elementBySlug } from '@/modules/prepare/catalogue';
@@ -1155,9 +1156,10 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
   const facts = await projectFacts(projectId);
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
   /* The payment stages move to the Design Final's total (owner, 14 Nov 2026). */
-  const money = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { paymentPhases: true } });
+  const money = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { paymentPhases: true, gstPctOfValue: true, gstPaise: true } });
   const stages = readSignedStages(money?.paymentPhases);
-  const restaged = stages ? restageOnTotal(stages, summary.designTotalPaise, summary.salesTotalPaise) : null;
+  /* GST on part of the project (owner, 21 Nov 2026) comes off, and goes back on the Design Final's value. */
+  const restaged = stages && money ? restageKeepingGst(stages, Number(money.gstPaise), money.gstPctOfValue, (base) => restageOnTotal(base, summary.designTotalPaise, summary.salesTotalPaise)) : null;
   const newStages = restaged?.ok && restaged.changed ? restaged.stages : null;
   await prisma.$transaction(async (tx) => {
     await tx.homeProject.update({
@@ -1166,7 +1168,7 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
         designClosedAt: now,
         designFinalQuoteId: df.id,
         designChanges: summary as unknown as Prisma.InputJsonValue,
-        ...(newStages ? { paymentPhases: newStages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(summary.designTotalPaise) } : {}),
+        ...(newStages && restaged?.ok ? { paymentPhases: newStages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(restaged.totalPaise), gstPaise: BigInt(restaged.gstPaise) } : {}),
       },
     });
     await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length, ...(newStages ? { fromPaise: summary.salesTotalPaise, toPaise: summary.designTotalPaise } : {}) } });
