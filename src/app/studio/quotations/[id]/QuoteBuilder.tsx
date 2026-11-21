@@ -140,6 +140,9 @@ export function QuoteBuilder({
   useEffect(() => {
     if (server === saved.current) return;
     if (JSON.stringify(onScreen.current) !== saved.current) return; // unsaved work wins
+    /* The same lines as on screen, only keyed by id now (a save just landed):
+       keep the screen's, so no row is re-keyed and a box being typed in keeps its cursor. */
+    if (sameButKeys(JSON.parse(server) as EditableLine[], onScreen.current)) return;
     saved.current = server;
     const next = JSON.parse(server) as EditableLine[];
     setLines(next);
@@ -446,12 +449,22 @@ export function QuoteBuilder({
       savedClient.current = sentClient;
     }
     const result = await saveLinesAction(quote.id, payload, termsIn);
-    if (result && 'ok' in result && !result.ok) {
+    if (!result.ok) {
       setError(result.error);
       return false;
     }
+    /* A new line now has its id: put it on the line on screen (by its key), so
+       the next save updates it rather than adding it again, even when it was
+       edited while this save was in flight (autosave, 21 Nov 2026). */
+    const idOf = new Map<string, string>();
+    lines.forEach((l, i) => {
+      const id = result.ids[i];
+      if (!l.id && id) idOf.set(l.key, id);
+    });
+    const withIds = (list: EditableLine[]) => list.map((l) => (!l.id && idOf.has(l.key) ? { ...l, id: idOf.get(l.key)! } : l));
+    if (idOf.size > 0) setLines(withIds);
     /* Saved from what was SENT: a figure typed while it was in flight is still unsaved. */
-    saved.current = sentLines;
+    saved.current = idOf.size > 0 ? JSON.stringify(withIds(JSON.parse(sentLines) as EditableLine[])) : sentLines;
     savedTerms.current = sentTerms;
     return true;
   }
@@ -459,6 +472,47 @@ export function QuoteBuilder({
   /* One save at a time (owner, 13 Nov 2026: saving twice made an extra copy). `saving` only turns true on the next
      render, so a quick double click got in twice; this ref is set at once and the second press is ignored. */
   const inFlight = useRef(false);
+
+  /* Autosave (owner, 21 Nov 2026): a few seconds after the last change, the
+     quotation is saved as "Save" would (no copy is made, nothing is sent).
+     On unless turned off; the choice is remembered in this browser. A save
+     that fails is not retried until something changes. */
+  const [autosave, setAutosave] = useState(true);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(AUTOSAVE_KEY) === 'off') setAutosave(false);
+    } catch {
+      /* no storage: stays on */
+    }
+  }, []);
+  function chooseAutosave(on: boolean) {
+    setAutosave(on);
+    try {
+      window.localStorage.setItem(AUTOSAVE_KEY, on ? 'on' : 'off');
+    } catch {
+      /* no storage: for this visit only */
+    }
+  }
+  const autoFailed = useRef<string | null>(null);
+  const onScreenNow = JSON.stringify([lines, terms, client]);
+  useEffect(() => {
+    if (!autosave || !dirty || locked || saving || !termsIn) return;
+    if (autoFailed.current === onScreenNow) return;
+    const timer = window.setTimeout(() => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      startSave(async () => {
+        try {
+          if (!(await persist())) autoFailed.current = onScreenNow;
+        } finally {
+          inFlight.current = false;
+        }
+      });
+    }, AUTOSAVE_MS);
+    return () => window.clearTimeout(timer);
+    // persist reads this render's lines, terms and client, which onScreenNow stands for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autosave, dirty, locked, saving, termsIn, onScreenNow]);
 
   function saveAs(stage: 'SALES' | 'DESIGN') {
     if (inFlight.current) return;
@@ -720,9 +774,23 @@ export function QuoteBuilder({
           </>
           )}
         </div>
-        <p className={`hsaved ${saving ? 'muted' : dirty ? 'warn-t' : 'good-t'}`} role="status">
-          {saving ? 'Saving…' : dirty ? 'Unsaved changes — figures on screen are live; the stored copy is not.' : 'Saved. Everything on screen is stored.'}
-        </p>
+        <div className="hstack" style={{ gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <p className={`hsaved ${saving ? 'muted' : dirty ? 'warn-t' : 'good-t'}`} role="status" style={{ flex: '1 1 auto' }}>
+            {saving
+              ? 'Saving…'
+              : dirty
+                ? autosave && !locked && termsIn && autoFailed.current !== onScreenNow
+                  ? 'Unsaved changes — saving in a moment.'
+                  : 'Unsaved changes — figures on screen are live; the stored copy is not.'
+                : 'Saved. Everything on screen is stored.'}
+          </p>
+          {locked ? null : (
+            <label className="hstack sm" style={{ gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }} title="Save a few seconds after each change. Making the Design Final or sending still needs its own button.">
+              <input type="checkbox" checked={autosave} onChange={(e) => chooseAutosave(e.target.checked)} />
+              Autosave
+            </label>
+          )}
+        </div>
         {error ? (
           <p role="alert" className="qerr">
             {error}
@@ -948,6 +1016,17 @@ let counter = 0;
 function freshKey(): string {
   counter += 1;
   return `new-${counter}`;
+}
+
+/** Autosave waits this long after the last change, and remembers on/off in this browser under this key. */
+const AUTOSAVE_MS = 3000;
+const AUTOSAVE_KEY = 'oi.quote.autosave';
+
+/** The same lines, ignoring the on-screen keys (and an agreed figure written as null or absent). */
+function sameButKeys(a: readonly EditableLine[], b: readonly EditableLine[]): boolean {
+  const plain = (l: EditableLine) =>
+    JSON.stringify([l.id ?? null, l.room, l.product, l.code, l.unit, l.details ?? null, l.widthMm ?? null, l.heightMm ?? null, l.qtyMilli ?? null, l.ratePaise, l.agreedPaise ?? null, l.note ?? null]);
+  return a.length === b.length && a.every((l, i) => plain(l) === plain(b[i]!));
 }
 
 function toEditable(line: QuoteRow['lines'][number]): EditableLine {
