@@ -48,6 +48,7 @@ import { currentMember } from '@/modules/studio/access';
 import { asQuoteCategory, categoryRefusal, CATEGORY_ERRORS } from './category-rules';
 import { readSignedStages } from '@/modules/portal/payments';
 import { restageOnTotal } from '@/modules/studio-design/restage';
+import { restageKeepingGst } from '@/modules/project/project-gst';
 import { phoneSearchDigits } from '@/modules/studio/phone-search';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
@@ -1075,16 +1076,18 @@ async function restageProjectOnDesignFinal(quoteId: string, studioId: string): P
     if (!q || q.stage !== 'DESIGN' || !q.basedOnId || q.scopeForProjectId) return;
     const project = await prisma.homeProject.findFirst({
       where: { introduction: { studioId }, cancelledAt: null, signedQuoteId: q.basedOnId },
-      select: { id: true, paymentPhases: true },
+      select: { id: true, paymentPhases: true, gstPctOfValue: true, gstPaise: true },
     });
     const stages = project ? readSignedStages(project.paymentPhases) : null;
     if (!project || !stages) return;
-    /* Booking and design advance as on the sales final; the later stages on the Design Final (owner, 19 Nov 2026). */
-    const r = restageOnTotal(stages, totalsFor(q).totalPaise, await salesFinalTotalInStudio(q.basedOnId, studioId));
+    /* Booking and design advance as on the sales final; the later stages on the Design Final (owner, 19 Nov 2026).
+       GST on part of the project (owner, 21 Nov 2026) comes off and goes back on the Design Final's value. */
+    const sales = await salesFinalTotalInStudio(q.basedOnId, studioId);
+    const r = restageKeepingGst(stages, Number(project.gstPaise), project.gstPctOfValue, (base) => restageOnTotal(base, totalsFor(q).totalPaise, sales));
     if (!r.ok || !r.changed) return;
     await prisma.homeProject.update({
       where: { id: project.id },
-      data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(r.stages.reduce((a, x) => a + x.amountPaise, 0)) },
+      data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(r.totalPaise), gstPaise: BigInt(r.gstPaise) },
     });
   } catch (error) {
     console.error('[studio-quote] restageProjectOnDesignFinal failed', error);

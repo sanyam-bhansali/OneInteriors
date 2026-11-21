@@ -33,6 +33,7 @@ import { can } from '@/modules/studio/roles';
 import { siteLabel } from '@/modules/studio/team-rules';
 import { recordEvent, type ProjectActor } from './events';
 import { staffOn, type Staff } from './flow-access';
+import { checkGstPct, regst } from './project-gst';
 import { dayFromDb, dayToDb, isDay, istDay } from './working-days';
 import {
   canRecord,
@@ -495,6 +496,8 @@ export interface StudioPaymentRow {
 
 export interface StudioPayments {
   projectId: string;
+  /** GST on part of the project (owner, 21 Nov 2026): the % of the value it is on (null = none), the GST added, and who may set it. */
+  gst: { pct: number | null; gstPaise: number; canSet: boolean };
   ledger: Ledger;
   rows: StudioPaymentRow[];
   /** The stage a new payment is most likely for, and what is open on it. */
@@ -508,6 +511,8 @@ export interface StudioPayments {
 
 const PROJECT_MONEY_SELECT = {
   ...MONEY_SELECT,
+  gstPctOfValue: true,
+  gstPaise: true,
   payments: { select: { ...ROW_SELECT, note: true, receiptDocument: { select: { storageKey: true, deletedAt: true } } } },
 } as const;
 
@@ -524,6 +529,7 @@ async function studioView(projectId: string, p: ProjectMoney, mayRecord: boolean
   const urls = keys.map((key) => (key ? signed[k++] || null : null));
   return {
     projectId,
+    gst: { pct: p.gstPctOfValue ?? null, gstPaise: p.gstPaise == null ? 0 : fromDb(p.gstPaise), canSet: mayRecord },
     ledger: l,
     rows: l.rows.map((r, i) => ({
       id: r.id,
@@ -545,6 +551,44 @@ async function studioView(projectId: string, p: ProjectMoney, mayRecord: boolean
     dueOn: Object.fromEntries(dueDates(p.paidPhases)),
     canRecord: mayRecord,
     canSetDue: maySetDue,
+  };
+}
+
+/**
+ * GST on part of the project (owner, 21 Nov 2026: "18% GST on 30% of project … one tickbox if GST applicable or
+ * not"), on its Payments tab, by whoever records payments. The GST added before comes off the stages, then 18% of
+ * the given % of the value goes onto the stages after the design advance (project-gst.ts); the total follows.
+ * `on` false takes it off. Payments already recorded stay on their stage.
+ */
+export async function setProjectGst(projectId: string, input: { on: unknown; pct: unknown }, now = new Date()): Promise<FlowResult & { message?: string }> {
+  const staff = await staffOn(projectId, 'payment.record');
+  if (!staff.ok) return staff;
+  const on = input.on === true || input.on === 'true' || input.on === 'on';
+  let pct: number | null = null;
+  if (on) {
+    const c = checkGstPct(input.pct);
+    if (!c.ok) return c;
+    pct = c.pct;
+  }
+  const p = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { paymentPhases: true, gstPctOfValue: true, gstPaise: true } });
+  const stages = p ? readSignedStages(p.paymentPhases) : null;
+  if (!p || !stages) return { ok: false, error: 'This project has no signed payment plan to add GST to.' };
+  if (p.gstPctOfValue === pct) return { ok: true, message: 'Nothing changed.' };
+  const r = regst(stages, fromDb(p.gstPaise), pct);
+  if (r.stages.some((s) => s.amountPaise < 0)) return { ok: false, error: 'The stages do not add up as expected. Reload the page and try again.' };
+  await prisma.$transaction(async (tx) => {
+    await lockProject(tx, projectId);
+    await tx.homeProject.update({
+      where: { id: projectId },
+      data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(r.totalPaise), gstPctOfValue: pct, gstPaise: BigInt(r.gstPaise) },
+    });
+    await recordEvent(tx, { projectId, type: 'payment.gst_set', actor: staff.actor, payload: { pct, gstPaise: r.gstPaise, totalPaise: r.totalPaise }, at: now });
+    await mirror(tx, projectId);
+  });
+  const rupees = (n: number) => `₹${Math.round(n / 100).toLocaleString('en-IN')}`;
+  return {
+    ok: true,
+    message: pct === null ? `GST taken off. The total is ${rupees(r.totalPaise)}.` : `GST of ${rupees(r.gstPaise)} (18% on ${pct}% of ${rupees(r.valuePaise)}) added to the stages after the design advance. The total is ${rupees(r.totalPaise)}.`,
   };
 }
 

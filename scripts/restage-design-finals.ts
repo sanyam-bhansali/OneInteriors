@@ -44,6 +44,7 @@ async function main() {
   const { prisma } = await import('../src/lib/prisma');
   const { readSignedStages } = await import('../src/modules/portal/payments');
   const { restageOnTotal } = await import('../src/modules/studio-design/restage');
+  const { restageKeepingGst } = await import('../src/modules/project/project-gst');
   const { quoteTotalInStudio, salesFinalTotalInStudio } = await import('../src/modules/studio-quote/quotes');
   try {
     const studio = await prisma.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true } });
@@ -51,7 +52,7 @@ async function main() {
     console.log(`${studio.tradeName} (${slug})\n`);
     const projects = await prisma.homeProject.findMany({
       where: { cancelledAt: null, introduction: { studioId: studio.id }, signedQuoteId: { not: null } },
-      select: { id: true, signedQuoteId: true, designFinalQuoteId: true, paymentPhases: true, introduction: { select: { brief: { select: { contactName: true } } } } },
+      select: { id: true, signedQuoteId: true, designFinalQuoteId: true, paymentPhases: true, gstPctOfValue: true, gstPaise: true, introduction: { select: { brief: { select: { contactName: true } } } } },
     });
     let changed = 0;
     for (const p of projects) {
@@ -76,7 +77,8 @@ async function main() {
       }
       /* Booking and design advance as on the sales final; the later stages on the Design Final (owner, 19 Nov 2026). */
       const sales = await salesFinalTotalInStudio(p.signedQuoteId!, studio.id);
-      const r = restageOnTotal(stages, Math.round(total), sales === null ? null : Math.round(sales));
+      /* GST on part of the project (owner, 21 Nov 2026) comes off and goes back on the Design Final's value. */
+      const r = restageKeepingGst(stages, Number(p.gstPaise), p.gstPctOfValue, (base) => restageOnTotal(base, Math.round(total), sales === null ? null : Math.round(sales)));
       if (!r.ok) {
         console.log(`${client.padEnd(26)} skipped: ${r.error}`);
         continue;
@@ -88,7 +90,7 @@ async function main() {
       if (dryRun) continue;
       await prisma.homeProject.update({
         where: { id: p.id },
-        data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(Math.round(total)) },
+        data: { paymentPhases: r.stages as unknown as Prisma.InputJsonValue, contractPaise: BigInt(r.totalPaise), gstPaise: BigInt(r.gstPaise) },
       });
     }
     console.log(`\n${changed} of ${projects.length} projects with a Design Final ${dryRun ? 'would move' : 'moved'} to their Design Final's total.${dryRun ? ' Dry run: nothing was written.' : ''}`);

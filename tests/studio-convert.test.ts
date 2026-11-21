@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { BULK_CONVERT, CONVERT_FIRST, HANDOVER_MIN, checkHandover, convertedLeadData, wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
+import { BULK_CONVERT, CONVERT_FIRST, HANDOVER_MIN, checkHandover, checkProperty, convertedLeadData, wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
 import { can } from '@/modules/studio/roles';
 import { messageFor, EMAILED_TO_STUDIO } from '@/modules/notify/messages';
 
@@ -88,5 +88,24 @@ describe('what Convert writes on the lead (owner, 19 Nov 2026)', () => {
     const d = convertedLeadData({ now, introductionId: 'i1', fromStageId: 's1', wonStageId: null });
     expect('stageId' in d).toBe(false);
     expect(d.nextActionOn).toBeNull();
+  });
+});
+
+describe('the property is required to convert (owner, 20 Nov 2026)', () => {
+  it('needs the building name and the address', () => {
+    expect(checkProperty('', 'Flat 402, B wing, Baner Road, Baner')).toMatchObject({ ok: false });
+    expect(checkProperty('Sapphire Heights', '')).toMatchObject({ ok: false });
+    expect(checkProperty('Sapphire Heights', 'Baner')).toMatchObject({ ok: false });
+    expect(checkProperty(undefined, undefined)).toMatchObject({ ok: false });
+  });
+
+  it('trims and keeps both on one line', () => {
+    expect(checkProperty('  Sapphire   Heights ', "Flat 402,\n B wing,  Baner Road")).toEqual({ ok: true, building: 'Sapphire Heights', address: 'Flat 402, B wing, Baner Road' });
+  });
+
+  it('the server checks it before anything else is touched, and saves both on the lead', () => {
+    const src = readFileSync('src/modules/studio-sales/convert.ts', 'utf8');
+    expect(src.indexOf('checkProperty(input.building, input.address)')).toBeLessThan(src.indexOf('checkHandover(input.handover)'));
+    expect(src).toMatch(/society: property\.building,\s*address: property\.address/);
   });
 });

@@ -33,6 +33,26 @@ export function wonMoveRefusal(m: { toKind: StageKind | null; fromKind: StageKin
   return CONVERT_FIRST;
 }
 
+export const BUILDING_MAX = 120;
+export const ADDRESS_MIN = 10;
+export const ADDRESS_MAX = 300;
+
+const oneLine = (raw: unknown) => (typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '');
+
+/**
+ * The property, required to convert (owner, 20 Nov 2026): the building's
+ * name and the address, so design and site know where the home is.
+ */
+export function checkProperty(building: unknown, address: unknown): { ok: true; building: string; address: string } | { ok: false; error: string } {
+  const b = oneLine(building);
+  const a = oneLine(address);
+  if (b.length < 2) return { ok: false, error: 'Write the building’s name: the society or tower the home is in.' };
+  if (b.length > BUILDING_MAX) return { ok: false, error: `Keep the building’s name under ${BUILDING_MAX} characters.` };
+  if (a.length < ADDRESS_MIN) return { ok: false, error: 'Write the property’s address: flat number, wing, road and area.' };
+  if (a.length > ADDRESS_MAX) return { ok: false, error: `Keep the address under ${ADDRESS_MAX} characters.` };
+  return { ok: true, building: b, address: a };
+}
+
 /** The handover to design: trimmed, at least `HANDOVER_MIN` characters, at most `HANDOVER_MAX`. */
 export function checkHandover(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
   const text = typeof raw === 'string' ? raw.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
