@@ -39,3 +39,12 @@ export const ACCEPTED_LOGO = 'PNG, JPG or WebP';
  */
 export const MAX_BRAND_PAGE_BYTES = 6 * 1024 * 1024;
 export const MAX_BRAND_PAGE_MB = MAX_BRAND_PAGE_BYTES / 1024 / 1024;
+
+/**
+ * The signature and the stamp on invoices and the statement (owner, 21 Nov
+ * 2026: PNG or JPEG, about 2 MB). A transparent PNG sits best over the stamp.
+ */
+export const MAX_SIGN_BYTES = 2 * 1024 * 1024;
+export const MAX_SIGN_MB = MAX_SIGN_BYTES / 1024 / 1024;
+export const SIGN_TYPES: readonly string[] = ['image/png', 'image/jpeg'];
+export const ACCEPTED_SIGN = 'PNG or JPG';

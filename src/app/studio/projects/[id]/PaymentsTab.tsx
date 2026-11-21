@@ -90,6 +90,10 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
                   <td className="py-3 pr-3">
                     <span className="font-medium">{s.label}</span>
                     {s.pct !== null ? <span className={`block ${muted}`}>{s.pct}% as signed</span> : null}
+                    {/* One invoice per payment stage (owner, 21 Nov 2026): its number is given the first time it is opened. */}
+                    <Link href={`/studio/projects/${data.projectId}/invoice/${s.index + 1}`} className="acc-t text-[12.5px]" data-testid={`invoice-link-${s.index + 1}`}>
+                      Invoice
+                    </Link>
                   </td>
                   <td className={`py-3 pr-3 text-right ${mono}`}>
                     {formatINR(s.amountPaise)}

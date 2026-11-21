@@ -81,6 +81,8 @@ export const PROJECT_EVENT_TYPES = [
   'payment.disputed',
   // GST on part of the project set or changed (owner, 21 Nov 2026; project/project-gst.ts)
   'payment.gst_set',
+  // A payment stage's invoice number given, the first time its invoice was opened (owner, 21 Nov 2026; project/invoice.ts)
+  'invoice.issued',
   'document.filed',
   'document.shared',
   'document.superseded',
