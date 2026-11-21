@@ -62,6 +62,8 @@ export interface ClientRow {
   phone: string | null;
   email: string | null;
   society: string | null;
+  /** The property's address; read on the lead's own page only. */
+  address?: string | null;
   locality: string | null;
   config: string | null;
   carpetSqft: number | null;
@@ -1482,6 +1484,7 @@ export async function clientById(id: string): Promise<ClientRow | null> {
       phone: row.phone,
       email: row.email,
       society: row.society,
+      address: row.address,
       locality: row.locality,
       config: row.config,
       carpetSqft: row.carpetSqft,

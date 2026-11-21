@@ -242,6 +242,7 @@ export default async function ClientPage({
               phone: client.phone ?? '',
               email: client.email ?? '',
               society: client.society ?? '',
+              address: client.address ?? '',
               config: client.config ?? '',
               budgetPaise: client.budgetPaise,
               source: client.source,

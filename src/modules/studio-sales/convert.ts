@@ -36,7 +36,7 @@ import { projectStages, readStages, scheduleAmounts, templateOrDefault } from '.
 import { queueConversions } from './conversions';
 import { bookingRefusal } from './booking-rules';
 import { BOOKING_QUOTE, factsFor, firstWonStage } from './booking';
-import { checkHandover, convertedLeadData } from './convert-rules';
+import { checkHandover, checkProperty, convertedLeadData } from './convert-rules';
 
 export interface ConvertRevision {
   n: number;
@@ -65,6 +65,9 @@ export interface ConvertScreen {
   notes: string;
   /** Why the lead cannot be converted at all (no quotation sent, no mobile). */
   blocked: string | null;
+  /** The building and address on the lead, to start the required fields from. */
+  building: string;
+  address: string;
 }
 
 const LEAD_SELECT = {
@@ -72,6 +75,9 @@ const LEAD_SELECT = {
   name: true,
   phone: true,
   email: true,
+  society: true,
+  address: true,
+  societyRecord: { select: { name: true } },
   stageId: true,
   assignedToId: true,
   poolTeamId: true,
@@ -139,7 +145,7 @@ export async function convertScreen(clientId: unknown): Promise<ConvertScreen | 
       : !lead.phone
         ? 'Add the client’s mobile number to the lead first: the project and the client’s app need it.'
         : null;
-  return { name: lead.name, quotes, picked, notes, blocked };
+  return { name: lead.name, quotes, picked, notes, blocked, building: lead.societyRecord?.name ?? lead.society ?? '', address: lead.address ?? '' };
 }
 
 export type ConvertResult = { ok: true; projectId: string; stage: string | null } | { ok: false; error: string };
@@ -151,7 +157,10 @@ export type ConvertResult = { ok: true; projectId: string; stage: string | null 
  * since that revision, it is first put back to what that revision said, so
  * the project is built from exactly what the client was sent.
  */
-export async function convertLead(input: { clientId: unknown; quoteId: unknown; n: unknown; handover: unknown; stageId?: unknown }, now = new Date()): Promise<ConvertResult> {
+export async function convertLead(
+  input: { clientId: unknown; quoteId: unknown; n: unknown; handover: unknown; building: unknown; address: unknown; stageId?: unknown },
+  now = new Date(),
+): Promise<ConvertResult> {
   const found = await leadFor(input.clientId);
   if (!found) return { ok: false, error: ACCESS_ERRORS.notYourRole };
   const { scope, lead } = found;
@@ -160,6 +169,8 @@ export async function convertLead(input: { clientId: unknown; quoteId: unknown; 
   if (lead.bookedAt) return { ok: false, error: 'This lead is already converted.' };
   if (!lead.phone) return { ok: false, error: 'Add the client’s mobile number to the lead first: the project and the client’s app need it.' };
 
+  const property = checkProperty(input.building, input.address);
+  if (!property.ok) return property;
   const handover = checkHandover(input.handover);
   if (!handover.ok) return handover;
 
@@ -221,7 +232,11 @@ export async function convertLead(input: { clientId: unknown; quoteId: unknown; 
         });
         await tx.studioClient.updateMany({
           where: { id: lead.id, studioId },
-          data: convertedLeadData({ now, introductionId: project.introductionId, fromStageId: lead.stageId, wonStageId: won?.id ?? null }),
+          data: {
+            ...convertedLeadData({ now, introductionId: project.introductionId, fromStageId: lead.stageId, wonStageId: won?.id ?? null }),
+            society: property.building,
+            address: property.address,
+          },
         });
         await record({
           db: tx,

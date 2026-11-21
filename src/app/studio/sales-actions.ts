@@ -62,6 +62,7 @@ export async function editLeadAction(input: {
   phone: string;
   email: string;
   society: string;
+  address: string;
   config: string;
   budget: string;
   source: string;
