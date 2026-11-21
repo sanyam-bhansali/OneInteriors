@@ -1325,7 +1325,7 @@ function cleanLine(raw: SaveLineInput): SaveLineInput | null {
 export async function saveQuoteLines(
   quoteId: string,
   rawLines: SaveLineInput[],
-): Promise<ActionResult> {
+): Promise<{ ok: true; ids: (string | null)[] } | { ok: false; error: string }> {
   const writable = await writableQuote(quoteId);
   if (!writable.ok) return writable;
 
@@ -1333,7 +1333,10 @@ export async function saveQuoteLines(
     return { ok: false, error: 'That is more lines than a quotation can hold.' };
   }
 
-  const lines = rawLines.map(cleanLine).filter((l): l is SaveLineInput => l !== null);
+  /* Where each line sent landed, so the builder can give a new line its id
+     and an autosave while someone is still typing never adds it twice. */
+  const cleaned = rawLines.map(cleanLine);
+  const lines = cleaned.filter((l): l is SaveLineInput => l !== null);
 
   try {
     const existing = await prisma.studioQuoteLine.findMany({
@@ -1387,15 +1390,16 @@ export async function saveQuoteLines(
 
     const gone = [...existingIds].filter((id) => !kept.has(id));
 
-    await prisma.$transaction([
-      ...(gone.length > 0
-        ? [prisma.studioQuoteLine.deleteMany({ where: { id: { in: gone }, quoteId } })]
-        : []),
+    const deletes = gone.length > 0 ? [prisma.studioQuoteLine.deleteMany({ where: { id: { in: gone }, quoteId } })] : [];
+    const done = await prisma.$transaction([
+      ...deletes,
       ...writes,
       prisma.studioQuote.update({ where: { id: quoteId }, data: { updatedAt: new Date() } }),
     ]);
 
-    return { ok: true };
+    const written = (done.slice(deletes.length, deletes.length + writes.length) as { id: string }[]).map((r) => r.id);
+    let at = 0;
+    return { ok: true, ids: cleaned.map((l) => (l === null ? null : written[at++]!)) };
   } catch (error) {
     console.error('[studio-quote] saveQuoteLines failed', error);
     return { ok: false, error: 'That did not save. Nothing was changed.' };

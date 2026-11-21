@@ -172,7 +172,12 @@ export async function setStatusAction(quoteId: string, status: QuoteStatusName):
  * refuses ids that are not on this quotation; nothing here assumes the
  * browser sent what the builder renders.
  */
-export async function saveLinesAction(quoteId: string, lines: SaveLineInput[], terms?: QuoteTermsInput): Promise<State> {
+/** `ids`: each line sent, where it landed (null when it was dropped as empty), for the builder's autosave. */
+export async function saveLinesAction(
+  quoteId: string,
+  lines: SaveLineInput[],
+  terms?: QuoteTermsInput,
+): Promise<{ ok: true; ids: (string | null)[] } | { ok: false; error: string }> {
   const result = await saveQuoteLines(quoteId, lines);
   if (!result.ok) return result;
   if (terms) {
@@ -180,7 +185,7 @@ export async function saveLinesAction(quoteId: string, lines: SaveLineInput[], t
     if (!saved.ok) return saved;
   }
   refresh(quoteId);
-  return { ok: true };
+  return { ok: true, ids: result.ids };
 }
 
 export type BuildState =
