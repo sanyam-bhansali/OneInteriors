@@ -151,8 +151,43 @@ export function executionSheetDays(): { kind: Exclude<PlanKind, 'DESIGN'>; days:
   });
 }
 
-/** Execution's whole length on the sheet, in days (110). */
+/** Execution's whole length on the sheet, in days (110): the stages' shares, not a project's length. */
 export const EXECUTION_DAYS = executionSheetDays().reduce((a, s) => a + s.days, 0);
+
+/**
+ * How long execution takes (owner, 21 Nov 2026): "2 Bhk - 45 Days, 3 Bhk 60
+ * Days, 4 Bhk 75 Days Essential increase premium by 20 % and luxe by 40%".
+ * Essential is the base. 1 BHK (not given) is 30, 15 less as each size
+ * steps; bigger than 4 BHK is a 4 BHK's. A flat of unknown size is a 2 BHK
+ * and a project with no category Premium, as the design days are
+ * (studio-design/template.ts).
+ */
+export const EXECUTION_DAYS_BY_BHK: Readonly<Record<1 | 2 | 3 | 4, number>> = { 1: 30, 2: 45, 3: 60, 4: 75 };
+export const EXECUTION_CATEGORY_FACTOR: Readonly<Record<string, number>> = { ESSENTIAL: 1, PREMIUM: 1.2, LUXURY: 1.4 };
+
+export function executionDaysFor(bhk: number | null | undefined, category: string | null | undefined): number {
+  const size = (bhk ? Math.min(4, Math.max(1, Math.round(bhk))) : 2) as 1 | 2 | 3 | 4;
+  const factor = EXECUTION_CATEGORY_FACTOR[category ?? 'PREMIUM'] ?? EXECUTION_CATEGORY_FACTOR.PREMIUM!;
+  return Math.round(EXECUTION_DAYS_BY_BHK[size] * factor);
+}
+
+/**
+ * Each execution stage's days for a project's execution length: the sheet's
+ * shares (civil 20, carpentry 67, finishing 14, handover 9 of 110), in whole
+ * days that add up to exactly `total`, each at least one day.
+ */
+export function executionStageDays(total: number): { kind: Exclude<PlanKind, 'DESIGN'>; days: number }[] {
+  const sheet = executionSheetDays();
+  const whole = Math.max(sheet.length, Math.round(total));
+  // Largest remainder, so the parts add up to the whole.
+  const exact = sheet.map((s) => (s.days * whole) / EXECUTION_DAYS);
+  const days = exact.map((x) => Math.max(1, Math.floor(x)));
+  let left = whole - days.reduce((a, b) => a + b, 0);
+  const order = exact.map((x, i) => ({ i, r: x - Math.floor(x) })).sort((a, b) => b.r - a.r);
+  for (let k = 0; left > 0; k = (k + 1) % order.length, left--) days[order[k]!.i]! += 1;
+  for (let i = days.length - 1; left < 0 && i >= 0; i--) while (left < 0 && days[i]! > 1) { days[i]! -= 1; left++; }
+  return sheet.map((s, i) => ({ kind: s.kind, days: days[i]! }));
+}
 
 /** The template's steps of one stage kind, in order. */
 export function templateFor(kind: PlanKind): TemplateStep[] {

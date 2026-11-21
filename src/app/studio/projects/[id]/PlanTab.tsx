@@ -18,7 +18,7 @@ import {
 } from '@/modules/project/project-rules';
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
 import { doneLabel, parsePercent } from '@/modules/project/step-rules';
-import { EXECUTION_DAYS, isProjectClosureStep } from '@/modules/project/step-template';
+import { isProjectClosureStep } from '@/modules/project/step-template';
 import type { ClosureDue } from '@/modules/project/closure-due';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
@@ -150,7 +150,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
         {!plan.executionPlanned ? (
           /* Owner, 21 Nov 2026: execution is planned, and the handover given, only once design is complete. */
           <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
-            Handover is planned once design is complete: execution then runs the execution sheet (about {EXECUTION_DAYS} days) from that day. Until then execution has no dates and only the design&rsquo;s can be moved.
+            Handover is planned once design is complete: execution then runs from that day, for the flat&rsquo;s size and category (2 BHK Essential 45 days, 3 BHK 60, 4 BHK 75; Premium 20% more, Luxe 40% more). Until then execution has no dates and only the design&rsquo;s can be moved.
           </p>
         ) : null}
         {plan.executionPlanned && o.plannedHandover && o.forecastHandover ? (

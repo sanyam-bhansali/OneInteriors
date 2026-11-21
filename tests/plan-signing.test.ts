@@ -63,7 +63,7 @@ import { signFinalQuote, type FinalQuoteView } from '@/modules/portal/choose';
 import { PLAN_KINDS } from '@/modules/portal/tracker';
 import { templateFor } from '@/modules/project/step-template';
 import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
-import { EXECUTION_DAYS } from '@/modules/project/step-template';
+import { executionDaysFor } from '@/modules/project/step-template';
 
 import { FILED_CONTENT_TYPE, generatedDocLink } from '@/modules/portal/documents';
 
@@ -149,7 +149,7 @@ describe('signing builds the plan', () => {
     expect(all.every((i) => i.inScope && i.quoteLineId === null && i.plannedOn instanceof Date)).toBe(true);
     // Execution follows the sheet from the day design ends (owner, 21 Nov 2026), and the project's days end on handover.
     const rows = ops('tx.homeProjectStage.create').map((c) => (c.args as { data: { plannedStart: Date; plannedEnd: Date } }).data);
-    expect(rows.at(-1)!.plannedEnd.getTime() - rows[0]!.plannedEnd.getTime()).toBe(EXECUTION_DAYS * 86_400_000);
+    expect(rows.at(-1)!.plannedEnd.getTime() - rows[0]!.plannedEnd.getTime()).toBe(executionDaysFor(null, null) * 86_400_000);
     const days = (ops('tx.homeProject.create')[0]!.args as { data: { totalDays: number } }).data.totalDays;
     expect(rows.at(-1)!.plannedEnd.getTime() - rows[0]!.plannedStart.getTime()).toBe(days * 86_400_000);
   });

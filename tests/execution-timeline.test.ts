@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { overallDelay, type RuleChange, type RuleStage } from '@/modules/project/project-rules';
 import { executionStartDay } from '@/modules/project/execution-plan';
 import { designThenSheet, executionFrom, executionStepDays, planSpanDays, stepsFor, templateStages } from '@/modules/portal/quote-to-plan';
-import { EXECUTION_DAYS, executionSheetDays, templateFor } from '@/modules/project/step-template';
+import { EXECUTION_DAYS, executionDaysFor, executionSheetDays, executionStageDays, templateFor } from '@/modules/project/step-template';
 import { dayToDb, istDay, isoWeekday, type StudioCalendar } from '@/modules/project/working-days';
 
 /* Owner, 21 Nov 2026: "Execution timeline is not proper". Execution got whatever was left of 60 days after design
@@ -23,13 +23,40 @@ describe('the execution sheet', () => {
   });
 });
 
-describe('stage dates: design, then the sheet', () => {
-  it('execution starts the day design ends and runs the sheet back to back, whatever the design length', () => {
+/* Owner, 21 Nov 2026: "2 Bhk - 45 Days, 3 Bhk 60 Days, 4 Bhk 75 Days Essential increase premium by 20 % and luxe by 40%". */
+describe('execution days by flat size and category', () => {
+  it('Essential 45 / 60 / 75; Premium 20% more; Luxe 40% more', () => {
+    expect([2, 3, 4].map((b) => executionDaysFor(b, 'ESSENTIAL'))).toEqual([45, 60, 75]);
+    expect([2, 3, 4].map((b) => executionDaysFor(b, 'PREMIUM'))).toEqual([54, 72, 90]);
+    expect([2, 3, 4].map((b) => executionDaysFor(b, 'LUXURY'))).toEqual([63, 84, 105]);
+  });
+
+  it('1 BHK is 30 (Essential); bigger than 4 BHK is a 4 BHK; unknown size a 2 BHK; no category Premium', () => {
+    expect(executionDaysFor(1, 'ESSENTIAL')).toBe(30);
+    expect(executionDaysFor(5, 'ESSENTIAL')).toBe(75);
+    expect(executionDaysFor(null, 'ESSENTIAL')).toBe(45);
+    expect(executionDaysFor(3, null)).toBe(72);
+  });
+
+  it("split across the stages in the sheet's shares, adding up exactly", () => {
+    for (const total of [30, 45, 54, 60, 63, 72, 75, 84, 90, 105]) {
+      const parts = executionStageDays(total);
+      expect(parts.map((p) => p.kind)).toEqual(['CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER']);
+      expect(parts.reduce((a, p) => a + p.days, 0)).toBe(total);
+      expect(parts.every((p) => p.days >= 1)).toBe(true);
+    }
+    expect(executionStageDays(60).map((p) => p.days)).toEqual([11, 36, 8, 5]);
+    expect(executionStageDays(110).map((p) => p.days)).toEqual([20, 67, 14, 9]);
+  });
+});
+
+describe('stage dates: design, then execution', () => {
+  it('execution starts the day design ends and runs back to back, whatever the design length', () => {
     for (const designDays of [10, 43, 99]) {
-      const s = designThenSheet(dayToDb('2026-11-17'), designDays);
+      const s = designThenSheet(dayToDb('2026-11-17'), designDays, null, 60);
       expect(s.map((x) => x.kind)).toEqual(['DESIGN', 'CIVIL', 'CARPENTRY', 'FINISH', 'HANDOVER']);
       for (let i = 1; i < s.length; i++) expect(day(s[i]!.plannedStart)).toBe(day(s[i - 1]!.plannedEnd));
-      expect(planSpanDays(dayToDb('2026-11-17'), s)).toBe(designDays + EXECUTION_DAYS);
+      expect(planSpanDays(dayToDb('2026-11-17'), s)).toBe(designDays + 60);
     }
   });
 
@@ -41,17 +68,18 @@ describe('stage dates: design, then the sheet', () => {
     }
   });
 
-  it('a signed project with design steps is planned this way (no more squeezed execution)', () => {
-    const stages = templateStages(dayToDb('2026-11-17'), 60, { template: null, bhk: 4, payments: [] });
+  it('a signed project with design steps gets its size and category days (no more squeezed execution)', () => {
+    const stages = templateStages(dayToDb('2026-11-17'), 60, { template: null, bhk: 4, category: 'LUXURY', payments: [] });
     const exec = stages.filter((s) => s.kind !== 'DESIGN');
     const days = exec.map((s) => (s.plannedEnd.getTime() - s.plannedStart.getTime()) / 86_400_000);
-    expect(days).toEqual([20, 67, 14, 9]);
+    expect(days.reduce((a, b) => a + b, 0)).toBe(105);
+    expect(days).toEqual(executionStageDays(105).map((p) => p.days));
   });
 
-  it('re-planning a running project: execution from its design end', () => {
-    const e = executionFrom('2027-01-16');
-    expect(e[0]).toEqual({ kind: 'CIVIL', start: '2027-01-16', end: '2027-02-05' });
-    expect(e.at(-1)!.end).toBe('2027-05-06');
+  it('planning from a design end: execution for the given days', () => {
+    const e = executionFrom('2027-01-16', null, 60);
+    expect(e[0]).toEqual({ kind: 'CIVIL', start: '2027-01-16', end: '2027-01-27' });
+    expect(e.at(-1)!.end).toBe('2027-03-17');
   });
 });
 
@@ -107,7 +135,7 @@ describe('the handover is given only once design is complete', () => {
     expect(lifecycle).toMatch(/if \(p\.phase === 'DESIGN'\) await planExecutionAfterDesign\(db, projectId, now\);/);
     const plan = readFileSync('src/modules/project/execution-plan.ts', 'utf8');
     expect(plan).toMatch(/executionPlannedAt: now/);
-    expect(plan).toMatch(/executionFrom\(start, cal\)/);
+    expect(plan).toMatch(/executionFrom\(start, cal, executionDaysFor\(/);
   });
 
   it('no handover date and nothing to move on execution until the project exits design (owner, 21 Nov 2026)', () => {
