@@ -185,15 +185,26 @@ export const leaveCovers = (l: Pick<LeaveSpan, 'fromDay' | 'toDay'>, day: string
 
 // ── Casual and sick leave (owner, 21 Nov 2026) ───────────────
 /*
- * "We provide 1 Casual leave and 1 sick leave every month." Unused leave
- * lapses at the month's end (owner: "No, lapses each month"); more than the
- * month's allowance may still be asked, the rest is unpaid ("Allow as
- * unpaid"). "Any casual leave which is taken but not approved it will be
- * calculated as 2 leaves": a casual day off that was not approved by that
- * day (still waiting once the day has passed, or approved only afterwards)
- * counts as two days. Declined and withdrawn leave counts nothing. Counted
- * in the studio's working days.
+ * "We provide 1 Casual leave and 1 sick leave every month", and "the leaves
+ * not taken should be accumulated each month": each type earns one day a
+ * month, from November 2026 (when this began) or the month the person joined,
+ * and what is not taken carries on, with no reset. More than the balance may
+ * still be asked; the rest is unpaid ("Allow as unpaid"). "Any casual leave
+ * which is taken but not approved it will be calculated as 2 leaves": a casual
+ * day off that was not approved by that day (still waiting once the day has
+ * passed, or approved only afterwards) counts as two days. Declined and
+ * withdrawn leave counts nothing. Counted in the studio's working days. Leave
+ * before the allowance began takes nothing off it.
  */
+
+/** The first month leave is earned. */
+export const ALLOWANCE_FROM = '2026-11';
+const monthNo = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+/** Days of a type earned from `startMonth` through `month`, both included (none before the start). */
+export const earnedThrough = (type: LeaveType, startMonth: string, month: string): number =>
+  Math.max(0, monthNo(month) - monthNo(startMonth) + 1) * MONTHLY_ALLOWANCE[type];
+/** Where a person's allowance starts: November 2026, or the month they joined when later. */
+export const allowanceStart = (joinedDay: string | null): string => (joinedDay && joinedDay.slice(0, 7) > ALLOWANCE_FROM ? joinedDay.slice(0, 7) : ALLOWANCE_FROM);
 
 export const LEAVE_TYPES = { CASUAL: 'Casual leave', SICK: 'Sick leave' } as const;
 export type LeaveType = keyof typeof LEAVE_TYPES;
@@ -237,14 +248,14 @@ export function dayWeight(l: Pick<CountedLeave, 'type' | 'status' | 'approvedDay
 }
 
 /**
- * Paid and unpaid days for one member's leave. Month by month and type by
- * type, in the order the leave falls (then the order asked): the month's
- * allowance is used first, the rest is unpaid. Asked and approved leave count;
- * declined and withdrawn count nothing.
+ * Paid and unpaid days for one member's leave, type by type, in the order the
+ * leave falls (then the order asked): each day is paid while the days earned
+ * up to its month are not used up, and unpaid after. Asked and approved leave
+ * count; declined and withdrawn count nothing.
  */
-export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar, today: string): Map<string, LeaveCount> {
+export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar, today: string, startMonth: string = ALLOWANCE_FROM): Map<string, LeaveCount> {
   const out = new Map<string, LeaveCount>();
-  const used = new Map<string, number>(); // `${month}|${type}` → days used
+  const used = new Map<LeaveType, number>();
   const order = [...leaves].sort((a, b) => a.fromDay.localeCompare(b.fromDay) || a.askedAt - b.askedAt);
   for (const l of order) {
     const c: LeaveCount = { workingDays: 0, days: 0, paid: 0, unpaid: 0, unapprovedDays: 0 };
@@ -252,15 +263,19 @@ export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar,
       for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) {
         if (!isWorkingDay(d, cal)) continue;
         const w = dayWeight(l, d, today);
-        const key = `${d.slice(0, 7)}|${l.type}`;
-        const before = used.get(key) ?? 0;
-        const paid = Math.max(0, Math.min(w, MONTHLY_ALLOWANCE[l.type] - before));
-        used.set(key, before + w);
         c.workingDays++;
         c.days += w;
+        if (w > 1) c.unapprovedDays++;
+        // Before the allowance began: nothing earned and nothing used.
+        if (d.slice(0, 7) < startMonth) {
+          c.paid += w;
+          continue;
+        }
+        const before = used.get(l.type) ?? 0;
+        const paid = Math.max(0, Math.min(w, earnedThrough(l.type, startMonth, d.slice(0, 7)) - before));
+        used.set(l.type, before + w);
         c.paid += paid;
         c.unpaid += w - paid;
-        if (w > 1) c.unapprovedDays++;
       }
     }
     out.set(l.id, c);
@@ -268,16 +283,30 @@ export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar,
   return out;
 }
 
-/** A month's balance per type: allowed, used (as counted, with unapproved casual days twice) and left. */
-export function monthBalance(leaves: readonly CountedLeave[], month: string, cal: StudioCalendar, today: string): Record<LeaveType, { allowed: number; used: number; left: number }> {
-  const out = {} as Record<LeaveType, { allowed: number; used: number; left: number }>;
+/**
+ * The balance per type in `month`: days earned so far (carried over from
+ * earlier months), used up to the month's end (as counted, unapproved casual
+ * days twice), and left.
+ */
+export function leaveBalance(
+  leaves: readonly CountedLeave[],
+  month: string,
+  cal: StudioCalendar,
+  today: string,
+  startMonth: string = ALLOWANCE_FROM,
+): Record<LeaveType, { earned: number; used: number; left: number }> {
+  const out = {} as Record<LeaveType, { earned: number; used: number; left: number }>;
   for (const type of Object.keys(LEAVE_TYPES) as LeaveType[]) {
     let usedDays = 0;
     for (const l of leaves) {
       if (l.type !== type || !isOpenLeave(l) || !isDay(l.fromDay) || !isDay(l.toDay)) continue;
-      for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) if (d.startsWith(month) && isWorkingDay(d, cal)) usedDays += dayWeight(l, d, today);
+      for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) {
+        const m = d.slice(0, 7);
+        if (m >= startMonth && m <= month && isWorkingDay(d, cal)) usedDays += dayWeight(l, d, today);
+      }
     }
-    out[type] = { allowed: MONTHLY_ALLOWANCE[type], used: usedDays, left: Math.max(0, MONTHLY_ALLOWANCE[type] - usedDays) };
+    const earned = earnedThrough(type, startMonth, month);
+    out[type] = { earned, used: usedDays, left: Math.max(0, earned - usedDays) };
   }
   return out;
 }

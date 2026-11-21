@@ -52,12 +52,12 @@ export function AskLeave({ view }: { view: LeaveView }) {
         {view.types.map((t) => (
           <label key={t.key} className="flex items-center gap-2">
             <input type="radio" name="type" value={t.key} checked={type === t.key} onChange={() => setType(t.key)} /> {t.label}
-            {memberId === view.meId ? <span className={muted}>({view.balance[t.key].left} left this month)</span> : null}
+            {memberId === view.meId ? <span className={muted}>({view.balance[t.key].left} available)</span> : null}
           </label>
         ))}
       </fieldset>
       <p className={`m-0 ${muted}`}>
-        One casual and one sick leave a month; unused leave does not carry over. More than that is unpaid. Casual leave taken without approval (still waiting once the day has passed, or approved only after it) counts as two days.
+        One casual and one sick leave earned each month; unused leave carries over. More than you have is unpaid. Casual leave taken without approval (still waiting once the day has passed, or approved only after it) counts as two days.
       </p>
       <div className="flex flex-wrap gap-2">
         {view.team.length > 1 ? (
@@ -230,18 +230,18 @@ export function HolidayWork({ view }: { view: LeaveView }) {
   );
 }
 
-/** This month's casual and sick leave left (owner, 21 Nov 2026: one of each a month). */
+/** Casual and sick leave available now: one of each earned a month, unused carried over (owner, 21 Nov 2026). */
 function Balance({ view }: { view: LeaveView }) {
   return (
     <p className="m-0 text-[13.5px]">
-      This month:{' '}
+      Available now:{' '}
       {view.types.map((t, i) => {
         const b = view.balance[t.key];
         return (
           <span key={t.key}>
             {i > 0 ? ' · ' : ''}
-            <b>{b.left}</b> of {b.allowed} {t.label.toLowerCase()} left
-            {b.used > b.allowed ? <span style={{ color: 'var(--bad)' }}> ({b.used - b.allowed} unpaid)</span> : null}
+            <b>{b.left}</b> {t.label.toLowerCase()}
+            {b.used > b.earned ? <span style={{ color: 'var(--bad)' }}> ({b.used - b.earned} over: unpaid)</span> : null}
           </span>
         );
       })}
@@ -263,7 +263,7 @@ function Row({ r, view, run, pending }: { r: LeaveRowView; view: LeaveView; run:
         ) : null}
         {r.unpaidDays > 0 && (r.status === 'ASKED' || r.status === 'APPROVED') ? (
           <span className="block text-[12.5px]" style={{ color: 'var(--bad)' }}>
-            {r.unpaidDays} day{r.unpaidDays === 1 ? '' : 's'} unpaid (over this month&rsquo;s {r.typeLabel.toLowerCase()}).
+            {r.unpaidDays} day{r.unpaidDays === 1 ? '' : 's'} unpaid (more than the {r.typeLabel.toLowerCase()} earned by then).
           </span>
         ) : null}
         {r.reason ? <span className={`block ${muted}`}>{r.reason}</span> : null}

@@ -24,7 +24,9 @@ import {
   checkLeaveAsk,
   countLeave,
   LEAVE_TYPES,
-  monthBalance,
+  allowanceStart,
+  ALLOWANCE_FROM,
+  leaveBalance,
   typeOfLeave,
   type CountedLeave,
   type LeaveCount,
@@ -270,8 +272,8 @@ export interface LeaveView {
   team: { id: string; name: string }[];
   kinds: { key: LeaveKind; label: string }[];
   types: { key: LeaveType; label: string }[];
-  /** My leave this month: one casual and one sick (owner, 21 Nov 2026); unused lapses at the month's end. */
-  balance: Record<LeaveType, { allowed: number; used: number; left: number }>;
+  /** My leave now: one casual and one sick earned a month (owner, 21 Nov 2026), unused carried over. */
+  balance: Record<LeaveType, { earned: number; used: number; left: number }>;
   /** Working on a holiday (owner, 21 Nov 2026): waiting, this month's and mine. Approvers see everyone's. */
   work: WorkRowView[];
 }
@@ -302,7 +304,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
   const approver = mayApproveHold(member);
   const [studio, members, allRows] = await Promise.all([
     prisma.studio.findUnique({ where: { id: member.studioId }, select: { workingDays: true, holidays: { select: { day: true, name: true } } } }),
-    prisma.studioMember.findMany({ where: { studioId: member.studioId, status: 'ACTIVE' }, select: { id: true, user: { select: { name: true } } } }),
+    prisma.studioMember.findMany({ where: { studioId: member.studioId, status: 'ACTIVE' }, select: { id: true, createdAt: true, user: { select: { name: true } } } }),
     prisma.studioLeave.findMany({
       where: {
         studioId: member.studioId,
@@ -324,7 +326,10 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
   const leaves = allRows.filter((l) => l.type !== HOLIDAY_WORK);
   const workRows = allRows.filter((l) => l.type === HOLIDAY_WORK);
   /* The allowance is counted per person, month by month, so every open leave of theirs from the months shown counts. */
-  const since = dayToDb(addDays(`${(leaves[0] ? dayFromDb(leaves[0].fromDay) : first).slice(0, 7)}-01`, -1));
+  const windowStart = addDays(`${(leaves[0] ? dayFromDb(leaves[0].fromDay) : first).slice(0, 7)}-01`, -1);
+  // Unused leave carries over (owner, 21 Nov 2026), so every leave since the allowance began counts.
+  const since = dayToDb(windowStart < `${ALLOWANCE_FROM}-01` ? windowStart : `${ALLOWANCE_FROM}-01`);
+  const startOf = new Map(members.map((m) => [m.id, allowanceStart(istDay(m.createdAt))]));
   const counted = await prisma.studioLeave.findMany({
     where: { studioId: member.studioId, status: { in: ['ASKED', 'APPROVED'] }, toDay: { gte: since }, ...NOT_WORK },
     take: 3000,
@@ -342,7 +347,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
   const byMember = new Map<string, CountedLeave[]>();
   for (const l of counted) byMember.set(l.memberId, [...(byMember.get(l.memberId) ?? []), asCounted(l)]);
   const counts = new Map<string, LeaveCount>();
-  for (const list of byMember.values()) for (const [id, c] of countLeave(list, cal, today)) counts.set(id, c);
+  for (const [memberId, list] of byMember) for (const [id, c] of countLeave(list, cal, today, startOf.get(memberId) ?? ALLOWANCE_FROM)) counts.set(id, c);
   const holidayName = new Map(studio.holidays.map((h) => [dayFromDb(h.day), h.name?.trim() || 'Holiday']));
   const rows: (LeaveRowView & { askedAt: Date })[] = leaves.map((l) => {
     const fromDay = dayFromDb(l.fromDay);
@@ -395,7 +400,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
     team: approver ? members.map((m) => ({ id: m.id, name: m.user.name?.trim() || 'Someone' })).sort((a, b) => a.name.localeCompare(b.name)) : [],
     kinds: (Object.keys(LEAVE_KINDS) as LeaveKind[]).map((key) => ({ key, label: LEAVE_KINDS[key] })),
     types: (Object.keys(LEAVE_TYPES) as LeaveType[]).map((key) => ({ key, label: LEAVE_TYPES[key] })),
-    balance: monthBalance(byMember.get(member.id) ?? [], today.slice(0, 7), cal, today),
+    balance: leaveBalance(byMember.get(member.id) ?? [], today.slice(0, 7), cal, today, startOf.get(member.id) ?? ALLOWANCE_FROM),
     work: workRows
       .filter((w) => approver || w.memberId === member.id)
       .filter((w) => w.status === 'ASKED' || w.status === 'APPROVED')

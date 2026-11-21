@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { checkHolidayWorkAsk, checkLeaveAsk, countLeave, dayWeight, HOLIDAY_WORK_PAY, holidayWorkPaidDays, monthBalance, typeOfLeave, type CountedLeave } from '@/modules/studio-leave/rules';
+import {
+  allowanceStart,
+  checkHolidayWorkAsk,
+  checkLeaveAsk,
+  countLeave,
+  dayWeight,
+  earnedThrough,
+  HOLIDAY_WORK_PAY,
+  holidayWorkPaidDays,
+  leaveBalance,
+  typeOfLeave,
+  type CountedLeave,
+} from '@/modules/studio-leave/rules';
 import type { StudioCalendar } from '@/modules/project/working-days';
 
-/* Owner, 21 Nov 2026: "We provide 1 Casual leave and 1 sick leave every month"; unused lapses; more is unpaid;
+/* Owner, 21 Nov 2026: "We provide 1 Casual leave and 1 sick leave every month"; "the leaves not taken should be accumulated each month"; more is unpaid;
    "any casual leave which is taken but not approved it will be calculated as 2 leaves". */
 const CAL: StudioCalendar = { workingDays: [2, 3, 4, 5, 6, 7], holidays: new Set() }; // Monday off
 const TODAY = '2026-11-21';
@@ -33,15 +45,25 @@ describe('casual and sick leave, one of each a month', () => {
     expect(c.get('s')).toMatchObject({ days: 1, paid: 1, unpaid: 0, unapprovedDays: 0 });
   });
 
-  it('unused leave lapses: next month starts fresh', () => {
-    const c = countLeave([leave({ id: 'oct', fromDay: '2026-10-06' }), leave({ id: 'nov', fromDay: '2026-11-03' })], CAL, TODAY);
+  it('unused leave carries over: none taken in November leaves two for December (owner: "accumulated each month")', () => {
+    const c = countLeave([leave({ id: 'dec', fromDay: '2026-12-01', toDay: '2026-12-02', approvedDay: '2026-11-20' })], CAL, TODAY);
+    expect(c.get('dec')).toMatchObject({ days: 2, paid: 2, unpaid: 0 });
+    const b = leaveBalance([], '2027-02', CAL, TODAY);
+    expect(b.CASUAL).toEqual({ earned: 4, used: 0, left: 4 });
+  });
+
+  it('leave before the allowance began (November 2026) takes nothing off it', () => {
+    const c = countLeave([leave({ id: 'oct', fromDay: '2026-10-06', approvedDay: '2026-10-01' }), leave({ id: 'nov', fromDay: '2026-11-03' })], CAL, TODAY);
+    expect(c.get('oct')).toMatchObject({ paid: 1, unpaid: 0 });
     expect(c.get('nov')).toMatchObject({ paid: 1, unpaid: 0 });
   });
 
-  it('a leave across two months uses each month’s allowance', () => {
-    const c = countLeave([leave({ id: 'x', fromDay: '2026-10-31', toDay: '2026-11-03', approvedDay: '2026-10-20' })], CAL, TODAY);
-    // 31 Oct (Sat), 1 Nov (Sun), 3 Nov (Tue) are working days; 2 Nov is Monday off.
-    expect(c.get('x')).toMatchObject({ workingDays: 3, days: 3, paid: 2, unpaid: 1 });
+  it('someone who joined later earns from the month they joined', () => {
+    expect(allowanceStart('2027-01-15')).toBe('2027-01');
+    expect(allowanceStart('2025-06-01')).toBe('2026-11');
+    expect(earnedThrough('SICK', '2027-01', '2026-12')).toBe(0);
+    const c = countLeave([leave({ id: 'x', fromDay: '2027-01-05', toDay: '2027-01-06', approvedDay: '2027-01-01' })], CAL, TODAY, '2027-01');
+    expect(c.get('x')).toMatchObject({ paid: 1, unpaid: 1 });
   });
 
   it('declined and withdrawn leave count nothing', () => {
@@ -69,9 +91,9 @@ describe('casual leave taken without approval counts as two', () => {
   });
 
   it('the balance counts it twice', () => {
-    const b = monthBalance([leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null })], '2026-11', CAL, TODAY);
-    expect(b.CASUAL).toEqual({ allowed: 1, used: 2, left: 0 });
-    expect(b.SICK).toEqual({ allowed: 1, used: 0, left: 1 });
+    const b = leaveBalance([leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null })], '2026-11', CAL, TODAY);
+    expect(b.CASUAL).toEqual({ earned: 1, used: 2, left: 0 });
+    expect(b.SICK).toEqual({ earned: 1, used: 0, left: 1 });
   });
 });
 
