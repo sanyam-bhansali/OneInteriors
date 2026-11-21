@@ -23,6 +23,7 @@ import {
   holidayWorkPaidDays,
   checkLeaveAsk,
   countLeave,
+  mayMarkHalfDay,
   LEAVE_TYPES,
   allowanceStart,
   ALLOWANCE_FROM,
@@ -241,6 +242,8 @@ export interface LeaveRowView {
   /** Casual or sick (owner, 21 Nov 2026). */
   type: LeaveType;
   typeLabel: string;
+  /** Marked as a half day (owner, 21 Nov 2026). */
+  halfDay: boolean;
   /** What it takes off the allowance (a casual day taken without approval counts twice), and how much of that is unpaid. */
   countedDays: number;
   unpaidDays: number;
@@ -267,6 +270,8 @@ export interface LeaveView {
   upcoming: LeaveRowView[];
   canApprove: boolean;
   canAsk: boolean;
+  /** The owner, the design head or a sales head: may mark someone's half day (owner, 21 Nov 2026). */
+  canMarkHalfDay: boolean;
   meId: string;
   /** For an approver entering leave for someone. */
   team: { id: string; name: string }[];
@@ -317,11 +322,12 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
       },
       orderBy: { fromDay: 'asc' },
       take: 500,
-      select: { id: true, memberId: true, fromDay: true, toDay: true, kind: true, type: true, reason: true, status: true, shiftedProjects: true, askedAt: true, decidedAt: true, member: { select: { user: { select: { name: true } } } } },
+      select: { id: true, memberId: true, fromDay: true, toDay: true, kind: true, type: true, halfDay: true, reason: true, status: true, shiftedProjects: true, askedAt: true, decidedAt: true, member: { select: { user: { select: { name: true } } } } },
     }),
   ]);
   if (!studio) return null;
   const cal = calendarOf({ workingDays: studio.workingDays, holidays: studio.holidays });
+  const marker = mayMarkHalfDay(member, await salesSystemOf(member.id));
   /* Holiday work (owner, 21 Nov 2026) shares the table but is never leave. */
   const leaves = allRows.filter((l) => l.type !== HOLIDAY_WORK);
   const workRows = allRows.filter((l) => l.type === HOLIDAY_WORK);
@@ -333,7 +339,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
   const counted = await prisma.studioLeave.findMany({
     where: { studioId: member.studioId, status: { in: ['ASKED', 'APPROVED'] }, toDay: { gte: since }, ...NOT_WORK },
     take: 3000,
-    select: { id: true, memberId: true, fromDay: true, toDay: true, kind: true, type: true, status: true, askedAt: true, decidedAt: true },
+    select: { id: true, memberId: true, fromDay: true, toDay: true, kind: true, type: true, halfDay: true, status: true, askedAt: true, decidedAt: true },
   });
   const asCounted = (l: (typeof counted)[number]): CountedLeave => ({
     id: l.id,
@@ -343,6 +349,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
     status: l.status,
     approvedDay: l.status === 'APPROVED' && l.decidedAt ? istDay(l.decidedAt) : null,
     askedAt: l.askedAt.getTime(),
+    halfDay: l.halfDay,
   });
   const byMember = new Map<string, CountedLeave[]>();
   for (const l of counted) byMember.set(l.memberId, [...(byMember.get(l.memberId) ?? []), asCounted(l)]);
@@ -359,6 +366,7 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
     return {
       type,
       typeLabel: LEAVE_TYPES[type],
+      halfDay: l.halfDay,
       countedDays: c?.days ?? 0,
       unpaidDays: c?.unpaid ?? 0,
       unapprovedDays: c?.unapprovedDays ?? 0,
@@ -396,8 +404,9 @@ export async function leaveView(month: string, now = new Date()): Promise<LeaveV
     upcoming: rows.filter((r) => r.status === 'APPROVED' && daysBetween(today, r.toDay) >= 0).map(strip),
     canApprove: writer(member) && approver,
     canAsk: writer(member),
+    canMarkHalfDay: writer(member) && marker,
     meId: member.id,
-    team: approver ? members.map((m) => ({ id: m.id, name: m.user.name?.trim() || 'Someone' })).sort((a, b) => a.name.localeCompare(b.name)) : [],
+    team: approver || marker ? members.map((m) => ({ id: m.id, name: m.user.name?.trim() || 'Someone' })).sort((a, b) => a.name.localeCompare(b.name)) : [],
     kinds: (Object.keys(LEAVE_KINDS) as LeaveKind[]).map((key) => ({ key, label: LEAVE_KINDS[key] })),
     types: (Object.keys(LEAVE_TYPES) as LeaveType[]).map((key) => ({ key, label: LEAVE_TYPES[key] })),
     balance: leaveBalance(byMember.get(member.id) ?? [], today.slice(0, 7), cal, today, startOf.get(member.id) ?? ALLOWANCE_FROM),
@@ -506,6 +515,12 @@ async function applyLeave(tx: Prisma.TransactionClient, leave: { id: string; stu
 
 const TX = { timeout: 60_000, maxWait: 10_000 } as const;
 
+/** The member's sales role's built-in kind (ADMIN, HEAD, REP), if any. */
+async function salesSystemOf(memberId: string): Promise<string | null> {
+  const m = await prisma.studioMember.findUnique({ where: { id: memberId }, select: { salesRole: { select: { system: true } } } });
+  return m?.salesRole?.system ?? null;
+}
+
 async function approveInside(tx: Prisma.TransactionClient, leave: { id: string; studioId: string; memberId: string; fromDay: Date; toDay: Date }, byId: string, now: Date) {
   const r = await applyLeave(tx, { id: leave.id, studioId: leave.studioId, memberId: leave.memberId, fromDay: dayFromDb(leave.fromDay), toDay: dayFromDb(leave.toDay) }, byId, now);
   await tx.studioLeave.update({ where: { id: leave.id }, data: { shiftedDays: r.days, shiftedProjects: r.projects } });
@@ -522,10 +537,14 @@ const approvedWords = (r: { days: number; projects: number }) =>
  * may enter it for anyone (unplanned leave after the fact, say), and theirs
  * is approved at once, as a hold asked by an approver is.
  */
-export async function askLeave(input: { memberId?: unknown; fromDay: unknown; toDay: unknown; kind?: unknown; type?: unknown; reason: unknown }, now = new Date()): Promise<LeaveResult> {
+export async function askLeave(input: { memberId?: unknown; fromDay: unknown; toDay: unknown; kind?: unknown; type?: unknown; reason: unknown; halfDay?: unknown }, now = new Date()): Promise<LeaveResult> {
   const member = await currentMember();
   if (!writer(member)) return { ok: false, error: 'Sign in to your studio to ask for leave.' };
-  const approver = mayApproveHold(member);
+  /* A half day is marked, not asked (owner, 21 Nov 2026): by the owner, the design head or a sales head, and approved as marked. */
+  const halfDay = input.halfDay === true;
+  const marker = halfDay && mayMarkHalfDay(member, await salesSystemOf(member.id));
+  if (halfDay && !marker) return { ok: false, error: 'A half day is marked by the owner, the design head or a sales head.' };
+  const approver = mayApproveHold(member) || marker;
   const forId = typeof input.memberId === 'string' && input.memberId ? input.memberId : member.id;
   if (forId !== member.id && !approver) return { ok: false, error: 'You ask for your own leave. The owner or the design head may enter it for someone else.' };
   const target = await prisma.studioMember.findFirst({ where: { id: forId, studioId: member.studioId }, select: { id: true } });
@@ -542,6 +561,7 @@ export async function askLeave(input: { memberId?: unknown; fromDay: unknown; to
         toDay: dayToDb(ok.toDay),
         kind: ok.kind,
         type: ok.type,
+        halfDay: ok.halfDay,
         reason: ok.reason,
         askedById: member.userId,
         askedAt: now,
@@ -549,8 +569,11 @@ export async function askLeave(input: { memberId?: unknown; fromDay: unknown; to
       },
       select: { id: true, studioId: true, memberId: true, fromDay: true, toDay: true },
     });
+    // A half day moves no design date.
+    if (ok.halfDay) return 'half' as const;
     return approver ? approveInside(tx, row, member.userId, now) : null;
   }, TX);
+  if (result === 'half') return { ok: true, message: 'Half day marked.' };
   if (!result) {
     /* Tell the approvers (owner, 20 Nov 2026: "notification should pop for every approval"). Never fails the ask. */
     void tellLeave(member.studioId, { kind: 'asked', memberId: forId, fromDay: ok.fromDay, toDay: ok.toDay });

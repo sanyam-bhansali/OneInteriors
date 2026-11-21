@@ -228,6 +228,13 @@ export interface CountedLeave {
   approvedDay: string | null;
   /** Tie-break for leaves starting the same day. */
   askedAt: number;
+  /** A half day (owner, 21 Nov 2026): one day, counted as half. */
+  halfDay?: boolean;
+}
+
+/** Who may mark a half day (owner, 21 Nov 2026: "for sales head and design head"): the owner, the design head, a sales head or admin. */
+export function mayMarkHalfDay(m: { role: string; designHead?: boolean | null }, salesSystem: string | null | undefined): boolean {
+  return m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true) || (m.role === 'SALES' && (salesSystem === 'HEAD' || salesSystem === 'ADMIN'));
 }
 
 /** What one leave counts for. `days` is what it takes off the allowance; `unapprovedDays` the casual days counted twice. */
@@ -240,11 +247,12 @@ export interface LeaveCount {
 }
 
 /** How much one working day of this leave counts: two for a casual day taken without approval, else one. */
-export function dayWeight(l: Pick<CountedLeave, 'type' | 'status' | 'approvedDay'>, day: string, today: string): number {
-  if (l.type !== 'CASUAL') return 1;
-  if (l.status === 'APPROVED') return l.approvedDay !== null && daysBetween(day, l.approvedDay) > 0 ? UNAPPROVED_CASUAL_WEIGHT : 1;
+export function dayWeight(l: Pick<CountedLeave, 'type' | 'status' | 'approvedDay' | 'halfDay'>, day: string, today: string): number {
+  const base = l.halfDay ? 0.5 : 1;
+  if (l.type !== 'CASUAL') return base;
+  if (l.status === 'APPROVED') return l.approvedDay !== null && daysBetween(day, l.approvedDay) > 0 ? base * UNAPPROVED_CASUAL_WEIGHT : base;
   // Still waiting: a day already gone was taken without approval; today and later are not taken yet.
-  return daysBetween(day, today) > 0 ? UNAPPROVED_CASUAL_WEIGHT : 1;
+  return daysBetween(day, today) > 0 ? base * UNAPPROVED_CASUAL_WEIGHT : base;
 }
 
 /**
@@ -265,7 +273,7 @@ export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar,
         const w = dayWeight(l, d, today);
         c.workingDays++;
         c.days += w;
-        if (w > 1) c.unapprovedDays++;
+        if (w > (l.halfDay ? 0.5 : 1)) c.unapprovedDays++;
         // Before the allowance began: nothing earned and nothing used.
         if (d.slice(0, 7) < startMonth) {
           c.paid += w;
@@ -360,13 +368,14 @@ export function holidayWorkPaidDays(l: { fromDay: string; toDay: string; status:
 }
 
 export function checkLeaveAsk(
-  input: { fromDay: unknown; toDay: unknown; kind?: unknown; type?: unknown; reason: unknown },
+  input: { fromDay: unknown; toDay: unknown; kind?: unknown; type?: unknown; reason: unknown; halfDay?: unknown },
   today: string,
   /** The member's other leave. */
   existing: readonly LeaveSpan[],
-): { ok: true; fromDay: string; toDay: string; kind: LeaveKind; type: LeaveType; reason: string } | { ok: false; error: string } {
+): { ok: true; fromDay: string; toDay: string; kind: LeaveKind; type: LeaveType; reason: string; halfDay: boolean } | { ok: false; error: string } {
   const fromDay = typeof input.fromDay === 'string' ? input.fromDay : '';
-  const toDay = typeof input.toDay === 'string' && input.toDay ? input.toDay : fromDay;
+  const halfDay = input.halfDay === true;
+  const toDay = halfDay ? fromDay : typeof input.toDay === 'string' && input.toDay ? input.toDay : fromDay;
   if (!isDay(fromDay) || !isDay(toDay)) return { ok: false, error: 'Pick the first and last day of the leave.' };
   /* Casual or sick (owner, 21 Nov 2026); planned or not follows: sick leave and leave already taken are unplanned. */
   let kind: LeaveKind;
@@ -389,7 +398,7 @@ export function checkLeaveAsk(
   if (reason.length > LEAVE_REASON_MAX) return { ok: false, error: `Keep the reason under ${LEAVE_REASON_MAX} characters.` };
   const clash = existing.find((l) => isOpenLeave(l) && daysBetween(l.fromDay, toDay) >= 0 && daysBetween(fromDay, l.toDay) >= 0);
   if (clash) return { ok: false, error: `This overlaps leave already ${clash.status === 'APPROVED' ? 'approved' : 'asked for'} (${clash.fromDay} to ${clash.toDay}).` };
-  return { ok: true, fromDay, toDay, kind, type, reason };
+  return { ok: true, fromDay, toDay, kind, type, reason, halfDay };
 }
 
 /** What a leave's plan moves say, team only: "On leave 10 Nov to 12 Nov (3 working days)." */

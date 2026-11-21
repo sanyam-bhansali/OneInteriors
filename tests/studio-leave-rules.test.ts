@@ -117,7 +117,7 @@ describe('leave', () => {
 
   it('takes a planned leave from today on', () => {
     // A leave asked without a type (before 21 Nov 2026) is casual when planned.
-    expect(checkLeaveAsk(ok, today, [])).toEqual({ ok: true, fromDay: '2026-11-17', toDay: '2026-11-19', kind: 'PLANNED', type: 'CASUAL', reason: "Sister's wedding" });
+    expect(checkLeaveAsk(ok, today, [])).toEqual({ ok: true, fromDay: '2026-11-17', toDay: '2026-11-19', kind: 'PLANNED', type: 'CASUAL', reason: "Sister's wedding", halfDay: false });
     expect(checkLeaveAsk({ ...ok, toDay: '' }, today, [])).toMatchObject({ ok: true, toDay: '2026-11-17' });
   });
 

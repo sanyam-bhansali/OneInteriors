@@ -10,7 +10,7 @@ function done(r: LeaveResult): LeaveResult {
   return r;
 }
 
-export async function askLeaveAction(input: { memberId?: string; fromDay: string; toDay: string; type: string; reason: string }): Promise<LeaveResult> {
+export async function askLeaveAction(input: { memberId?: string; fromDay: string; toDay: string; type: string; reason: string; halfDay?: boolean }): Promise<LeaveResult> {
   return done(await askLeave(input));
 }
 

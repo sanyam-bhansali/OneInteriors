@@ -10,6 +10,7 @@ import {
   HOLIDAY_WORK_PAY,
   holidayWorkPaidDays,
   leaveBalance,
+  mayMarkHalfDay,
   typeOfLeave,
   type CountedLeave,
 } from '@/modules/studio-leave/rules';
@@ -123,6 +124,29 @@ describe('working on a holiday', () => {
     expect(store).toMatch(/const leaves = allRows\.filter\(\(l\) => l\.type !== HOLIDAY_WORK\);/);
     expect(store).toMatch(/if \(leave\.type === HOLIDAY_WORK\) return 'work' as const;/);
     expect(store.match(/\.\.\.NOT_WORK/g)?.length).toBe(2);
+  });
+});
+
+/* Owner, 21 Nov 2026: "option to mark as half day for sales head and design head". */
+describe('half days', () => {
+  it('count as half; an unapproved casual half day counts as one', () => {
+    const c = countLeave([leave({ id: 'h', fromDay: '2026-11-03', halfDay: true }), leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null, halfDay: true, askedAt: 1 })], CAL, TODAY);
+    expect(c.get('h')).toMatchObject({ days: 0.5, paid: 0.5, unpaid: 0 });
+    expect(c.get('u')).toMatchObject({ days: 1, paid: 0.5, unpaid: 0.5, unapprovedDays: 1 });
+  });
+
+  it('are one day', () => {
+    expect(checkLeaveAsk({ fromDay: '2026-11-24', toDay: '2026-11-26', type: 'CASUAL', reason: 'Doctor', halfDay: true }, TODAY, [])).toMatchObject({ ok: true, toDay: '2026-11-24', halfDay: true });
+  });
+
+  it('are marked by the owner, the design head or a sales head (or admin), no one else', () => {
+    expect(mayMarkHalfDay({ role: 'OWNER' }, null)).toBe(true);
+    expect(mayMarkHalfDay({ role: 'DESIGNER', designHead: true }, null)).toBe(true);
+    expect(mayMarkHalfDay({ role: 'SALES' }, 'HEAD')).toBe(true);
+    expect(mayMarkHalfDay({ role: 'SALES' }, 'ADMIN')).toBe(true);
+    expect(mayMarkHalfDay({ role: 'SALES' }, 'REP')).toBe(false);
+    expect(mayMarkHalfDay({ role: 'DESIGNER', designHead: false }, null)).toBe(false);
+    expect(mayMarkHalfDay({ role: 'PM' }, null)).toBe(false);
   });
 });
 

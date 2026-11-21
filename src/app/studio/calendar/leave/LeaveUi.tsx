@@ -18,6 +18,7 @@ export function AskLeave({ view }: { view: LeaveView }) {
   const { pending, message, run } = useRun();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState('CASUAL');
+  const [halfDay, setHalfDay] = useState(false);
   const [fromDay, setFrom] = useState(view.today);
   const [toDay, setTo] = useState(view.today);
   const [reason, setReason] = useState('');
@@ -40,7 +41,7 @@ export function AskLeave({ view }: { view: LeaveView }) {
       className="card flex flex-col gap-3 p-3"
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => askLeaveAction({ memberId, fromDay, toDay, type, reason }), () => {
+        run(() => askLeaveAction({ memberId, fromDay, toDay: halfDay ? fromDay : toDay, type, reason, halfDay }), () => {
           setOpen(false);
           setReason('');
           router.refresh();
@@ -85,10 +86,18 @@ export function AskLeave({ view }: { view: LeaveView }) {
             required
           />
         </label>
-        <label className="flex flex-col gap-1 text-[13px]">
-          Last day
-          <input type="date" className="fld" value={toDay} min={fromDay} onChange={(e) => setTo(e.target.value)} required />
-        </label>
+        {halfDay ? null : (
+          <label className="flex flex-col gap-1 text-[13px]">
+            Last day
+            <input type="date" className="fld" value={toDay} min={fromDay} onChange={(e) => setTo(e.target.value)} required />
+          </label>
+        )}
+        {view.canMarkHalfDay ? (
+          /* Owner, 21 Nov 2026: the sales head and the design head (and the owner) mark half days. */
+          <label className="flex items-center gap-2 self-end pb-2 text-[13.5px]">
+            <input type="checkbox" checked={halfDay} onChange={(e) => setHalfDay(e.target.checked)} /> Half day
+          </label>
+        ) : null}
         <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-[13px]">
           Why (a few words)
           <input className="fld" value={reason} maxLength={120} onChange={(e) => setReason(e.target.value)} placeholder="Sister's wedding" required />
@@ -255,7 +264,7 @@ function Row({ r, view, run, pending }: { r: LeaveRowView; view: LeaveView; run:
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-3 py-2 text-[13.5px]">
       <span>
-        <span className="font-medium">{r.mine ? 'You' : r.who}</span> · {span(r)} <span className={muted}>· {r.typeLabel.toLowerCase()} · {r.workingDays} working day{r.workingDays === 1 ? '' : 's'}</span>
+        <span className="font-medium">{r.mine ? 'You' : r.who}</span> · {span(r)} <span className={muted}>· {r.typeLabel.toLowerCase()} · {r.halfDay ? 'half day' : `${r.workingDays} working day${r.workingDays === 1 ? '' : 's'}`}</span>
         {r.unapprovedDays > 0 ? (
           <span className="block text-[12.5px]" style={{ color: 'var(--bad)' }}>
             Taken without approval: counts as {r.countedDays} day{r.countedDays === 1 ? '' : 's'}.
