@@ -110,6 +110,16 @@ describe('the handover is given only once design is complete', () => {
     expect(plan).toMatch(/executionFrom\(start, cal\)/);
   });
 
+  it('no handover date and nothing to move on execution until the project exits design (owner, 21 Nov 2026)', () => {
+    const tab = readFileSync('src/app/studio/projects/[id]/PlanTab.tsx', 'utf8');
+    expect(tab).toMatch(/const undated = !plan\.executionPlanned && s\.kind !== 'DESIGN';/);
+    expect(tab).toMatch(/plan\.canEdit && s\.state !== 'done' && !undated/);
+    expect(tab).toMatch(/plan\.executionPlanned \|\| s\.kind === 'DESIGN'/);
+    const edit = readFileSync('src/modules/project/plan-edit.ts', 'utf8');
+    expect(edit).toMatch(/if \(p && p\.executionPlannedAt === null\) return \{ ok: false, error: EXECUTION_UNDATED \};/);
+    expect(readFileSync('src/app/studio/projects/[id]/DesignPanel.tsx', 'utf8')).not.toMatch(/and handover move/);
+  });
+
   it('the client app says "After design" until then; projects past design count as planned', () => {
     expect(readFileSync('src/app/app/project/page.tsx', 'utf8')).toMatch(/handoverKnown === false \? 'After design'/);
     expect(readFileSync('prisma/migrations/20261121180000_execution_planned_at/migration.sql', 'utf8')).toMatch(/WHERE "phase" <> 'DESIGN'/);

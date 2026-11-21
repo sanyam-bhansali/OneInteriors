@@ -98,6 +98,9 @@ export interface MoveDateInput {
   shiftLater?: boolean;
 }
 
+/** Moving an execution or handover date during design (owner, 21 Nov 2026). */
+export const EXECUTION_UNDATED = 'Execution and the handover are dated when the project exits design. Until then only the design’s dates can be moved.';
+
 const toRule = (s: { id: string; kind: string; name: string; plannedStart: Date; plannedEnd: Date; actualEnd: Date | null }): RuleStage => ({
   id: s.id,
   kind: s.kind as StageKind,
@@ -131,6 +134,12 @@ export async function moveDate(input: MoveDateInput, now = new Date()): Promise<
     select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true },
   });
   if (rows.length === 0) return { ok: false, error: 'This project has no plan built from its quote yet.' };
+  /* Owner, 21 Nov 2026: execution and the handover have no dates until the project exits design. */
+  const moving = rows.find((r) => r.id === input.stageId);
+  if (moving && moving.kind !== 'DESIGN') {
+    const p = await prisma.homeProject.findUnique({ where: { id: input.projectId }, select: { executionPlannedAt: true } });
+    if (p && p.executionPlannedAt === null) return { ok: false, error: EXECUTION_UNDATED };
+  }
   if (decisionId) {
     const d = await prisma.homeDecision.findFirst({ where: { id: decisionId, projectId: input.projectId }, select: { id: true } });
     if (!d) return { ok: false, error: 'That decision is not on this project.' };

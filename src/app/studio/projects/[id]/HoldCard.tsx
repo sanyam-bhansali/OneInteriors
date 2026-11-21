@@ -40,7 +40,7 @@ export function HoldCard({ view, customer }: { view: HoldView; customer: string 
             On hold since {dayWords(o.startedOn)} · {plural(o.days)} · {o.reason}
           </p>
           <p className={`m-0 ${muted}`}>
-            Nothing on this project counts as late while it is on hold. When you take it off, the open steps, the stage under way and handover move {o.days ? plural(o.days) : 'the hold days'} later, on {customer}&rsquo;s side, never as our delay. {customer} sees &ldquo;on hold&rdquo; and the reason, never your note.
+            Nothing on this project counts as late while it is on hold. When you take it off, the open steps, the stage under way and the dates after it (the handover, once dated) move {o.days ? plural(o.days) : 'the hold days'} later, on {customer}&rsquo;s side, never as our delay. {customer} sees &ldquo;on hold&rdquo; and the reason, never your note.
           </p>
           {o.note ? <p className={`m-0 ${muted}`}>Team note: {o.note}</p> : null}
           {view.canEnd ? (
