@@ -35,15 +35,18 @@ const CREWS_TAB = { href: '/studio/settings/trades', label: 'Crews and trades' }
 /** Holidays (owner, 13 Nov 2026): the owner and the design head; adding one moves the design plans. */
 const HOLIDAYS_TAB = { href: '/studio/settings/holidays', label: 'Holidays' };
 
+/** Invoices (owner, 21 Nov 2026): who signs invoices and the statement, the stamp, prefix, SAC and bank. Owner only. */
+const INVOICES_TAB = { href: '/studio/settings/invoices', label: 'Invoices' };
+
 /** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */
 const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
 
-const ALL = [...TABS, PAYMENTS_TAB, DESIGN_TAB, HOLIDAYS_TAB, CREWS_TAB, TEAM_TAB];
+const ALL = [...TABS, PAYMENTS_TAB, INVOICES_TAB, DESIGN_TAB, HOLIDAYS_TAB, CREWS_TAB, TEAM_TAB];
 
 export function SettingsTabs({ team = false, allowed }: { team?: boolean; allowed?: readonly string[] }) {
   const pathname = usePathname();
   const tabs = allowed
-    ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, HOLIDAYS_TAB, CREWS_TAB].filter((t) => allowed.includes(t.href))
+    ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, INVOICES_TAB, DESIGN_TAB, HOLIDAYS_TAB, CREWS_TAB].filter((t) => allowed.includes(t.href))
     : team
       ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, HOLIDAYS_TAB, CREWS_TAB]
       : TABS;

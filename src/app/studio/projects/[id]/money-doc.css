@@ -1,0 +1,89 @@
+/* Invoices and the statement (owner, 21 Nov 2026): the approved sample pages'
+   look (invoice-preview/sample-invoice.html, sample-statement.html), scoped
+   under .mdoc so nothing else in the studio app changes. */
+.mdoc {
+  --md-ink: #1d1b26;
+  --md-muted: #6b6878;
+  --md-line: #e4e1ea;
+  --md-brand: #5b1e2a;
+  --md-soft: #f6f3f5;
+  --md-paid: #1e7a46;
+  color: var(--md-ink);
+  font: 13.5px/1.45 'Segoe UI', Arial, sans-serif;
+}
+.mdoc * { box-sizing: border-box; }
+.mdoc-page {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto 16px;
+  background: #fff;
+  padding: 16mm 15mm 14mm;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, .12);
+}
+.mdoc header.mdoc-head { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 14px; border-bottom: 3px solid var(--md-brand); }
+.mdoc .mdoc-logo { display: block; max-width: 170px; max-height: 56px; object-fit: contain; }
+.mdoc .mdoc-co b { font-size: 17px; display: block; margin-top: 8px; }
+.mdoc .mdoc-co span { display: block; color: var(--md-muted); font-size: 12px; }
+.mdoc .mdoc-co span strong { color: var(--md-ink); font-weight: 600; }
+.mdoc .mdoc-title { text-align: right; }
+.mdoc .mdoc-title h1 { margin: 0; font-size: 22px; letter-spacing: .06em; color: var(--md-brand); }
+.mdoc .mdoc-title table { margin-left: auto; margin-top: 8px; border-collapse: collapse; font-size: 12.5px; }
+.mdoc .mdoc-title td { padding: 1px 0 1px 12px; text-align: right; }
+.mdoc .mdoc-title td:first-child { color: var(--md-muted); }
+.mdoc .mdoc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+.mdoc .mdoc-box { background: var(--md-soft); border-radius: 8px; padding: 10px 12px; }
+.mdoc .mdoc-box h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--md-muted); }
+.mdoc .mdoc-box b { font-size: 14px; }
+.mdoc h2.mdoc-h2 { margin: 18px 0 6px; font-size: 14px; letter-spacing: .04em; color: var(--md-brand); }
+.mdoc table.mdoc-items { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.mdoc table.mdoc-items th { background: var(--md-brand); color: #fff; font-weight: 600; font-size: 12px; text-align: left; padding: 8px 10px; }
+.mdoc table.mdoc-items td { padding: 9px 10px; border-bottom: 1px solid var(--md-line); vertical-align: top; }
+.mdoc table.mdoc-items td.paid { color: var(--md-paid); font-weight: 600; }
+.mdoc .r { text-align: right; white-space: nowrap; }
+.mdoc .m { color: var(--md-muted); }
+.mdoc .mdoc-sub td { color: var(--md-muted); }
+.mdoc .mdoc-grand td { font-weight: 700; font-size: 15px; background: var(--md-soft); border-bottom: 0; }
+.mdoc .mdoc-words { margin: 10px 0 0; font-size: 12.5px; }
+.mdoc .mdoc-words b { font-weight: 600; }
+.mdoc .mdoc-status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+.mdoc .mdoc-status div { border: 1px solid var(--md-line); border-radius: 8px; padding: 8px 10px; }
+.mdoc .mdoc-status span { display: block; font-size: 11px; color: var(--md-muted); text-transform: uppercase; letter-spacing: .06em; }
+.mdoc .mdoc-status b { font-size: 15px; }
+.mdoc .paid { color: var(--md-paid); }
+.mdoc .mdoc-notes { font-size: 11.5px; color: var(--md-muted); margin: 8px 0 0; }
+.mdoc .mdoc-notes p { margin: 3px 0; }
+.mdoc .mdoc-totals { margin-left: auto; width: 330px; max-width: 100%; border-collapse: collapse; margin-top: 14px; }
+.mdoc .mdoc-totals td { padding: 6px 10px; }
+.mdoc .mdoc-totals .rem td { font-weight: 700; font-size: 15px; background: var(--md-soft); border-top: 2px solid var(--md-ink); }
+.mdoc .mdoc-sign { display: flex; justify-content: flex-end; margin-top: 22px; }
+.mdoc .mdoc-signbox { width: 260px; text-align: center; position: relative; }
+.mdoc .mdoc-signbox .for { font-size: 12.5px; font-weight: 600; }
+.mdoc .mdoc-signbox .art { position: relative; height: 118px; }
+.mdoc .mdoc-signbox .stamp { position: absolute; left: 6px; top: 2px; width: 112px; height: 112px; object-fit: contain; transform: rotate(-8deg); }
+.mdoc .mdoc-signbox .sig { position: absolute; right: 0; top: 34px; width: 170px; max-height: 80px; object-fit: contain; }
+.mdoc .mdoc-signbox .line { border-top: 1px solid var(--md-ink); padding-top: 5px; }
+.mdoc .mdoc-signbox .name { font-weight: 700; }
+.mdoc .mdoc-signbox .role { font-size: 12px; color: var(--md-muted); }
+.mdoc footer.mdoc-foot { margin-top: 22px; font-size: 10.5px; color: var(--md-muted); border-top: 1px solid var(--md-line); padding-top: 6px; display: flex; justify-content: space-between; gap: 12px; }
+.mdoc .mdoc-keep { break-inside: avoid; page-break-inside: avoid; }
+
+/* A phone sees the page at its real size and scrolls sideways. */
+@media screen and (max-width: 840px) {
+  .mdoc { overflow-x: auto; }
+  .mdoc-page { max-width: none; }
+}
+
+@media print {
+  body:has(.mdoc) .apphead,
+  body:has(.mdoc) .no-print { display: none !important; }
+  body:has(.mdoc) .oi-page, body:has(.mdoc) .oi-frame { padding: 0 !important; margin: 0 !important; display: block !important; }
+  body:has(.mdoc) script { display: none !important; }
+  body:has(.mdoc) .oi-studio, body:has(.mdoc) .oi-frame, body:has(.mdoc) .oi-page { background: #fff !important; }
+  .mdoc-wrap { padding: 0 !important; }
+  .mdoc { overflow: visible; }
+  .mdoc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mdoc-page { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .mdoc table.mdoc-items thead { display: table-header-group; }
+  .mdoc table.mdoc-items tr { break-inside: avoid; page-break-inside: avoid; }
+}

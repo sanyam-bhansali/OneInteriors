@@ -19,6 +19,7 @@ import { currentMember } from '@/modules/studio/access';
 import { projectsVisibleTo } from '@/modules/studio/roles';
 import { siteLabel } from '@/modules/studio/team-rules';
 import { dueAtClosure, type ClosureDue, type DueExtra } from './closure-due';
+import { issuerFor, type DocIssuer } from './invoice';
 import { staffOn } from './flow-access';
 import { rowStatuses } from './payment-ledger';
 import { ledgerOf, toLedgerRow } from './payments-flow';
@@ -76,6 +77,10 @@ export interface ProjectStatement {
   /** IST day it was made. */
   on: string;
   statement: Statement;
+  /** The studio on the page: legal name, address, GSTIN, logo, who signs (owner, 21 Nov 2026). */
+  issuer: DocIssuer;
+  /** The signed quotation's number and the Design Final's, when there is one. */
+  quotes: { signed: string | null; designFinal: string | null };
 }
 
 const clientOf = (b: { contactName: string | null; user: { name: string | null } | null }) => b.contactName?.trim() || b.user?.name?.trim() || 'Client';
@@ -115,6 +120,8 @@ export async function projectStatement(projectId: string, now = new Date()): Pro
     studio: p.introduction.studio.tradeName,
     on: new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10),
     statement,
+    issuer: await issuerFor(staff.studioId),
+    quotes: { signed: (p.signedQuoteId && number.get(p.signedQuoteId)) || null, designFinal: (p.designFinalQuoteId && number.get(p.designFinalQuoteId)) || null },
   };
 }
 
