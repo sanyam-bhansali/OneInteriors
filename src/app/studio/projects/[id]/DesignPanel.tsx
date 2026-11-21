@@ -533,7 +533,7 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
             </label>
           </fieldset>
           <p className={`m-0 ${muted}`}>
-            Every step after it, the design&rsquo;s end and handover move {late === 1 ? '1 working day' : `${late} working days`} later.
+            Every step after it and the design&rsquo;s end move {late === 1 ? '1 working day' : `${late} working days`} later.
           </p>
           <OnlyYourTeam>
             <label className="flex flex-col gap-1 text-[13px]">
@@ -545,7 +545,7 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       ) : null}
       {early > 0 ? (
         <p className={`m-0 ${muted}`}>
-          {early === 1 ? '1 working day' : `${early} working days`} early: the steps after it, the design&rsquo;s end and handover come forward (never before today).
+          {early === 1 ? '1 working day' : `${early} working days`} early: the steps after it and the design&rsquo;s end come forward (never before today).
         </p>
       ) : null}
       <OnlyYourTeam>
@@ -1126,7 +1126,7 @@ function DesignEndForm({ tab }: { tab: DesignTab }) {
         Final design date
         <input type="date" value={to} min={tab.today} required onChange={(e) => setTo(e.target.value)} className="fld w-auto" />
       </label>
-      <p className={`m-0 ${muted}`}>The open steps spread to end on this day by their own days, skipping days off. Handover moves with it. Not counted as anyone&rsquo;s delay.</p>
+      <p className={`m-0 ${muted}`}>The open steps spread to end on this day by their own days, skipping days off. The handover is dated when design is complete. Not counted as anyone&rsquo;s delay.</p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" className="btn pri sm" disabled={pending}>
           Set the date
