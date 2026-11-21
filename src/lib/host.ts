@@ -150,6 +150,8 @@ const PROJECT_APP = [
   '/app/snags',
   /* Warranty claims and paid service visits after the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md). */
   '/app/aftercare',
+  /* The client agreement, e-signed at design closure (owner, 21 Nov 2026; docs/studio-os/CLIENT-AGREEMENT.md). */
+  '/app/agreement',
   '/app/decision',
   '/app/signoff',
   '/app/locker',

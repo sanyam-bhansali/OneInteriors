@@ -94,10 +94,13 @@ export type ProjectEvent =
   | { kind: 'warranty-claim'; projectId: string; client: string; title: string; area: string }
   | { kind: 'service-booked'; projectId: string; client: string; category: string; when: string }
   | { kind: 'service-confirmed'; category: string; when: string; studio: string }
+  // The client agreement (owner, 21 Nov 2026; docs/studio-os/CLIENT-AGREEMENT.md): ready for the client to e-sign; signed, to the studio.
+  | { kind: 'agreement-ready'; studio: string }
+  | { kind: 'agreement-signed'; projectId: string; client: string }
   | { kind: 'service-changed'; what: 'moved' | 'cancelled' | 'done'; category: string; when: string; studio: string; note: string | null };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer', 'service-booked'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed', 'project-needs-designer', 'service-booked', 'agreement-signed'];
 
 export interface Message {
   title: string;
@@ -467,6 +470,20 @@ export function messageFor(e: ProjectEvent): Message {
         title: 'Your service visit is booked',
         body: clip(`${e.category} visit by ${e.studio}, ${e.when}.`, 160),
         url: '/app/aftercare',
+      };
+    case 'agreement-ready':
+      return {
+        template: 'agreement.ready',
+        title: 'Your agreement is ready to sign',
+        body: clip(`${e.studio} has sent your agreement. Read it and sign it with Aadhaar in the app.`, 160),
+        url: '/app/agreement',
+      };
+    case 'agreement-signed':
+      return {
+        template: 'agreement.signed',
+        title: `Agreement signed: ${clip(e.client, 60)}`,
+        body: 'The signed copy is in the client’s Locker.',
+        url: `/studio/projects/${e.projectId}`,
       };
     case 'service-changed':
       return {

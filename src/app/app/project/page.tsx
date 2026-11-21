@@ -12,6 +12,7 @@ import { dayLabel, daysLate, pickDecision, shortDate } from '@/modules/app/proje
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { projectFocus, type Block } from '@/modules/app/project-focus';
 import { DesignCard } from './DesignCard';
+import { AgreementRow } from './AgreementRow';
 import { PaymentEntries } from './PaymentEntries';
 import { LifecycleCard } from './LifecycleCard';
 import { ExtrasCard, SignoffsCard } from './ExtrasCard';
@@ -204,7 +205,13 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
           </div>
         ) : null;
       case 'design':
-        return design ? <DesignCard design={design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} hideProgress={inDesign} /> : null;
+        return (
+          <>
+            {design ? <DesignCard design={design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} hideProgress={inDesign} /> : null}
+            {/* The client agreement, once the studio sends it at design closure (owner, 21 Nov 2026). */}
+            <AgreementRow projectId={project.id} />
+          </>
+        );
       case 'site':
         return (
           <div className="oa-list">

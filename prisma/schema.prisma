@@ -714,6 +714,7 @@ model Studio {
   serviceSlotVisits Int                    @default(2)
   coverageRules     WarrantyCoverageRule[]
   serviceRequests   ServiceRequest[]
+  clientAgreements  ClientAgreement[]
 
   /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
   /// (projects, design, site mode, the payments desk, crews, team) is open
@@ -1904,6 +1905,9 @@ model HomeProject {
   /// project/change-orders.ts, project/signoffs.ts).
   changeOrders HomeChangeOrder[]
   signoffs     HomeQuoteSignoff[]
+
+  /// The client agreement, e-signed at design closure (owner, 21 Nov 2026).
+  clientAgreements ClientAgreement[]
 
   /// Brought onto One Interiors while already running ("Add an existing
   /// project", owner 20 Oct 2026; docs/studio-os/BRING-IN-PROJECTS.md): when,
@@ -3601,6 +3605,15 @@ model StudioBranding {
   /// have never read.
   welcomeNote String? @db.Text
   terms       String? @db.Text
+
+  /// The client agreement (owner, 21 Nov 2026; docs/studio-os/CLIENT-
+  /// AGREEMENT.md): kept apart from the quotation's terms, filled with the
+  /// client's details and e-signed by the client at design closure. Same
+  /// light markup as `terms`, with {{placeholders}}. Null: not written yet.
+  clientAgreement        String? @db.Text
+  /// Who signs for the studio; printed as already signed on the PDF.
+  agreementSignatory     String?
+  agreementSignatoryRole String?
 
   /// The name printed at the top of quotations and in the builder (owner,
   /// 22 Oct 2026: Hauspire prints "HAUSPIRE"). Null: the trading name. The
@@ -6677,4 +6690,55 @@ model ServiceRequest {
   @@index([studioId, slotDay, slotStart])
   @@index([projectId, createdAt])
   @@map("service_requests")
+}
+
+/// SENT: filled, made into a PDF and out for the client's eSign. SIGNED: the
+/// signed copy is in the client's Locker (eSign, or a signed copy the studio
+/// uploaded). CANCELLED: replaced by a newer one, or withdrawn.
+enum ClientAgreementStatus {
+  SENT
+  SIGNED
+  CANCELLED
+}
+
+/// One client agreement on a project (owner, 21 Nov 2026; docs/studio-os/
+/// CLIENT-AGREEMENT.md): the studio's template filled with this client's
+/// details, signed by the client only (the studio's side is printed as
+/// signed). The eSign provider is pluggable (agreement/provider.ts); until one
+/// is connected the studio uploads the signed copy.
+model ClientAgreement {
+  id                String                @id @default(cuid())
+  projectId         String
+  project           HomeProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  studioId          String
+  studio            Studio                @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  /// The design quotation it was filled from, when there is one.
+  quoteId           String?
+  status            ClientAgreementStatus @default(SENT)
+  /// The details the studio confirmed ({ clientName, relation, address, pan, siteAddress, date }).
+  fields            Json
+  /// The agreement as filled, exactly as the PDF prints it.
+  text              String                @db.Text
+  /// The unsigned PDF, then the signed one (private `project-docs`, signed links only).
+  pdfPath           String?
+  signedPath        String?
+  /// The Locker document filed when it was signed.
+  documentId        String?
+  /// 'esign:<provider>' or 'upload'.
+  signedVia         String?
+  provider          String?
+  providerRequestId String?               @unique
+  signUrl           String?               @db.Text
+  /// The signer's name as the eSign returned it (from Aadhaar).
+  signerName        String?
+  sentById          String
+  sentAt            DateTime              @default(now())
+  signedAt          DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([projectId, status])
+  @@index([studioId, status])
+  @@map("client_agreements")
 }
