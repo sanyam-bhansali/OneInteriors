@@ -12,7 +12,7 @@ export function routeFor(url: string | undefined): RouteHref | null {
   const [path, query = ''] = url.split('?');
   const id = new URLSearchParams(query).get('id');
   // App paths, as the sample and newer notices send them.
-  if (path && /^\/(home|project|site|geio|me|chats|snags|locker|notifications)$/.test(path)) return path;
+  if (path && /^\/(home|project|site|geio|me|chats|snags|locker|notifications|aftercare|agreement)$/.test(path)) return path;
   /* In-app chat (1 Nov 2026): a message opens its conversation. */
   const chat = /^\/app\/chats\/(designer|team|one_interiors)$/.exec(path ?? '');
   const project = new URLSearchParams(query).get('project');
@@ -29,6 +29,11 @@ export function routeFor(url: string | undefined): RouteHref | null {
       return '/snags';
     case '/app/locker':
       return '/locker';
+    /* After the handover, and the agreement at design closure (owner, 20–21 Nov 2026). */
+    case '/app/aftercare':
+      return '/aftercare';
+    case '/app/agreement':
+      return '/agreement';
     case '/app/decision':
       return id ? { pathname: '/decision/[id]', params: { id } } : '/home';
     default:
