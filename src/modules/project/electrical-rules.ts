@@ -109,6 +109,15 @@ export function spreadOverUnpaid(totalPaise: number, stages: readonly { pct: num
   return open.map((s, k) => ({ stageIndex: s.i, deltaPaise: parts[k]! })).filter((x) => x.deltaPaise !== 0);
 }
 
+/**
+ * When an electrical bill can be made, changed and sent (owner, 22 Nov 2026: "they can change electrical bill
+ * whenever needed after the project is created"): in every phase, design included — not only after sign-off
+ * like extra work. Only a closed-out project, whose final payment is fixed, refuses it.
+ */
+export function electricalOpen(closedOut: boolean): { ok: true } | { ok: false; error: string } {
+  return closedOut ? { ok: false, error: 'This project is closed out: its final payment is fixed, so the electrical bill cannot change.' } : { ok: true };
+}
+
 /** "12 points", "2.5 metres". */
 export function qtyWords(qtyMilli: number, unit: string): string {
   const q = (qtyMilli / QTY_SCALE).toFixed(3).replace(/\.?0+$/, '');

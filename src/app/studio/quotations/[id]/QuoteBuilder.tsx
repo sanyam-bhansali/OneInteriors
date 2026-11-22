@@ -834,9 +834,7 @@ export function QuoteBuilder({
           </div>
           {lines.length > 0 ? (
             <div className="hpdf">
-              <button type="button" className="btn pri sm" disabled={saving} onClick={() => saveAndOpen(`/studio/quotations/${quote.id}/print`)} title="Saves this quotation, then opens the PDF">
-                ⬇ Save &amp; Quotation PDF
-              </button>
+              {/* "Save & Quotation PDF" removed (owner, 22 Nov 2026): Generate PDF at the top does it. */}
               <button
                 type="button"
                 className="btn sec sm"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_DISCOUNT_BPS, checkElectricalLines, electricalAmount, electricalTotals, parseDiscount, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
+import { DEFAULT_DISCOUNT_BPS, checkElectricalLines, electricalAmount, electricalOpen, electricalTotals, parseDiscount, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
 
 /* Owner, 22 Nov 2026: the electrical bill — picked from the admin's rate list, quantity and note by the designer, approved by the client, spread over the unpaid stages, in one PDF with the quotation. */
 const ITEMS = new Map<string, ElectricalItem>([
@@ -104,5 +104,20 @@ describe('wiring', () => {
   it('only the owner or the design head keeps the rate list', () => {
     const store = readFileSync('src/modules/project/electrical-bill.ts', 'utf8');
     expect(store).toContain("m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true)");
+  });
+});
+
+describe('open whenever needed after the project is created (owner, 22 Nov 2026)', () => {
+  it('any phase, design included; only a closed-out project refuses', () => {
+    expect(electricalOpen(false)).toEqual({ ok: true });
+    expect(electricalOpen(true).ok).toBe(false);
+  });
+
+  it('saving, the panel and sending use it, not the extra-work gate', () => {
+    const bill = readFileSync('src/modules/project/electrical-bill.ts', 'utf8');
+    expect(bill).not.toContain('extrasOpen');
+    expect(bill.match(/electricalOpen\(project\.closedOutAt !== null\)/g)?.length).toBe(2);
+    const orders = readFileSync('src/modules/project/change-orders.ts', 'utf8').replace(/\r\n/g, '\n');
+    expect(orders).toContain('o.kind === ELECTRICAL\n      ? electricalOpen(project.closedOutAt !== null)');
   });
 });
