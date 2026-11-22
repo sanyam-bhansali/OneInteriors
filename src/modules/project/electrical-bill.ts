@@ -15,11 +15,10 @@ import { prisma } from '@/lib/prisma';
 import { fromDb, toDb } from '@/lib/money';
 import { readSignedStages } from '@/modules/portal/payments';
 import { currentMember, type StudioMemberRef } from '@/modules/studio/access';
-import { extrasOpen } from './change-order-rules';
 import { recordEvent } from './events';
 import { staffOn } from './flow-access';
 import { lockProject } from './payments-flow';
-import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalTotals, parseDiscount, parseQty, type ElectricalItem } from './electrical-rules';
+import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalOpen, electricalTotals, parseDiscount, parseQty, type ElectricalItem } from './electrical-rules';
 
 export type ElectricalResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -105,8 +104,9 @@ export async function saveElectricalDraft(projectId: string, input: { id?: unkno
   if (!staff.ok) return staff;
   const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { phase: true, closedOutAt: true, paymentPhases: true, designFinalQuoteId: true, signedQuoteId: true } });
   if (!project) return { ok: false, error: 'That project is gone.' };
-  const open = extrasOpen(project.phase, project.closedOutAt !== null, project.designFinalQuoteId !== null);
-  if (!open.ok) return { ok: false, error: open.error.replace(/Extra work|extra work/g, 'The electrical bill') };
+  // Any phase, design included, until close-out (owner, 22 Nov 2026).
+  const open = electricalOpen(project.closedOutAt !== null);
+  if (!open.ok) return open;
   if (!readSignedStages(project.paymentPhases)) return { ok: false, error: 'This project has no signed payment plan for the electrical bill to land on.' };
   const items = await activeItems(staff.studioId);
   if (items.length === 0) return { ok: false, error: 'The electrical rate list is empty. The owner or the design head adds the items first.' };
@@ -250,12 +250,12 @@ export async function electricalForProject(projectId: string): Promise<{ bills: 
     prisma.homeChangeOrder.findMany({ where: { projectId, kind: ELECTRICAL }, orderBy: { number: 'desc' }, take: 50, select: BILL_SELECT }),
     gstOf(view.studioId, project),
   ]);
-  const open = extrasOpen(project.phase, project.closedOutAt !== null, project.designFinalQuoteId !== null);
+  const open = electricalOpen(project.closedOutAt !== null);
   return {
     bills: orders.map((o) => toView(o, items)),
     items,
     canWrite: write.ok,
-    open: !open.ok ? open.error.replace(/Extra work|extra work/g, 'The electrical bill') : !readSignedStages(project.paymentPhases) ? 'This project has no signed payment plan for the electrical bill to land on.' : null,
+    open: !open.ok ? open.error : !readSignedStages(project.paymentPhases) ? 'This project has no signed payment plan for the electrical bill to land on.' : null,
     gstBps: terms.gstBps,
   };
 }

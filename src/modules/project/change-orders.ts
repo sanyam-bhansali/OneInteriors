@@ -63,7 +63,7 @@ import { recordEvent, type ProjectActor } from './events';
 import { staffOn } from './flow-access';
 import { isBackfilled, rowStatuses } from './payment-ledger';
 import { lockProject, recordPayment, type RecordInput } from './payments-flow';
-import { ELECTRICAL, spreadOverUnpaid } from './electrical-rules';
+import { ELECTRICAL, electricalOpen, spreadOverUnpaid } from './electrical-rules';
 import { dayFromDb, dayToDb, istDay } from './working-days';
 import { holdDays } from '@/modules/studio-hold/rules';
 import { shiftPlanForClient } from '@/modules/studio-hold/store';
@@ -336,7 +336,7 @@ export async function saveExtraDraft(projectId: string, input: ExtraDraftInput, 
 class Refused extends Error {}
 
 async function orderForStudio(id: string) {
-  return prisma.homeChangeOrder.findUnique({ where: { id: id.slice(0, 64) }, select: { id: true, projectId: true, status: true, number: true, title: true, totalPaise: true, photoDocumentId: true } });
+  return prisma.homeChangeOrder.findUnique({ where: { id: id.slice(0, 64) }, select: { id: true, projectId: true, status: true, number: true, title: true, totalPaise: true, photoDocumentId: true, kind: true } });
 }
 
 /** Send a draft to the client: they are told once, and the photo is filed in their locker. */
@@ -348,7 +348,12 @@ export async function sendExtra(id: string, now = new Date()): Promise<ExtraResu
   if (!canMove(o.status, 'SENT_TO_CLIENT', 'studio')) return { ok: false, error: `It is ${STATUS_LABEL[o.status].toLowerCase()}, so it cannot be sent.` };
   if (fromDb(o.totalPaise) <= 0) return { ok: false, error: 'It has no price yet.' };
   const project = await prisma.homeProject.findUnique({ where: { id: o.projectId }, select: { phase: true, closedOutAt: true, designFinalQuoteId: true } });
-  const open = project ? extrasOpen(project.phase, project.closedOutAt !== null, project.designFinalQuoteId !== null) : ({ ok: false, error: 'That project is gone.' } as const);
+  /* The electrical bill can be sent in any phase until close-out (owner, 22 Nov 2026); extra work keeps its own gate. */
+  const open = !project
+    ? ({ ok: false, error: 'That project is gone.' } as const)
+    : o.kind === ELECTRICAL
+      ? electricalOpen(project.closedOutAt !== null)
+      : extrasOpen(project.phase, project.closedOutAt !== null, project.designFinalQuoteId !== null);
   if (!open.ok) return open;
   const moved = await prisma.$transaction(async (tx) => {
     const ok = await moveOrder(tx, o, 'SENT_TO_CLIENT', staff.actor, now, { sentAt: now });

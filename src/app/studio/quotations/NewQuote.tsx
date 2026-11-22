@@ -48,7 +48,10 @@ export function StartQuote({
   total,
   compact,
   leadRequired = false,
+  initialFrom,
 }: {
+  /** "Use as template" (owner, 22 Nov 2026): opened with this quotation already picked to copy. */
+  initialFrom?: { quote: PickedQuote; label: string };
   /** Products with a rate. */
   priced: number;
   /** Products ticked into the standard build. */
@@ -61,9 +64,10 @@ export function StartQuote({
 }) {
   const [open, setOpen] = useState(!compact);
   const [state, action, pending] = useActionState(createQuoteAction, IDLE);
-  const [config, setConfig] = useState<ConfigName>('3 BHK');
-  const [build, setBuild] = useState(true);
-  const [category, setCategory] = useState('');
+  const preset = initialFrom?.quote;
+  const [config, setConfig] = useState<ConfigName>(preset?.config && (CONFIGS as readonly string[]).includes(preset.config) ? (preset.config as ConfigName) : '3 BHK');
+  const [build, setBuild] = useState(!preset);
+  const [category, setCategory] = useState<string>(preset?.category ?? '');
   /* Who it is for (Studio OS Phase 1): an existing lead, found by name or
      phone, or a new person (added to the leads unless unticked). */
   const [lead, setLead] = useState<FoundClient | null>(null);
@@ -73,8 +77,8 @@ export function StartQuote({
   const [found, setFound] = useState<FoundClient[]>([]);
   const [addLead, setAddLead] = useState(true);
   /* Start from a previous quotation (owner, 17 Nov 2026). */
-  const [copying, setCopying] = useState(false);
-  const [from, setFrom] = useState<PickedQuote | null>(null);
+  const [copying, setCopying] = useState(!!preset);
+  const [from, setFrom] = useState<PickedQuote | null>(preset ?? null);
 
   async function look(text: string) {
     setName(text);
@@ -263,6 +267,7 @@ export function StartQuote({
           <div style={{ marginTop: 8 }}>
             <PreviousQuotePicker
               picked={from}
+              pickedLabel={from && preset && from.id === preset.id ? initialFrom?.label : undefined}
               onPick={(q) => {
                 setFrom(q);
                 if (q.config && (CONFIGS as readonly string[]).includes(q.config)) setConfig(q.config as ConfigName);

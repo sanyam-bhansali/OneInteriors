@@ -40,6 +40,9 @@ import { Check, ChevronDown, Plus } from 'lucide-react';
  * `setTimeout` here.
  */
 
+const LIST_MIN = 420;
+const LIST_MAX = 640;
+
 export interface ComboOption {
   /** What is stored. For a product this is its id; for a room, the name. */
   value: string;
@@ -83,7 +86,36 @@ export function Combobox({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLDivElement>(null);
   const listId = useId();
+  /* Where the open list sits on the screen (owner, 22 Nov 2026: "the dropdown should be full length so the name
+     doesn't get cut"). Fixed to the viewport, so a table's scroller cannot clip it, and at least LIST_MIN wide, so a
+     product's whole name shows even from a narrow cell; it flips above the box when there is no room below. */
+  const [place, setPlace] = useState<React.CSSProperties | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const r = field.current?.getBoundingClientRect();
+      if (!r) return;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const width = Math.min(Math.max(r.width, LIST_MIN), LIST_MAX, vw - 16);
+      const left = Math.max(8, Math.min(r.left, vw - width - 8));
+      const below = vh - r.bottom - 14;
+      const above = r.top - 14;
+      const up = below < 180 && above > below;
+      const maxHeight = Math.max(120, Math.min(352, up ? above : below));
+      const base: React.CSSProperties = { position: 'fixed', left, width, right: 'auto', margin: 0, maxHeight, zIndex: 80 };
+      setPlace(up ? { ...base, top: 'auto', bottom: vh - r.top + 6 } : { ...base, top: r.bottom + 6 });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [open]);
 
   const selected = options.find((o) => o.value === value) ?? null;
 
@@ -163,7 +195,7 @@ export function Combobox({
     <div ref={box} className={compact ? 'qfield cmb' : 'qfield'} style={{ position: 'relative' }}>
       <span className={compact ? 'sr-only' : 'lbl'}>{label}</span>
 
-      <div style={{ position: 'relative' }}>
+      <div ref={field} style={{ position: 'relative' }}>
         <input
           value={text}
           role="combobox"
@@ -185,6 +217,7 @@ export function Combobox({
           }}
           onKeyDown={onKey}
           aria-label={compact ? label : undefined}
+          title={open ? undefined : (selected?.label ?? value) || undefined}
           className="fld"
           style={{ paddingRight: compact ? 24 : 34 }}
         />
@@ -203,6 +236,7 @@ export function Combobox({
           id={listId}
           role="listbox"
           className="pick float"
+          style={place ?? undefined}
         >
           {matches.map((o, i) => (
             <li key={o.value} id={`${listId}-${i}`} role="option" aria-selected={o.value === value}>
@@ -216,10 +250,12 @@ export function Combobox({
                 data-active={i === active}
                 style={{ display: 'flex', alignItems: 'baseline' }}
               >
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{o.label}</span>
+                {/* The whole name, wrapping if it must; never cut with "…". */}
+                <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontWeight: 600, lineHeight: 1.35 }}>{o.label}</span>
                 {o.hint ? (
                   <span
                     className={`mono sm ${o.hintWarns ? 'warn-t' : 'muted'}`}
+                    style={{ flex: 'none', whiteSpace: 'nowrap' }}
                   >
                     {o.hint}
                   </span>

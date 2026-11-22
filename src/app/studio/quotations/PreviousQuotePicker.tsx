@@ -17,11 +17,14 @@ export type PickedQuote = Extract<PreviousQuoteCopy, { ok: true }>;
  */
 export function PreviousQuotePicker({
   picked,
+  pickedLabel,
   onPick,
   onClear,
   compact = false,
 }: {
   picked: PickedQuote | null;
+  /** Who the picked one was for, when it arrived already picked ("Use as template"). */
+  pickedLabel?: string;
   onPick: (q: PickedQuote, row: PreviousQuote) => void;
   onClear: () => void;
   /** The First quote page's narrow side column. */
@@ -70,7 +73,7 @@ export function PreviousQuotePicker({
       <div className="qnote good" style={{ display: 'block' }}>
         <p style={{ margin: 0 }}>
           Copying <b>{picked.number}</b>
-          {row ? ` (${[row.clientName, row.society, row.config].filter(Boolean).join(' · ')})` : ''}: {picked.lines.length} lines and its terms, for this new
+          {row ? ` (${[row.clientName, row.society, row.config].filter(Boolean).join(' · ')})` : pickedLabel ? ` (${pickedLabel})` : ''}: {picked.lines.length} lines and its terms, for this new
           client. Its client details, status and revisions are not copied.{' '}
           <button
             type="button"

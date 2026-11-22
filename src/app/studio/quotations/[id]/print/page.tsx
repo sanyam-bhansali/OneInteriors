@@ -5,7 +5,6 @@ import { quoteDocContext } from '@/modules/studio-quote/document-data';
 import { docHead, quoteFileName } from '@/modules/studio-quote/document';
 import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from './PrintButton';
-import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { QuotationDocument } from '../../doc/QuotationDocument';
 import '../../doc/quote-doc.css';
 /* Change orders (15 Oct 2026): the approved extra work after sign-off, as its own section. */
@@ -89,13 +88,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           <>
             <ElectricalBillDoc bills={electrical} quotationPaise={totals.totalPaise} />
             <ExtrasAfterSignOff extras={extras} />
-            {/* Their flat, from their floor plan, when their brief came with one. */}
-            {quote.planRooms.length > 0 ? (
-              <div className="qd-keep" style={{ marginBottom: '5mm' }}>
-                <p className="qd-bandline">Your floor plan</p>
-                <FloorPlanView rooms={quote.planRooms} printable />
-              </div>
-            ) : null}
+            {/* No 2D floor plan on the quotation PDF (owner, 22 Nov 2026). */}
           </>
         }
       />
