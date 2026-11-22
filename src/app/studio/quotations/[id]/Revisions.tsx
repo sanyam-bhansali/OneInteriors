@@ -19,7 +19,7 @@ import { formatINR } from '@/lib/money';
 import type { QuoteSalesView } from '@/modules/studio-sales/revisions';
 import type { PaymentStage } from '@/modules/studio-sales/payment-template';
 import { latestRevision } from '@/modules/studio-sales/revision-rules';
-import { markSalesFinalAction, sendAgainAction } from '../../sales-actions';
+import { markSalesFinalAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
 import { PaymentStagesEditor } from '../../PaymentStagesEditor';
 import { SalesVoice } from './SalesVoice';
@@ -27,7 +27,6 @@ import { SalesVoice } from './SalesVoice';
 const when = (d: Date | string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 export function Revisions({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHref: string | null; mayBook: boolean }) {
-  const send = useAct();
   const last = view.revisions[view.revisions.length - 1] ?? null;
   const [a, setA] = useState(view.revisions.length >= 2 ? view.revisions[view.revisions.length - 2]!.n : (last?.n ?? 1));
   const [b, setB] = useState(last?.n ?? 1);
@@ -40,7 +39,7 @@ export function Revisions({ view, leadHref, mayBook }: { view: QuoteSalesView; l
           <span className="chip">None sent yet</span>
         </div>
         <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
-          When you send this quotation (Mark as sent), the copy the client has is kept as R1. Each time you send a changed version, it becomes R2, R3…
+          Press Generate PDF: that copy is kept as R1. Each time you generate it again after a change, it becomes R2, R3…
         </p>
       </section>
     );
@@ -50,16 +49,11 @@ export function Revisions({ view, leadHref, mayBook }: { view: QuoteSalesView; l
     <section id="revisions" className="card" style={{ scrollMarginTop: 80 }}>
       <div className="chead">
         <h2>Revisions sent</h2>
-        {view.status === 'ISSUED' && view.changedSinceSent ? (
-          <button type="button" disabled={send.pending} onClick={() => send.run(() => sendAgainAction(view.quoteId))} className="btn pri sm">
-            {send.pending ? 'Saving…' : `Send this version as R${(last?.n ?? 0) + 1}`}
-          </button>
-        ) : null}
       </div>
+      {/* One button (owner, 22 Nov 2026): Generate PDF at the top keeps the next revision; no separate send here. */}
       {view.status === 'ISSUED' && view.changedSinceSent ? (
-        <p className="muted sm" style={{ margin: 0 }}>You changed it since {last ? `R${last.n}` : 'it was sent'}. Press this when you send the new version to the client.</p>
+        <p className="muted sm" style={{ margin: 0 }}>You changed it since {last ? `R${last.n}` : 'it was sent'}. Generate PDF keeps it as R{(last?.n ?? 0) + 1}.</p>
       ) : null}
-      <Said result={send.result} />
 
       <ul className="revlist">
         {view.revisions.map((r) => (
@@ -155,7 +149,7 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
             </div>
           ) : null}
           {!current.linesUnchanged && !booked ? (
-            <p className="qerr">The quotation has changed since R{current.n}. Send the new version and mark it, or undo the change, before the booking.</p>
+            <p className="qerr">The quotation has changed since R{current.n}. Generate the PDF again and mark the new version, or undo the change, before the booking.</p>
           ) : null}
           {booked ? (
             <p className="qok">

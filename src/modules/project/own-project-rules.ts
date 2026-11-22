@@ -33,7 +33,7 @@ export interface OwnQuoteFacts {
 export const OWN_QUOTE_ERRORS = {
   introduced:
     'This client came to you through One Interiors. Their project starts when they sign your final quote in the app, so nothing is needed here.',
-  status: 'Only a quotation the client accepted can start a project. Mark it as sent or won first.',
+  status: 'Only a quotation the client has can start a project. Press Generate PDF on it first.',
   empty: 'This quotation has nothing priced on it yet.',
   started: 'A project has already been started from this quotation.',
   clientGone: 'The client on this quotation has been deleted.',

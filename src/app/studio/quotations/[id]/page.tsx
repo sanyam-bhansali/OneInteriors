@@ -155,10 +155,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           quoteId={quote.id}
           status={quote.status}
           canPrint={quote.lines.length > 0}
-          stage={quote.stage}
           basedOnId={quote.basedOnId}
           deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
-          clientFirstName={quote.clientName.split(/\s+/)[0] ?? ''}
         />
         )}
       </div>

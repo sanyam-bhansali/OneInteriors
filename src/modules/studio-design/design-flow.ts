@@ -1137,7 +1137,7 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
   if (!p) return { ok: false, error: 'That project is not one of yours.' };
   if (p.designClosedAt) return { ok: true, message: 'Design is closed already.' };
   if (!df) return { ok: false, error: 'Make the Design Final first.' };
-  if (df.status === 'DRAFT') return { ok: false, error: `Send ${df.number} to the client first (mark it sent), then close the design.` };
+  if (df.status === 'DRAFT') return { ok: false, error: `Press Generate PDF on ${df.number} first, then close the design.` };
   // design.close was checked on this project above; read the two quotations in the studio (a designer writes none).
   const cmp = await quotesToCompareInStudio(df.id, check.member.studioId);
   if (!cmp) return { ok: false, error: 'We could not read the two quotations to compare. Open the Design Final and try again.' };

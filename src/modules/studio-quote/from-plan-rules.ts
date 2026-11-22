@@ -144,7 +144,7 @@ export function outcomeMessage(o: {
 }): string {
   const readPart = o.read ? `Read the plan: ${o.summary}.` : planReadMessage(o.reason ?? 'reader-failed');
   if (o.built && o.builtFrom === 'plan') {
-    return `${readPart} First quotation ${o.built.number} is built from it (${o.built.lines} lines) — open it, check it and mark it sent.`;
+    return `${readPart} First quotation ${o.built.number} is built from it (${o.built.lines} lines) — open it, check it and press Generate PDF.`;
   }
   if (o.built && o.builtFrom === 'lead') {
     return `${readPart} Quotation ${o.built.number} is built from the lead's BHK instead (${o.built.lines} lines).`;

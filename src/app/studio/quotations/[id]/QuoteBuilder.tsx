@@ -150,6 +150,8 @@ export function QuoteBuilder({
   }, [server]);
 
   useEffect(() => {
+    /* Generate PDF (StatusBar) waits for unsaved changes, so the revision it keeps is what is on screen (owner, 22 Nov 2026). */
+    document.body.dataset.quoteDirty = dirty ? '1' : '0';
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener('beforeunload', warn);
