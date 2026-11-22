@@ -43,7 +43,7 @@ export default async function StartProjectPage({ searchParams }: { searchParams:
               <Link href="/studio/quotations" className="acc-t">
                 Quotations
               </Link>{' '}
-              and mark it as sent or won, then come back here.
+              and press Generate PDF on it, then come back here.
             </p>
           </div>
         ) : (

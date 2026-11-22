@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { LineIcon } from '../../ui/icons';
-import { copyQuoteAction, deleteQuoteAction, setStatusAction } from '../actions';
-import type { QuoteStageName, QuoteStatusName } from '@/modules/studio-quote/quotes';
+import { deleteQuoteAction, generatePdfAction } from '../actions';
+import type { QuoteStatusName } from '@/modules/studio-quote/quotes';
 
 /**
  * What happens to a quotation after it is written.
@@ -21,21 +21,16 @@ export function StatusBar({
   quoteId,
   status,
   canPrint,
-  stage,
   basedOnId,
   deletable,
-  clientFirstName = '',
 }: {
   quoteId: string;
   status: QuoteStatusName;
   canPrint: boolean;
-  stage: QuoteStageName;
   /** The Sales Final this was made from, for Compare. */
   basedOnId: string | null;
   /** A draft never sent and not a customer's final quote. */
   deletable: boolean;
-  /** For the button's words: "Mark as sent to Priya". */
-  clientFirstName?: string;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -49,89 +44,63 @@ export function StatusBar({
       setError(result && result.ok === false ? (result.error ?? 'That did not work.') : null);
     });
 
-  const set = (next: QuoteStatusName) =>
+
+  /* Generate PDF (owner, 22 Nov 2026): the PDF opens at once in its own tab; the copy is saved as the next
+     revision meanwhile (generatePdfAction). The tab is opened before the save so the browser does not block it. */
+  const generate = () => {
+    if (document.body.dataset.quoteDirty === '1') {
+      setError('Changes are still saving. Save (or wait a few seconds for autosave), then Generate PDF.');
+      return;
+    }
+    const tab = window.open(`/studio/quotations/${quoteId}/print`, '_blank');
     start(async () => {
-      const result = await setStatusAction(quoteId, next);
-      setError(result && 'ok' in result && !result.ok ? result.error : null);
+      const result = await generatePdfAction(quoteId, status);
+      if (result && 'ok' in result && !result.ok) {
+        tab?.close();
+        setError(result.error);
+      } else setError(null);
     });
+  };
 
   return (
-    <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8 }}>
+    <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
       {error ? <span className="qerr">{error}</span> : null}
 
-      {status === 'DRAFT' ? (
-        <button
-          type="button"
-          disabled={pending || !canPrint}
-          onClick={() => set('ISSUED')}
-          className="btn pri"
-          title={stage === 'DESIGN' ? 'When this is the design final you send the client; the copy they have is kept, and the earlier drafts stay in the quotation’s history' : 'When you have sent it to the client; the copy they have is kept as a revision'}
-        >
-          <LineIcon name="arrow" size={16} />
-          {/* The design team (27 Oct 2026): "Make it design final" belongs here, on the quotation, after the changes. */}
-          {stage === 'DESIGN' ? 'Mark as design final' : 'Mark as sent'}
-          {clientFirstName ? ` to ${clientFirstName}` : ''}
-        </button>
-      ) : null}
-
-      {status === 'ISSUED' ? (
-        <>
-          <button type="button" disabled={pending} onClick={() => set('ACCEPTED')} className="btn sec sm">
-            Won
-          </button>
-          <button type="button" disabled={pending} onClick={() => set('DECLINED')} className="btn sec sm">
-            Lost
-          </button>
-        </>
-      ) : null}
-
-      {status === 'ACCEPTED' || status === 'DECLINED' ? (
-        <button type="button" disabled={pending} onClick={() => set('ISSUED')} className="btn sec sm">
-          Reopen
-        </button>
-      ) : null}
-
+      {/* Owner, 22 Nov 2026: "We want to make quotation builder layout as simple as humanly possible" — two buttons. */}
       {basedOnId ? (
-        <Link href={`/studio/quotations/${quoteId}/compare`} className="btn sec sm">
+        <Link href={`/studio/quotations/${quoteId}/compare`} className="btn sec">
           Compare with Sales Final
         </Link>
       ) : null}
 
-      {stage === 'SALES' && canPrint ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run(() => copyQuoteAction(quoteId, 'design-final'))}
-          className="btn sec sm"
-          title="A copy for after design sign-off; this Sales Final stays as sent"
-        >
-          Make Design Final
-        </button>
-      ) : null}
-
-      {/* Owner, 22 Nov 2026: the same as on the list — New quotation with this one picked; type the name, pick the lead. */}
-      <Link href={`/studio/quotations?new=1&from=${encodeURIComponent(quoteId)}#new`} className="btn sec sm" title="A new quotation with this one's rooms, items, rates and terms, for another client">
-        Use as template
-      </Link>
-
-      {deletable ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => (confirmDelete ? run(() => deleteQuoteAction(quoteId)) : setConfirmDelete(true))}
-          onBlur={() => setConfirmDelete(false)}
-          className={`btn sec sm ${confirmDelete ? 'bad-t' : ''}`}
-        >
-          {confirmDelete ? 'Delete — press again' : 'Delete draft'}
-        </button>
-      ) : null}
-
       {canPrint ? (
-        <Link href={`/studio/quotations/${quoteId}/print`} target="_blank" className={status === 'DRAFT' ? 'btn sec' : 'btn pri'}>
+        <button type="button" onClick={generate} disabled={pending} className="btn pri" title="Opens the PDF and keeps this copy as the next revision (R1, R2…) when it has changed" data-testid="generate-pdf">
           <LineIcon name="eye" size={16} />
-          Print / PDF
-        </Link>
+          {pending ? 'Saving…' : 'Generate PDF'}
+        </button>
       ) : null}
+
+      {/* Rarely needed, out of the way. */}
+      <details className="qmore" style={{ position: 'relative' }}>
+        <summary className="btn ghost sm" aria-label="More">More</summary>
+        <div className="hstack" style={{ position: 'absolute', right: 0, top: 40, zIndex: 20, gap: 6, padding: 8, background: 'var(--paper)', borderRadius: 12, boxShadow: '0 12px 30px -10px rgba(0,0,0,.3), 0 0 0 1px var(--line)', flexWrap: 'wrap', minWidth: 220 }}>
+          {/* Owner, 22 Nov 2026: the same as on the list — New quotation with this one picked; type the name, pick the lead. */}
+          <Link href={`/studio/quotations?new=1&from=${encodeURIComponent(quoteId)}#new`} className="btn sec sm" title="A new quotation with this one's rooms, items, rates and terms, for another client">
+            Use as template
+          </Link>
+          {deletable ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => (confirmDelete ? run(() => deleteQuoteAction(quoteId)) : setConfirmDelete(true))}
+              onBlur={() => setConfirmDelete(false)}
+              className={`btn sec sm ${confirmDelete ? 'bad-t' : ''}`}
+            >
+              {confirmDelete ? 'Delete — press again' : 'Delete draft'}
+            </button>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
