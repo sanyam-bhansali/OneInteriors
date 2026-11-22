@@ -90,6 +90,7 @@ export const SITE_WORDS = {
   'bar.today': { en: 'Today', hi: 'आज', mr: 'आज' },
   'bar.snags': { en: 'Snags', hi: 'स्नैग', mr: 'स्नॅग' },
   'bar.me': { en: 'Me', hi: 'मैं', mr: 'मी' },
+  'bar.cash': { en: 'Cash', hi: 'कैश', mr: 'कॅश' },
   'bar.meetings': { en: 'Meetings', hi: 'मीटिंग', mr: 'मीटिंग' },
 
   'post.h1': { en: 'Today on site', hi: 'आज साइट पर', mr: 'आज साइटवर' },

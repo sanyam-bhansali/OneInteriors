@@ -12,6 +12,7 @@ import { SiteLogTab } from './SiteLogTab';
 import { SnagsTab as SnagsPanel } from './SnagsTab';
 /* Phase 5: payments from the rows, the customer's decisions, the locker (project/payments-flow.ts, decision-flow.ts, locker.ts). */
 import { PaymentsTab as PaymentsPanel } from './PaymentsTab';
+import { PettyExpenses } from './PettyExpenses';
 import { DecisionsCard } from './DecisionsCard';
 import { LockerCard } from './LockerCard';
 import { PlanTab as PlanEditor } from './PlanTab';
@@ -259,6 +260,7 @@ export default async function ProjectWorkspacePage({
           {tab === 'log' ? <SiteLogTab projectId={w.id} customer={w.customerFirst} now={now} legacy={w.updates} /> : null}
           {tab === 'snags' ? <SnagsPanel projectId={w.id} now={now} /> : null}
           {tab === 'payments' ? <PaymentsPanel projectId={w.id} customer={w.customerFirst} /> : null}
+          {tab === 'payments' ? <PettyExpenses projectId={w.id} /> : null}
           {tab === 'crews' ? <CrewsSection projectId={w.id} now={now} /> : null}
           {tab === 'closure' && closure ? <ClosurePanel view={closure} customer={w.customerFirst} /> : null}
           {tab === 'extras' && extras ? <ExtrasPanel data={extras} customer={w.customerFirst} /> : null}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Lang } from '@/modules/i18n/site';
-import { CalendarIcon, HomeIcon, PersonIcon, WrenchIcon } from './icons';
+import { CalendarIcon, HomeIcon, PersonIcon, RupeeIcon, WrenchIcon } from './icons';
 import { siteWords } from './words';
 
 /**
@@ -21,6 +21,8 @@ export function SiteBar({ lang }: { lang: Lang }) {
   const tabs = [
     { href: '/studio/site', label: t('bar.today'), icon: <HomeIcon />, on: path === '/studio/site' || path.startsWith('/studio/site/post') },
     { href: '/studio/site/snag', label: t('bar.snags'), icon: <WrenchIcon />, on: path.startsWith('/studio/site/snag') },
+    // Petty cash (owner, 21 Nov 2026): what they were given, what they spent, and the expense form.
+    { href: '/studio/site/cash', label: t('bar.cash'), icon: <RupeeIcon />, on: path.startsWith('/studio/site/cash') },
     { href: '/studio/calendar/meetings', label: t('bar.meetings'), icon: <CalendarIcon />, on: false },
     { href: '/studio/site/me', label: t('bar.me'), icon: <PersonIcon />, on: path.startsWith('/studio/site/me') },
   ];
