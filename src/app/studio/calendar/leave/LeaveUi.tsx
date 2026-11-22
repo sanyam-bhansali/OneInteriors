@@ -59,7 +59,7 @@ export function AskLeave({ view }: { view: LeaveView }) {
         ))}
       </fieldset>
       <p className={`m-0 ${muted}`}>
-        One casual and one sick leave earned each month; unused leave carries over. More than you have is unpaid. Casual leave taken without approval (still waiting once the day has passed, or approved only after it) counts as two days.
+        One casual and one sick leave earned each month; unused leave carries over. More than you have is unpaid. Casual leave taken without approval (still waiting once the day has passed, or approved only after it) counts as two days unpaid for each day, and takes nothing off your leave.
       </p>
       <div className="flex flex-wrap gap-2">
         {view.team.length > 1 ? (
@@ -268,7 +268,7 @@ function Row({ r, view, run, pending }: { r: LeaveRowView; view: LeaveView; run:
         <span className="font-medium">{r.mine ? 'You' : r.who}</span> · {span(r)} <span className={muted}>· {r.typeLabel.toLowerCase()} · {r.halfDay ? 'half day' : `${r.workingDays} working day${r.workingDays === 1 ? '' : 's'}`}</span>
         {r.unapprovedDays > 0 ? (
           <span className="block text-[12.5px]" style={{ color: 'var(--bad)' }}>
-            Taken without approval: counts as {r.countedDays} day{r.countedDays === 1 ? '' : 's'}.
+            Taken without approval: counts as {r.countedDays} day{r.countedDays === 1 ? '' : 's'}, unpaid.
           </span>
         ) : null}
         {r.unpaidDays > 0 && (r.status === 'ASKED' || r.status === 'APPROVED') ? (
