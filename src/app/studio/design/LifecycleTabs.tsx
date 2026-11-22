@@ -151,6 +151,24 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
         </span>
       </div>
       <dl className="lrows">
+        {/* Owner, 22 Nov 2026: "execution start date and handover date and working days taken for completing this project". */}
+        {tab === 'execution' && c.execution ? (
+          <>
+            <dt>Started</dt>
+            <dd className="mono" data-testid="life-card-exec-start">
+              {dayWords(c.execution.startOn)}
+            </dd>
+            <dt>{c.execution.handedOver ? 'Handed over' : 'Handover'}</dt>
+            <dd className="mono" data-testid="life-card-handover">
+              {dayWords(c.execution.handoverOn)}
+            </dd>
+            <dt>Working days</dt>
+            <dd data-testid="life-card-exec-days">
+              <span className="mono">{c.execution.workingDays}</span>
+              <span className="muted"> {c.execution.handedOver ? 'taken' : 'planned'}, weekly off and holidays not counted</span>
+            </dd>
+          </>
+        ) : null}
         <dt>Now</dt>
         <dd>{c.current}</dd>
         {c.next ? (
