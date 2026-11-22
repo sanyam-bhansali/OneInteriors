@@ -7,7 +7,8 @@ import { extrasToCollect } from '@/modules/project/change-orders';
 import { ExtrasToCollect } from '../projects/[id]/ExtrasToCollect';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
-import { currentMember } from '@/modules/studio/access';
+import { can, currentMember } from '@/modules/studio/access';
+import { flaggedCount } from '@/modules/petty-cash/store';
 import { seesMoneyDue } from '@/modules/project/statement';
 import { KpiRow } from '../ui/KpiRow';
 import { moneyKpis } from '@/modules/studio/app-kpis';
@@ -39,6 +40,7 @@ export default async function PaymentsDeskPage() {
      sales final, with the same form as the lead page. */
   /* The project lifecycle — TO BE SPECIFIED (owner): the accounts flow for the closure's final payment. For now it shows here, first, and is recorded with the same payment recording. */
   const [finals, extras] = await Promise.all([finalPayments(projects.map((p) => p.id)), extrasToCollect(projects.map((p) => p.id))]);
+  const pettyFlags = member && can(member, 'payment.record') ? await flaggedCount(member.studioId) : 0;
   const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId)] as const)));
   const weight = (p: (typeof projects)[number]) => {
     const rows = p.payments?.rows ?? [];
@@ -69,6 +71,12 @@ export default async function PaymentsDeskPage() {
           </p>
         </div>
         <div className="hstack">
+          {/* Petty cash to site supervisors, and flags to review (owner, 21 Nov 2026). */}
+          {member && can(member, 'payment.record') ? (
+            <Link href="/studio/payments/petty-cash" className={pettyFlags ? 'btn pri' : 'btn sec'}>
+              Petty cash{pettyFlags ? ` · ${pettyFlags} to review` : ''}
+            </Link>
+          ) : null}
           {/* Employee records (owner, 21 Nov 2026): owner and accounts only. */}
           {member && !member.viewOnly && (member.role === 'OWNER' || member.role === 'ACCOUNTS') ? (
             <Link href="/studio/people" className="btn sec">
