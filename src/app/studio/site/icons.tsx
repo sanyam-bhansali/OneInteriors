@@ -87,3 +87,10 @@ export const CloudIcon = ({ size = 18 }: { size?: number }) => (
     <path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z" />
   </svg>
 );
+
+/** Petty cash (owner, 21 Nov 2026): a rupee sign. */
+export const RupeeIcon = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+    <path d="M7 4h11M7 9h11M7 4h3.5a4.5 4.5 0 0 1 0 9H7l8 7" />
+  </svg>
+);

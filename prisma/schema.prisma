@@ -914,6 +914,9 @@ model Studio {
   holidays StudioHoliday[]
   /// The team's leave (owner, 13 Nov 2026: "a calendar-based leave approval system").
   leaves   StudioLeave[]
+  /// Petty cash to site supervisors and what they spent it on (owner, 21 Nov 2026).
+  pettyCash     StudioPettyCash[]
+  pettyExpenses StudioPettyExpense[]
 
   /// Past quotations the studio sent us, for deriving their rate card.
   quotationArchives QuotationArchive[]
@@ -6799,4 +6802,69 @@ model StudioInvoice {
   @@unique([projectId, stageIndex])
   @@unique([studioId, fyStart, seq])
   @@map("studio_invoices")
+}
+
+/// Petty cash given to a site supervisor (owner, 21 Nov 2026): the money goes
+/// to their bank account; the value lives here. Entered by the owner or
+/// accounts; the supervisor marks it received. Append-only: a mistake is a
+/// negative row with a note, never an edit.
+model StudioPettyCash {
+  id          String    @id @default(cuid())
+  studioId    String
+  studio      Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  /// The supervisor (StudioMember.id) it was given to.
+  memberId    String
+  amountPaise BigInt
+  givenOn     DateTime  @db.Date
+  note        String?
+  byId        String
+  byName      String
+  createdAt   DateTime  @default(now())
+  /// When the supervisor marked it received in the app.
+  receivedAt  DateTime?
+
+  @@index([studioId, memberId])
+  @@map("studio_petty_cash")
+}
+
+/// What a supervisor spent from petty cash, on a project, with the bill
+/// (owner, 21 Nov 2026: bill photo mandatory). It shows in that project's
+/// money with who paid. Flags (petty-cash/rules.ts) carry their reasons for
+/// accounts to review: spent on a site the person is not on, an amount far
+/// off the usual, the same bill twice, the same bill from two people, a photo
+/// the reader does not take for a bill or whose amount differs.
+model StudioPettyExpense {
+  id             String    @id @default(cuid())
+  studioId       String
+  studio         Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  /// Who spent it (StudioMember.id).
+  memberId       String
+  memberName     String
+  homeProjectId  String
+  amountPaise    BigInt
+  spentOn        DateTime  @db.Date
+  note           String
+  /// The bill photo in the private site-photos bucket, and its sha256.
+  billPath       String
+  billHash       String
+  /// What the photo reader read off the bill, when it could.
+  readAmountPaise BigInt?
+  readDay        String?
+  readVendor     String?
+  readSummary    String?
+  /// [{ code, reason }]: why it needs a look. Empty when nothing is off.
+  flags          Json      @default("[]")
+  /// Accounts cleared the flags (with a note), or rejected the expense
+  /// (then it does not count: the money is still with the person).
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewNote     String?
+  rejected       Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  @@index([studioId, createdAt])
+  @@index([studioId, billHash])
+  @@index([homeProjectId])
+  @@index([memberId])
+  @@map("studio_petty_expenses")
 }
