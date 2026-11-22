@@ -269,7 +269,8 @@ export function designThenSheet(startOn: Date, designDays: number, cal: StudioCa
   const out: { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] = [{ kind: 'DESIGN', plannedStart: cal ? dayToDb(day) : startOn, plannedEnd: dayToDb(designEnd) }];
   day = designEnd;
   for (const s of executionStageDays(executionDays)) {
-    const end = cal ? onWorkingDay(addDays(day, s.days), cal) : addDays(day, s.days);
+    // Working days only (owner, 21 Nov 2026: "leaving mondays as week off and holidays provided").
+    const end = cal ? shiftWorkingDays(day, s.days, cal) : addDays(day, s.days);
     out.push({ kind: s.kind, plannedStart: dayToDb(day), plannedEnd: dayToDb(end) });
     day = end;
   }
@@ -285,9 +286,10 @@ export function planSpanDays(startOn: Date, stages: readonly { plannedEnd: Date 
 
 /** Execution stages re-planned from the day design ends, on the sheet's lengths: for projects planned before 21 Nov 2026. */
 export function executionFrom(designEnd: string, cal: StudioCalendar | null = null, executionDays: number = executionDaysFor(null, null)): { kind: Exclude<PlanKind, 'DESIGN'>; start: string; end: string }[] {
-  let day = designEnd;
+  let day = cal ? onWorkingDay(designEnd, cal) : designEnd;
   return executionStageDays(executionDays).map((s) => {
-    const end = cal ? onWorkingDay(addDays(day, s.days), cal) : addDays(day, s.days);
+    // Working days only (owner, 21 Nov 2026): a stage of 11 days is 11 working days.
+    const end = cal ? shiftWorkingDays(day, s.days, cal) : addDays(day, s.days);
     const row = { kind: s.kind, start: day, end };
     day = end;
     return row;
@@ -345,7 +347,8 @@ export function executionStepDays(sheetDays: readonly string[], stage: { start: 
 export function trackerStepDays(kind: Exclude<PlanKind, 'DESIGN'>, labels: readonly string[], stage: { start: string; end: string }, executionDays: number, cal: StudioCalendar | null = null): string[] {
   return labels.map((label) => {
     const off = executionStepOffset(kind, label, executionDays);
-    let d = off === null ? stage.end : addDays(stage.start, off);
+    // A step's tracker day is counted in working days from the stage's start (owner, 21 Nov 2026).
+    let d = off === null ? stage.end : cal ? shiftWorkingDays(onWorkingDay(stage.start, cal), off, cal) : addDays(stage.start, off);
     if (d > stage.end) d = stage.end;
     if (cal) {
       const w = onWorkingDay(d, cal);
