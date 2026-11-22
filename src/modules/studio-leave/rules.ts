@@ -190,9 +190,11 @@ export const leaveCovers = (l: Pick<LeaveSpan, 'fromDay' | 'toDay'>, day: string
  * month, from November 2026 (when this began) or the month the person joined,
  * and what is not taken carries on, with no reset. More than the balance may
  * still be asked; the rest is unpaid ("Allow as unpaid"). "Any casual leave
- * which is taken but not approved it will be calculated as 2 leaves": a casual
- * day off that was not approved by that day (still waiting once the day has
- * passed, or approved only afterwards) counts as two days. Declined and
+ * which is taken but not approved it will be calculated as 2 leaves", and
+ * (22 Nov 2026) "it should count as 2 days unpaid leave": a casual day off
+ * that was not approved by that day (still waiting once the day has passed,
+ * or approved only afterwards) counts as two unpaid days, and takes nothing
+ * off the allowance. Declined and
  * withdrawn leave counts nothing. Counted in the studio's working days. Leave
  * before the allowance began takes nothing off it.
  */
@@ -278,7 +280,13 @@ export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar,
         const w = dayWeight(l, d, today);
         c.workingDays++;
         c.days += w;
-        if (w > (l.halfDay ? 0.5 : 1)) c.unapprovedDays++;
+        /* Taken without approval (owner, 22 Nov 2026: "it should count as 2 days unpaid leave"): both days unpaid,
+           and nothing taken off the allowance, so the leave earned stays for days that are approved. */
+        if (w > (l.halfDay ? 0.5 : 1)) {
+          c.unapprovedDays++;
+          c.unpaid += w;
+          continue;
+        }
         // Before the allowance began: nothing earned and nothing used.
         if (d.slice(0, 7) < startMonth) {
           c.paid += w;
@@ -298,8 +306,8 @@ export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar,
 
 /**
  * The balance per type in `month`: days earned so far (carried over from
- * earlier months), used up to the month's end (as counted, unapproved casual
- * days twice), and left.
+ * earlier months), used up to the month's end (unapproved days are unpaid and
+ * take nothing off it), and left.
  */
 export function leaveBalance(
   leaves: readonly CountedLeave[],
@@ -315,7 +323,10 @@ export function leaveBalance(
       if (l.type !== type || !isOpenLeave(l) || !isDay(l.fromDay) || !isDay(l.toDay)) continue;
       for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) {
         const m = d.slice(0, 7);
-        if (m >= startMonth && m <= month && isWorkingDay(d, cal)) usedDays += dayWeight(l, d, today);
+        if (!(m >= startMonth && m <= month && isWorkingDay(d, cal))) continue;
+        const w = dayWeight(l, d, today);
+        // An unapproved day is two days unpaid, not taken from the balance (owner, 22 Nov 2026).
+        if (w <= (l.halfDay ? 0.5 : 1)) usedDays += w;
       }
     }
     const earned = earnedThrough(type, startMonth, month);

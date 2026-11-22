@@ -87,14 +87,26 @@ describe('casual leave taken without approval counts as two', () => {
     expect(dayWeight({ type: 'SICK', status: 'ASKED', approvedDay: null }, '2026-11-20', TODAY)).toBe(1);
   });
 
-  it('one unapproved casual day uses the allowance and one more unpaid', () => {
-    const c = countLeave([leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null })], CAL, TODAY);
-    expect(c.get('u')).toMatchObject({ workingDays: 1, days: 2, paid: 1, unpaid: 1, unapprovedDays: 1 });
+  /* Owner, 22 Nov 2026: "If someone takes a leave without approval it should count as 2 days unpaid leave". */
+  it('one unapproved casual day is two days unpaid, and uses none of the allowance', () => {
+    const c = countLeave(
+      [leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null }), leave({ id: 'a', fromDay: '2026-11-19', askedAt: 1 })],
+      CAL,
+      TODAY,
+    );
+    expect(c.get('u')).toMatchObject({ workingDays: 1, days: 2, paid: 0, unpaid: 2, unapprovedDays: 1 });
+    // The month's casual day is still there for an approved one.
+    expect(c.get('a')).toMatchObject({ days: 1, paid: 1, unpaid: 0 });
   });
 
-  it('the balance counts it twice', () => {
+  it('approved only after the day: two days unpaid too', () => {
+    const c = countLeave([leave({ id: 'l', fromDay: '2026-11-03', approvedDay: '2026-11-05' })], CAL, TODAY);
+    expect(c.get('l')).toMatchObject({ days: 2, paid: 0, unpaid: 2 });
+  });
+
+  it('the balance does not count it', () => {
     const b = leaveBalance([leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null })], '2026-11', CAL, TODAY);
-    expect(b.CASUAL).toEqual({ earned: 1, used: 2, left: 0 });
+    expect(b.CASUAL).toEqual({ earned: 1, used: 0, left: 1 });
     expect(b.SICK).toEqual({ earned: 1, used: 0, left: 1 });
   });
 });
@@ -130,10 +142,10 @@ describe('working on a holiday', () => {
 
 /* Owner, 21 Nov 2026: "option to mark as half day for sales head and design head". */
 describe('half days', () => {
-  it('count as half; an unapproved casual half day counts as one', () => {
+  it('count as half; an unapproved casual half day counts as one, unpaid', () => {
     const c = countLeave([leave({ id: 'h', fromDay: '2026-11-03', halfDay: true }), leave({ id: 'u', fromDay: '2026-11-17', status: 'ASKED', approvedDay: null, halfDay: true, askedAt: 1 })], CAL, TODAY);
     expect(c.get('h')).toMatchObject({ days: 0.5, paid: 0.5, unpaid: 0 });
-    expect(c.get('u')).toMatchObject({ days: 1, paid: 0.5, unpaid: 0.5, unapprovedDays: 1 });
+    expect(c.get('u')).toMatchObject({ days: 1, paid: 0, unpaid: 1, unapprovedDays: 1 });
   });
 
   it('are one day', () => {
