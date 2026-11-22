@@ -455,8 +455,8 @@ export const SAMPLE_PROJECT: Project = {
 
 /*
  * Phase 5 (studio workspace): the decision's options as rows (one takes money
- * off), the money from the studio's payment entries (the booking recorded
- * before confirmations started, and today's entry waiting for Priya's yes),
+ * off), the money from the studio's payment entries (the booking, and
+ * today's part of the second stage),
  * and what the home is made of, as the server sends them
  * (portal/money-locker-view.ts).
  */
@@ -472,17 +472,16 @@ SAMPLE_PROJECT.payments = {
   signedPaise: L(18.4),
   changesPaise: 0,
   totalPaise: L(18.4),
-  paidPaise: L(7.36),
-  waitingPaise: L(2),
-  balancePaise: L(11.04),
+  paidPaise: L(9.36),
+  balancePaise: L(9.04),
   stages: [
-    { index: 0, label: 'At signing', amountPaise: L(7.36), changesPaise: 0, paidPaise: L(7.36), waitingPaise: 0, state: 'paid', dueOn: dayAt(-48) },
-    { index: 1, label: 'When finishing starts', amountPaise: L(7.36), changesPaise: 0, paidPaise: 0, waitingPaise: L(2), state: 'part', dueOn: dayAt(21) },
-    { index: 2, label: 'At handover, after snags close', amountPaise: L(3.68), changesPaise: 0, paidPaise: 0, waitingPaise: 0, state: 'later', dueOn: null },
+    { index: 0, label: 'At signing', amountPaise: L(7.36), changesPaise: 0, paidPaise: L(7.36), state: 'paid', dueOn: dayAt(-48) },
+    { index: 1, label: 'When finishing starts', amountPaise: L(7.36), changesPaise: 0, paidPaise: L(2), state: 'part', dueOn: dayAt(21) },
+    { index: 2, label: 'At handover, after snags close', amountPaise: L(3.68), changesPaise: 0, paidPaise: 0, state: 'later', dueOn: null },
   ],
   entries: [
-    { id: 'pay2', stageIndex: 1, stage: 'When finishing starts', amountPaise: L(2), receivedOn: dayAt(0), mode: 'UPI', status: 'waiting', receiptDocumentId: null, canAnswer: true },
-    { id: 'pay1', stageIndex: 0, stage: 'At signing', amountPaise: L(7.36), receivedOn: dayAt(-48), mode: null, status: 'earlier', receiptDocumentId: 'doc4', canAnswer: true },
+    { id: 'pay2', stageIndex: 1, stage: 'When finishing starts', amountPaise: L(2), receivedOn: dayAt(0), mode: 'UPI', status: 'paid', receiptDocumentId: null },
+    { id: 'pay1', stageIndex: 0, stage: 'At signing', amountPaise: L(7.36), receivedOn: dayAt(-48), mode: null, status: 'paid', receiptDocumentId: 'doc4' },
   ],
 };
 SAMPLE_PROJECT.materials = [
@@ -554,16 +553,11 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
   }
   if (route === 'POST /coins/opened') return ok({ earned: 10 });
   if (route === 'POST /snags') return ok({ id: `s${Date.now()}` });
-  // Phase 5: a pick changes the last payment and the locker; a payment is confirmed or disputed.
+  // Phase 5: a pick changes the last payment and the locker.
   const pickRoute = /^POST \/decisions\/([^/]+)$/.exec(route);
   if (pickRoute) {
     samplePick(decodeURIComponent(pickRoute[1]!), (body as { optionId?: string } | undefined)?.optionId);
     return ok({ message: null });
-  }
-  const payRoute = /^POST \/payments\/([^/]+)\/(confirm|dispute)$/.exec(route);
-  if (payRoute) {
-    sampleAnswer(decodeURIComponent(payRoute[1]!), payRoute[2] === 'confirm');
-    return ok({});
   }
   // Phase 4: the customer's answer to a fix, remembered for the session.
   const answer = /^POST \/snags\/([^/]+)\/(confirm|not-fixed)$/.exec(route);
@@ -604,34 +598,4 @@ function samplePick(decisionId: string, optionId: string | undefined) {
   };
   const m = SAMPLE_PROJECT.materials?.find((x) => x.id === 'm1');
   if (m) m.spec = choice.label;
-}
-
-/** Phase 5, sample only: "Yes, I paid" or "I didn't pay this". */
-function sampleAnswer(paymentId: string, confirm: boolean) {
-  const pay = SAMPLE_PROJECT.payments;
-  const e = pay?.entries.find((x) => x.id === paymentId);
-  if (!pay || !e) return;
-  const counted = e.status === 'earlier';
-  const st = pay.stages[e.stageIndex];
-  e.status = confirm ? 'confirmed' : 'disputed';
-  e.canAnswer = false;
-  if (confirm && !counted) {
-    pay.paidPaise += e.amountPaise;
-    pay.waitingPaise -= e.amountPaise;
-    pay.balancePaise -= e.amountPaise;
-    if (st) {
-      st.paidPaise += e.amountPaise;
-      st.waitingPaise -= e.amountPaise;
-    }
-  }
-  if (!confirm && st) {
-    if (counted) {
-      pay.paidPaise -= e.amountPaise;
-      pay.balancePaise += e.amountPaise;
-      st.paidPaise -= e.amountPaise;
-    } else {
-      pay.waitingPaise -= e.amountPaise;
-      st.waitingPaise -= e.amountPaise;
-    }
-  }
 }

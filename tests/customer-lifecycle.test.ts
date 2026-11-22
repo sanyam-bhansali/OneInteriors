@@ -40,9 +40,8 @@ const payments = (stages: { label: string; amountPaise: number; paidPaise: numbe
   changesPaise: 0,
   totalPaise: stages.reduce((a, s) => a + s.amountPaise, 0),
   paidPaise: stages.reduce((a, s) => a + s.paidPaise, 0),
-  waitingPaise: 0,
   balancePaise: 0,
-  stages: stages.map((s, index) => ({ index, label: s.label, amountPaise: s.amountPaise, changesPaise: 0, paidPaise: s.paidPaise, waitingPaise: 0, state: s.paidPaise >= s.amountPaise ? 'paid' : 'due', dueOn: s.dueOn ?? null })),
+  stages: stages.map((s, index) => ({ index, label: s.label, amountPaise: s.amountPaise, changesPaise: 0, paidPaise: s.paidPaise, state: s.paidPaise >= s.amountPaise ? 'paid' : 'due', dueOn: s.dueOn ?? null })),
   entries,
 });
 
@@ -106,12 +105,12 @@ describe('on site', () => {
     expect(customerLifecycle(input({ phase: 'EXECUTION', tracker: last })).next).toEqual({ kind: 'closure', label: null });
   });
 
-  it('asks for a payment past its due day, and for a confirmation of a recorded one', () => {
+  it('asks for a payment past its due day, never to confirm a recorded one (owner, 22 Nov 2026)', () => {
     const p = payments([{ label: 'Material procurement', amountPaise: 4_00_000_00, paidPaise: 0, dueOn: '2026-10-10' }]);
     expect(customerLifecycle(input({ phase: 'EXECUTION', payments: p })).blocker).toMatchObject({ kind: 'pay', label: 'Material procurement', amountPaise: 4_00_000_00 });
-    const entry = { id: 'e1', stageIndex: 0, stage: 'Booking', amountPaise: 1, receivedOn: '2026-10-01', mode: null, status: 'waiting', receiptDocumentId: null, canAnswer: true } as CustomerPayments['entries'][number];
+    const entry: CustomerPayments['entries'][number] = { id: 'e1', stageIndex: 0, stage: 'Booking', amountPaise: 100, receivedOn: '2026-10-01', mode: null, status: 'paid', receiptDocumentId: null };
     const paid = payments([{ label: 'Booking', amountPaise: 100, paidPaise: 100 }], [entry]);
-    expect(customerLifecycle(input({ phase: 'EXECUTION', payments: paid })).blocker).toMatchObject({ kind: 'confirm_payment', count: 1 });
+    expect(customerLifecycle(input({ phase: 'EXECUTION', payments: paid })).blocker).toBeNull();
   });
 });
 

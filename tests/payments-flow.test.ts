@@ -14,9 +14,11 @@ import { makeDb, type FakeDb } from './phase5-fake-db';
 /**
  * Payments (studio workspace Phase 5): paid and balance are always the sums
  * of the payment rows; overpaying a stage is refused with the difference
- * said; the customer confirms or says "I didn't pay this"; rows backfilled
- * from the old paidPhases marks count as paid. Then the flow itself, against
- * an in-memory stand-in for the database (tests/phase5-fake-db.ts).
+ * said; a row the studio records counts as paid at once ("Remove the client
+ * confirms in app for payments — it is marked by our team", owner, 22 Nov
+ * 2026); a dispute already on record still takes its row out. Then the flow
+ * itself, against an in-memory stand-in for the database
+ * (tests/phase5-fake-db.ts).
  */
 
 const STAGES: LedgerStageInput[] = [
@@ -44,14 +46,23 @@ const row = (over: Partial<LedgerRowInput>): LedgerRowInput => ({
 const confirmed = (over: Partial<LedgerRowInput>) => row({ customerConfirmedAt: '2026-10-02T00:00:00.000Z', ...over });
 
 describe('the ledger: paid and balance are the rows', () => {
-  it('counts only confirmed (and backfilled) rows as paid; waiting money is held, not paid', () => {
+  it('a row the studio recorded counts as paid straight away, with no confirmation from the client', () => {
+    const l = ledger(STAGES, [], [row({ amountPaise: 4_00_000_00 })]);
+    expect(l.rows[0]).toMatchObject({ status: 'recorded', counts: true });
+    expect(l.paidPaise).toBe(4_00_000_00);
+    expect(l.balancePaise).toBe(6_00_000_00);
+    expect(l.stages[0]).toMatchObject({ state: 'paid', paidPaise: 4_00_000_00, openPaise: 0, paidOn: '2026-10-01' });
+    expect(l).not.toHaveProperty('waitingPaise');
+  });
+
+  it('counts recorded, confirmed and backfilled rows alike as paid', () => {
     const rows = [confirmed({ amountPaise: 4_00_000_00 }), row({ stageIndex: 1, amountPaise: 1_50_000_00 }), row({ stageIndex: 1, amountPaise: 50_000_00, backfilled: true })];
     const l = ledger(STAGES, [], rows);
-    expect(l.paidPaise).toBe(4_00_000_00 + 50_000_00);
-    expect(l.waitingPaise).toBe(1_50_000_00);
+    expect(l.rows.map((r) => r.status)).toEqual(['confirmed', 'recorded', 'earlier']);
+    expect(l.paidPaise).toBe(4_00_000_00 + 1_50_000_00 + 50_000_00);
     expect(l.balancePaise).toBe(l.totalPaise - l.paidPaise);
     expect(l.stages.map((s) => s.state)).toEqual(['paid', 'part', 'later']);
-    expect(l.stages[1]).toMatchObject({ paidPaise: 50_000_00, waitingPaise: 1_50_000_00, openPaise: 2_00_000_00 });
+    expect(l.stages[1]).toMatchObject({ paidPaise: 2_00_000_00, openPaise: 2_00_000_00 });
   });
 
   it('always equals the sum of the counted rows, whatever the mix', () => {
@@ -69,7 +80,7 @@ describe('the ledger: paid and balance are the rows', () => {
       );
     }
     const l = ledger(STAGES, [{ deltaPaise: 14_000_00, stageIndex: 2 }], rows);
-    const counted = l.rows.filter((r) => r.status === 'confirmed' || r.status === 'earlier').reduce((s, r) => s + r.amountPaise, 0);
+    const counted = l.rows.filter((r) => r.status !== 'disputed' && r.status !== 'replaced').reduce((s, r) => s + r.amountPaise, 0);
     expect(l.paidPaise).toBe(counted);
     expect(l.stages.reduce((s, x) => s + x.paidPaise, 0)).toBe(counted);
     expect(l.balancePaise).toBe(10_00_000_00 + 14_000_00 - counted);
@@ -82,10 +93,9 @@ describe('the ledger: paid and balance are the rows', () => {
     expect(l.changesPaise).toBe(11_500_00);
   });
 
-  it('a disputed row is neither paid nor held: the stage is owed again', () => {
+  it('a disputed row (on record from before 22 Nov 2026) is not paid: the stage is owed again', () => {
     const l = ledger(STAGES, [], [row({ amountPaise: 4_00_000_00, disputedAt: '2026-10-03T00:00:00.000Z' })]);
     expect(l.paidPaise).toBe(0);
-    expect(l.waitingPaise).toBe(0);
     expect(l.stages[0]).toMatchObject({ state: 'due', openPaise: 4_00_000_00 });
     expect(l.rows[0]!.status).toBe('disputed');
   });
@@ -95,14 +105,13 @@ describe('the ledger: paid and balance are the rows', () => {
     const fix = row({ amountPaise: 3_00_000_00, correctsId: first.id });
     let l = ledger(STAGES, [], [first, fix]);
     expect(l.rows.find((r) => r.id === first.id)!.status).toBe('replaced');
-    expect(l.paidPaise).toBe(0);
-    expect(l.waitingPaise).toBe(3_00_000_00);
+    expect(l.paidPaise).toBe(3_00_000_00);
     const undo = row({ amountPaise: 0, correctsId: fix.id });
     l = ledger(STAGES, [], [first, fix, undo]);
-    expect(l.paidPaise + l.waitingPaise).toBe(0);
+    expect(l.paidPaise).toBe(0);
   });
 
-  it('backfilled rows are known by recorder or id, count as paid and still ask the customer', () => {
+  it('backfilled rows are known by recorder or id, and count as paid', () => {
     expect(isBackfilled({ id: 'hpp_abc' })).toBe(true);
     expect(isBackfilled({ id: 'x', recordedById: BACKFILL_RECORDER })).toBe(true);
     expect(isBackfilled({ id: 'x', recordedById: 'u-acc' })).toBe(false);
@@ -126,9 +135,9 @@ describe('overpayment is refused with the difference said', () => {
     expect(!r.ok && r.error).toBe('That is ₹25,000 more than the ₹1,00,000 still due on Booking. Record the extra against the next stage.');
   });
 
-  it('refuses a stage already recorded in full, naming the money waiting for the customer', () => {
+  it('refuses a stage already paid in full', () => {
     const r = canRecord(l, 1, 1_000_00);
-    expect(!r.ok && r.error).toMatch(/already recorded in full; ₹4,00,000 is waiting for the customer to confirm/);
+    expect(!r.ok && r.error).toBe('Carpentry is already paid in full.');
   });
 
   it('refuses nothing, and a stage that is not there', () => {
@@ -183,7 +192,7 @@ vi.mock('@/modules/storage/project-docs', () => ({
 }));
 vi.mock('@/modules/storage/site-photos', () => ({ signedSitePhotoUrls: vi.fn(async () => []), storeSitePhoto: vi.fn(async () => ({ ok: true, path: 'photo.jpg' })) }));
 
-import { confirmPayment, correctPayment, disputePayment, ledgerOf, recordPayment, studioPayments } from '@/modules/project/payments-flow';
+import { confirmPayment, correctPayment, disputePayment, ledgerOf, NO_DISPUTES, recordPayment, studioPayments } from '@/modules/project/payments-flow';
 
 let db: FakeDb;
 const as = (id: string, role = 'STUDIO') => {
@@ -201,8 +210,8 @@ beforeEach(() => {
   sent.customer.length = sent.ops.length = sent.studio.length = 0;
 });
 
-describe('recording, confirming and disputing a payment', () => {
-  it('accounts records money with a receipt: one row, the receipt filed in the locker, the customer asked to confirm', async () => {
+describe('recording a payment', () => {
+  it('accounts records money with a receipt: one row, the receipt filed in the locker, paid at once, the customer told it was received', async () => {
     as('u-acc');
     const receipt = new File(['%PDF'], 'receipt.pdf', { type: 'application/pdf' });
     const r = await recordPayment('p1', { stageIndex: 0, amount: '4,00,000', receivedOn: '2026-10-10', mode: 'UPI', note: 'UTR 1234' }, receipt, NOW);
@@ -213,10 +222,12 @@ describe('recording, confirming and disputing a payment', () => {
     expect(doc).toMatchObject({ kind: 'RECEIPT', storageKey: 'project_p1/receipt.pdf' });
     expect(doc.sharedAt).not.toBeNull();
     expect(db.s.events.map((e) => e.type)).toEqual(['document.filed', 'payment.recorded']);
-    expect(sent.customer).toEqual([{ kind: 'payment-to-confirm', stage: 'Booking', amountPaise: 4_00_000_00, studio: 'Teakline Studio' }]);
-    // Not paid until the customer says so; the old marks already stop reminding.
-    expect(money().paidPaise).toBe(0);
-    expect(money().waitingPaise).toBe(4_00_000_00);
+    expect(sent.customer).toEqual([{ kind: 'payment-recorded', stage: 'Booking', amountPaise: 4_00_000_00, studio: 'Teakline Studio' }]);
+    expect(sent.studio).toEqual([]);
+    // Paid as soon as the team records it (owner, 22 Nov 2026).
+    expect(money().paidPaise).toBe(4_00_000_00);
+    expect(money().balancePaise).toBe(6_00_000_00);
+    expect(money().rows[0]!.status).toBe('recorded');
     expect(db.s.project.paidPhases).toEqual([{ index: 0, paidOn: '2026-10-10' }]);
   });
 
@@ -235,17 +246,19 @@ describe('recording, confirming and disputing a payment', () => {
     expect(db.s.payments).toHaveLength(0);
   });
 
-  it('the customer confirms with one tap, once; then it counts as paid', async () => {
+  it('an old phone build\'s "Yes, I paid" is a harmless stamp: still paid, nobody told', async () => {
     as('u-acc');
     await recordPayment('p1', { stageIndex: 0, amount: '4,00,000', receivedOn: '2026-10-10', mode: 'UPI' }, null, NOW);
     const id = db.s.payments[0]!.id as string;
+    sent.customer.length = 0;
     as('u-cust', 'CUSTOMER');
     expect(await confirmPayment('u-cust', id, NOW)).toEqual({ ok: true, id });
     expect(await confirmPayment('u-cust', id, NOW)).toEqual({ ok: true, id });
     expect(db.s.events.filter((e) => e.type === 'payment.confirmed')).toHaveLength(1);
     expect(money().paidPaise).toBe(4_00_000_00);
     expect(money().balancePaise).toBe(6_00_000_00);
-    expect(await disputePayment('u-cust', id, 'oops', NOW)).toMatchObject({ ok: false });
+    expect(sent.studio).toEqual([]);
+    expect(sent.customer).toEqual([]);
   });
 
   it('family and strangers cannot answer for the money', async () => {
@@ -253,23 +266,31 @@ describe('recording, confirming and disputing a payment', () => {
     await recordPayment('p1', { stageIndex: 0, amount: '1,000', receivedOn: '2026-10-10', mode: 'CASH' }, null, NOW);
     const id = db.s.payments[0]!.id as string;
     expect(await confirmPayment('u-fam', id, NOW)).toEqual({ ok: false, error: 'That payment is not on your project.' });
-    expect(await disputePayment('u-other', id, null, NOW)).toEqual({ ok: false, error: 'That payment is not on your project.' });
+    expect(await disputePayment('u-other', id)).toEqual({ ok: false, error: 'That payment is not on your project.' });
     expect(db.s.payments[0]!.customerConfirmedAt).toBeNull();
   });
 
-  it('"I didn\'t pay this" goes to our team with the words; the stage is owed again; the words never reach the event log', async () => {
+  it('"I didn\'t pay this" is no longer taken: refused, nothing written, nobody told, still paid', async () => {
     as('u-acc');
     await recordPayment('p1', { stageIndex: 0, amount: '4,00,000', receivedOn: '2026-10-10', mode: 'CASH' }, null, NOW);
     const id = db.s.payments[0]!.id as string;
-    expect(await disputePayment('u-cust', id, 'I paid only half, by cheque', NOW)).toEqual({ ok: true, id });
-    expect(db.s.payments[0]).toMatchObject({ disputedById: 'u-cust', disputeNote: 'I paid only half, by cheque' });
-    expect(sent.ops).toEqual([
-      { kind: 'payment-disputed', customer: 'Priya Shah', studio: 'Teakline Studio', stage: 'Booking', amountPaise: 4_00_000_00, note: 'I paid only half, by cheque' },
-    ]);
-    expect(sent.studio).toEqual([]);
-    expect(JSON.stringify(db.s.events)).not.toContain('half');
-    expect(money().paidPaise + money().waitingPaise).toBe(0);
-    expect(db.s.project.paidPhases).toEqual([{ index: 0, paidOn: null }]);
+    const events = db.s.events.length;
+    expect(await disputePayment('u-cust', id)).toEqual({ ok: false, error: NO_DISPUTES });
+    expect(db.s.payments[0]!.disputedAt).toBeNull();
+    expect(db.s.events).toHaveLength(events);
+    expect(sent.ops).toEqual([]);
+    expect(money().paidPaise).toBe(4_00_000_00);
+    expect(db.s.project.paidPhases).toEqual([{ index: 0, paidOn: '2026-10-10' }]);
+  });
+
+  it('a dispute already on record stays: not paid, and confirming it is refused', async () => {
+    as('u-acc');
+    await recordPayment('p1', { stageIndex: 0, amount: '4,00,000', receivedOn: '2026-10-10', mode: 'CASH' }, null, NOW);
+    const id = db.s.payments[0]!.id as string;
+    db.s.payments[0]!.disputedAt = new Date('2026-10-11T00:00:00Z');
+    expect(money().paidPaise).toBe(0);
+    expect(money().rows[0]!.status).toBe('disputed');
+    expect(await disputePayment('u-cust', id)).toEqual({ ok: true, id });
     expect(await confirmPayment('u-cust', id, NOW)).toMatchObject({ ok: false });
   });
 
@@ -281,12 +302,13 @@ describe('recording, confirming and disputing a payment', () => {
     expect(db.s.payments).toHaveLength(2);
     expect(db.s.payments[0]!.amountPaise).toBe(BigInt(4_00_000_00));
     expect(db.s.payments[1]).toMatchObject({ correctsId: first, amountPaise: BigInt(3_50_000_00) });
-    expect(money().waitingPaise).toBe(3_50_000_00);
+    expect(money().paidPaise).toBe(3_50_000_00);
+    expect(sent.customer.at(-1)).toEqual({ kind: 'payment-recorded', stage: 'Booking', amountPaise: 3_50_000_00, studio: 'Teakline Studio' });
     expect(await correctPayment(first, { amount: '1' })).toEqual({ ok: false, error: 'This entry was already corrected. Correct the newer one.' });
     expect(await confirmPayment('u-cust', first, NOW)).toMatchObject({ ok: false });
   });
 
-  it('backfilled rows count as paid, show as recorded before confirmations started, and can still be confirmed', async () => {
+  it('backfilled rows count as paid', async () => {
     db.s.payments.push({
       id: 'hpp_abc',
       projectId: 'p1',

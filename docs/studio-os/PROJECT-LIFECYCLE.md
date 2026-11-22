@@ -46,7 +46,7 @@ accounts records it with the existing payment recording.
 ## Customer
 
 `portal/lifecycle-view.ts customerLifecycle` (pure): phase, current step, next step, the
-blocker (pay ₹x, confirm a payment, answer a drawing, your step, choose, confirm a fixed snag,
+blocker (pay ₹x, answer a drawing, your step, choose, confirm a fixed snag,
 sign off your handover) or "Nothing needed from you" with what the studio is doing; warranty
 end; `canSignOff`. Only starred step names cross. Words: `modules/app/lifecycle-words.ts`
 (en/hi/mr) = `mobile/src/lib/strings/lifecycle.ts`. Website `app/app/project/LifecycleCard.tsx`;

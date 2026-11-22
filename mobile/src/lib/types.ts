@@ -150,7 +150,7 @@ export interface Project {
   decisions: Decision[];
   snags: Snag[];
   documents: Doc[];
-  /** Phase 5: money from the studio's payment entries, each to confirm. Older servers omit it. */
+  /** Phase 5: money from the studio's payment entries (paid once recorded). Older servers omit it. */
   payments?: Payments | null;
   /** Phase 5: what the home is made of, with product codes once ordered. Older servers omit it. */
   materials?: Material[];
@@ -232,7 +232,7 @@ export interface Lifecycle {
   next: LifecycleStep | null;
   /** What you must do to unlock the next step; null = nothing needed from you. */
   blocker: {
-    kind: 'pay' | 'confirm_payment' | 'answer_drawing' | 'your_step' | 'decide' | 'confirm_snag' | 'sign_off' | 'approve_extra' | 'pay_extra' | 'sign_design_final' | 'sign_sales_final';
+    kind: 'pay' | 'answer_drawing' | 'your_step' | 'decide' | 'confirm_snag' | 'sign_off' | 'approve_extra' | 'pay_extra' | 'sign_design_final' | 'sign_sales_final';
     label: string | null;
     amountPaise: number | null;
     count: number | null;
@@ -480,7 +480,7 @@ export interface GeioTurn {
 
 // ── Phase 5: payments from entries, and the home's materials ──
 
-/** A payment the studio recorded. `waiting` asks the owner to confirm; `earlier` was recorded before confirmations started and counts as paid. */
+/** A payment the studio team marked received: `paid`. `disputed` = the client said they did not pay it, before 22 Nov 2026. */
 export interface PaymentEntry {
   id: string;
   stageIndex: number;
@@ -488,10 +488,8 @@ export interface PaymentEntry {
   amountPaise: number;
   receivedOn: string;
   mode: 'UPI' | 'BANK' | 'CHEQUE' | 'CASH' | null;
-  status: 'waiting' | 'confirmed' | 'earlier' | 'disputed';
+  status: 'paid' | 'disputed';
   receiptDocumentId: string | null;
-  /** The owner may confirm it or say they did not pay it. */
-  canAnswer: boolean;
 }
 
 export interface Payments {
@@ -499,7 +497,6 @@ export interface Payments {
   changesPaise: number;
   totalPaise: number;
   paidPaise: number;
-  waitingPaise: number;
   balancePaise: number;
   stages: {
     index: number;
@@ -507,8 +504,7 @@ export interface Payments {
     amountPaise: number;
     changesPaise: number;
     paidPaise: number;
-    waitingPaise: number;
-    state: 'paid' | 'waiting' | 'part' | 'due' | 'later';
+    state: 'paid' | 'part' | 'due' | 'later';
     dueOn: string | null;
   }[];
   entries: PaymentEntry[];

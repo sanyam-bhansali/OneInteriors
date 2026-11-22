@@ -19,14 +19,13 @@ export const dynamic = 'force-dynamic';
  *
  * Restyled to the approved sample-statement.html (owner, 21 Nov 2026): the
  * studio's header, Client and Summary boxes, the stage table, Total, Paid and
- * Remaining, and the signature. No "GST included" wording, and no line for
- * money recorded but not confirmed yet: Paid is confirmed plus recorded
- * before confirmations started, as on the Payments tab.
+ * Remaining, and the signature. No "GST included" wording. Paid is what the
+ * team recorded, as on the Payments tab (owner, 22 Nov 2026).
  */
 
 const signed = (p: number) => `${p < 0 ? '−' : ''}${formatINR(Math.abs(p))}`;
 
-/** Paid / Part paid / Not paid: money waiting for the client's yes is not shown here (owner, 21 Nov 2026). */
+/** Paid / Part paid / Not paid. */
 const paidWord = (o: StatementOrder) => (o.amountPaise <= 0 ? '—' : o.paidPaise >= o.amountPaise ? 'Paid' : o.paidPaise > 0 ? 'Part paid' : 'Not paid');
 
 function Orders({ title, orders, note }: { title: string; orders: StatementOrder[]; note?: string }) {

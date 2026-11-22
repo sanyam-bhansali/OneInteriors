@@ -54,7 +54,9 @@ Three tests every screen must pass:
   and the project event log are never edited or deleted. Corrections are new
   rows shown beside the original.
 - **The customer closes:** a snag closes only on the customer's confirmation
-  (or a 7-day timeout). A payment counts only after the customer confirms it.
+  (or a 7-day timeout). A payment counts as soon as the studio team records
+  it (owner, 22 Nov 2026: "Remove the client confirms in app for payments —
+  it is marked by our team"; before then the customer confirmed it).
 - **Photos come from the in-app camera** with time and location. Gallery
   photos are allowed but labelled "from gallery" to the customer.
 - **Voice, not typing:** every photo has its own mic. The supervisor says what
@@ -323,8 +325,8 @@ payment cannot be due with a snag open.
   studio is notified. Nobody retypes anything. Late, unanswered decisions are
   tagged as customer delay.
 - **Payments:** accounts/owner marks a stage received (amount, date, mode,
-  receipt). Customer confirms or flags "I didn't pay this" (goes to our
-  team). Overpayment is refused with the difference shown (existing
+  receipt). It counts as paid at once and the customer is told it was
+  received; there is nothing to confirm or dispute (owner, 22 Nov 2026). Overpayment is refused with the difference shown (existing
   `canPay()` pattern).
 - **Locker:** agreement, final quote, receipts and decision outcomes file
   automatically; studio uploads drawings (versioned) and adds product codes

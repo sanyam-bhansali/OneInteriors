@@ -37,8 +37,8 @@
  * `update.post`; filing a decision's options with the studio's cost is
  * `decision.create`. Two studio-wide settings are new: `crew.manage` and
  * `calendar.edit` (owner and PM, no assignment — they belong to the studio,
- * not a project). The customer confirming or disputing a payment is the
- * customer's own action, not a studio one, so it is not here.
+ * not a project). Customers no longer confirm or dispute payments (owner,
+ * 22 Nov 2026), so there is nothing for them here.
  *
  * ## Leads, quotations and bookings (Studio OS Phase 1)
  *

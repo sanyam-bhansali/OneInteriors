@@ -48,8 +48,6 @@ export interface PaymentGate {
   cleared: boolean;
   /** Balance still owed; null when the project has no payment plan in the app. */
   pendingPaise: Paise | null;
-  /** Of the pending amount: recorded by the studio, waiting for the client's confirmation. */
-  waitingPaise: Paise;
   /** What the client reads when it is not cleared. */
   message: string | null;
 }
@@ -60,20 +58,12 @@ export function paymentGate(l: Ledger | null): PaymentGate {
     return {
       cleared: false,
       pendingPaise: null,
-      waitingPaise: 0,
       message: `${CLEAR_PAYMENTS_FIRST} Your payment plan is not in the app yet, so we cannot see that it is cleared. Ask your studio to add it.`,
     };
   }
   const pending = Math.max(0, l.balancePaise);
-  if (pending <= 0) return { cleared: true, pendingPaise: 0, waitingPaise: 0, message: null };
-  const waiting = Math.min(pending, Math.max(0, l.waitingPaise));
-  const tail =
-    waiting > 0
-      ? waiting >= pending
-        ? ` Your studio has recorded it; confirm it under Payments if you have paid.`
-        : ` ${formatINR(waiting)} of it is recorded by your studio and waits for you to confirm under Payments.`
-      : '';
-  return { cleared: false, pendingPaise: pending, waitingPaise: waiting, message: `${CLEAR_PAYMENTS_FIRST} ${formatINR(pending)} is pending.${tail}` };
+  if (pending <= 0) return { cleared: true, pendingPaise: 0, message: null };
+  return { cleared: false, pendingPaise: pending, message: `${CLEAR_PAYMENTS_FIRST} ${formatINR(pending)} is pending.` };
 }
 
 // ── Service categories ─────────────────────────────────────────

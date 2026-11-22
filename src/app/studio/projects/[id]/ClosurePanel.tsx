@@ -119,7 +119,7 @@ export function ClosurePanel({ view, customer }: { view: ClosureView; customer: 
               </td>
             </tr>
             <tr>
-              <td>Paid so far (recorded payments){view.base.waitingPaise ? ` · ${formatINR(view.base.waitingPaise)} waiting for ${customer}'s yes` : ''}</td>
+              <td>Paid so far (recorded payments)</td>
               <td className="mono text-right">− {formatINR(shown.paidPaise)}</td>
             </tr>
             <tr>

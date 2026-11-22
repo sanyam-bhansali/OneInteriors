@@ -95,12 +95,12 @@ describe('payment gates', () => {
   const stages = [
     { index: 0, label: 'Booking advance', state: 'paid' as const },
     { index: 1, label: 'Design advance', state: 'due' as const },
-    { index: 2, label: 'Design closure', state: 'waiting' as const },
+    { index: 2, label: 'Design closure', state: 'part' as const },
   ];
 
-  it('lock a step until its payment is recorded; recorded and waiting for the customer counts', () => {
+  it('lock a step until its payment is recorded in full (recorded is paid: owner, 22 Nov 2026)', () => {
     expect(gateOf(1, stages)).toEqual({ open: false, payment: 'Design advance' });
-    expect(gateOf(2, stages)).toEqual({ open: true });
+    expect(gateOf(2, stages)).toEqual({ open: false, payment: 'Design closure' });
     expect(gateOf(0, stages)).toEqual({ open: true });
   });
 

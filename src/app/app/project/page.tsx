@@ -120,7 +120,6 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
     phase: project.lifecycle?.phase,
     designRunning: Boolean(design && !design.done),
     snags: project.snags.length,
-    paymentToConfirm: (project.payments?.waitingPaise ?? 0) > 0,
   });
   const inDesign = layout.focus === 'design';
 
@@ -253,7 +252,7 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
       case 'nextPayment':
         return <NextPayment money={money} phases={project.phases} studio={project.studio} />;
       case 'payments':
-        return money ? <Payments money={money} studio={project.studio} payments={project.payments} owner={project.role === 'owner'} onChanged={reload} /> : null;
+        return money ? <Payments money={money} studio={project.studio} payments={project.payments} /> : null;
       case 'changes':
         return project.changes.items.length ? <Changes changes={project.changes} contractPaise={money?.contractPaise ?? null} /> : null;
       case 'stages':
@@ -393,18 +392,12 @@ function Payments({
   money,
   studio,
   payments,
-  owner,
-  onChanged,
 }: {
   money: NonNullable<MyProject['money']>;
   studio: string;
-  /** The recorded payments (studio workspace Phase 5): what waits on the customer's yes. */
+  /** The payments the studio team marked received (studio workspace Phase 5). */
   payments: MyProject['payments'];
-  owner: boolean;
-  onChanged: () => void;
 }) {
-  // A stage the studio recorded money on that the customer has not confirmed yet.
-  const waitingOn = new Set((payments?.stages ?? []).filter((s) => s.waitingPaise > 0).map((s) => s.index));
   const R = 52;
   const C = 2 * Math.PI * R;
   const total = Math.max(1, money.contractPaise);
@@ -468,11 +461,7 @@ function Payments({
               <small>
                 {s.paidOn
                   ? `Paid ${shortDate(s.paidOn)}`
-                  : waitingOn.has(s.index)
-                    ? owner
-                      ? 'Recorded by the studio — please confirm'
-                      : 'Recorded by the studio — waiting for the owner to confirm'
-                    : s.dueOn
+                  : s.dueOn
                     ? `Due ${shortDate(s.dueOn)}`
                     : s.state === 'next'
                       ? /* Plain for a project brought in mid-way (owner, 1 Nov 2026): money paid before the app may not be recorded yet. */
@@ -487,7 +476,7 @@ function Payments({
           </li>
         ))}
       </ol>
-      {payments ? <PaymentEntries payments={payments} onChanged={onChanged} /> : null}
+      {payments ? <PaymentEntries payments={payments} /> : null}
       <p className="oa-note">
         You pay {studio} directly. We remind you two days before each payment is due, and keep every receipt in your Home locker.
       </p>

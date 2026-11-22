@@ -97,7 +97,7 @@ describe('money documents in the locker', () => {
 });
 
 describe('the website payments card', () => {
-  const e = (id: string, status: 'confirmed' | 'waiting' | 'disputed' | 'earlier') => ({
+  const e = (id: string, status: 'paid' | 'disputed') => ({
     id,
     stageIndex: 0,
     stage: 'Booking advance',
@@ -106,10 +106,9 @@ describe('the website payments card', () => {
     mode: 'UPI' as const,
     status,
     receiptDocumentId: null,
-    canAnswer: true,
   });
-  it('shows what waits on the customer first, then the latest two confirmed', () => {
-    const shown = entriesShown([e('c1', 'confirmed'), e('w1', 'waiting'), e('c2', 'confirmed'), e('c3', 'confirmed'), e('d1', 'disputed')]);
-    expect(shown.map((x) => x.id)).toEqual(['w1', 'd1', 'c1', 'c2']);
+  it('shows an old dispute first, then the latest three paid; nothing to confirm', () => {
+    const shown = entriesShown([e('c1', 'paid'), e('c2', 'paid'), e('c3', 'paid'), e('c4', 'paid'), e('d1', 'disputed')]);
+    expect(shown.map((x) => x.id)).toEqual(['d1', 'c1', 'c2', 'c3']);
   });
 });

@@ -87,14 +87,18 @@ describe('the project closure step', () => {
   });
 
   it('ticking it shows what is still due, the handover payment last', () => {
-    const l = ledger(stages, changes, [row('a', 0, 50_000_000), row('b', 1, 40_000_000), row('c', 1, 5_000_000, { customerConfirmedAt: null })]);
+    // Recorded counts as paid (owner, 22 Nov 2026); an old dispute leaves its money owed.
+    const l = ledger(stages, changes, [
+      row('a', 0, 50_000_000),
+      row('b', 1, 35_000_000, { customerConfirmedAt: null }),
+      row('c', 1, 5_000_000, { disputedAt: '2026-11-03T10:00:00Z' }),
+    ]);
     const due = dueAtClosure(l, [{ number: 'CO-1', title: 'Extra painting', openPaise: 2_000_000 }])!;
     expect(due.stages).toEqual([
-      { label: 'Carcass', openPaise: 0, waitingPaise: 5_000_000, last: false },
-      { label: 'Handover', openPaise: 7_000_000, waitingPaise: 0, last: true },
+      { label: 'Carcass', openPaise: 10_000_000, last: false },
+      { label: 'Handover', openPaise: 7_000_000, last: true },
     ]);
-    expect(due.openPaise).toBe(7_000_000);
-    expect(due.waitingPaise).toBe(5_000_000);
+    expect(due.openPaise).toBe(17_000_000);
     expect(due.extras).toHaveLength(1);
     expect(dueAtClosure(null)).toBeNull();
   });
@@ -121,7 +125,7 @@ describe('the statement', () => {
     ],
     payments: [
       { changeOrderId: null, amountPaise: 50_000_000, status: 'confirmed' },
-      { changeOrderId: 'o1', amountPaise: 1_000_000, status: 'waiting' },
+      { changeOrderId: 'o1', amountPaise: 1_000_000, status: 'recorded' },
     ],
   });
 
@@ -131,13 +135,14 @@ describe('the statement', () => {
     expect(s.quotation.stages.map((x) => x.owedPaise)).toEqual([50_000_000, 45_000_000, 7_450_000]);
     expect(s.electrical.map((o) => o.number)).toEqual(['101-A1']);
     expect(s.additional.map((o) => o.number)).toEqual(['CO-1']);
-    expect(s.additional[0]).toMatchObject({ amountPaise: 2_000_000, paidPaise: 0, waitingPaise: 1_000_000, remainingPaise: 2_000_000, paidLabel: 'Part paid' });
+    expect(s.additional[0]).toMatchObject({ amountPaise: 2_000_000, paidPaise: 1_000_000, remainingPaise: 1_000_000, paidLabel: 'Part paid' });
     expect(s.pending.map((o) => o.number)).toEqual(['CO-3']);
     expect(s.otherChanges).toEqual([{ label: 'Shutter finish: Gloss', deltaPaise: 150_000 }]);
     // The Payments tab's figures, exactly.
-    expect(s.totals).toEqual({ totalPaise: l.totalPaise, paidPaise: l.paidPaise, waitingPaise: l.waitingPaise, remainingPaise: l.balancePaise });
+    expect(s.totals).toEqual({ totalPaise: l.totalPaise, paidPaise: l.paidPaise, remainingPaise: l.balancePaise });
     expect(s.totals.totalPaise).toBe(102_450_000);
-    expect(s.totals.remainingPaise).toBe(7_450_000);
+    // The ₹10,000 recorded on the handover counts, unconfirmed (owner, 22 Nov 2026).
+    expect(s.totals.remainingPaise).toBe(6_450_000);
     // The stages' remaining add up to the remaining.
     expect(s.quotation.stages.reduce((n, x) => n + x.remainingPaise, 0)).toBe(s.totals.remainingPaise);
   });
@@ -161,7 +166,7 @@ describe('money due', () => {
       ['Apte', 50_000_000, 'Carcass'],
       ['Bhat', 5_000_000, 'Handover'],
     ]);
-    expect(out.totals).toEqual({ totalPaise: 200_000_000, paidPaise: 145_000_000, waitingPaise: 0, remainingPaise: 55_000_000 });
+    expect(out.totals).toEqual({ totalPaise: 200_000_000, paidPaise: 145_000_000, remainingPaise: 55_000_000 });
   });
 });
 

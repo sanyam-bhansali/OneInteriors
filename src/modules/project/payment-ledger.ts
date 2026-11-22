@@ -14,30 +14,31 @@
  *
  * ## Which rows count as paid
  *
+ * "Remove the client confirms in app for payments — it is marked by our
+ * team." (owner, 22 Nov 2026). A payment the studio records (accounts, the
+ * owner, the design head) counts as paid the moment it is recorded; the
+ * client is told it was received and is not asked anything.
+ *
  * A row is LIVE when no later row corrects it (`correctsId` points at the row
  * it replaces; corrections chain). A live row is then one of:
  *
- * - `confirmed` — the customer said yes, this arrived. Counts as paid.
- * - `earlier` — recorded before confirmations existed (the migration's
- *   backfill from `paidPhases`, `recordedById = 'backfill:paidPhases'`, ids
- *   `hpp_…`). The studio had already told the customer it was received and
- *   nobody disputed it for weeks, so it COUNTS AS PAID, shown as "recorded
- *   before confirmations started". The customer can still confirm it with
- *   one tap, or say "I didn't pay this", which takes it out like any other.
- * - `waiting` — recorded by the studio, the customer has not answered yet.
- *   Not paid yet (brief §2: "a payment counts only after the customer
- *   confirms it"), but it is money the studio says it has, so it is held
- *   against the stage: a second record of the same money is refused.
- * - `disputed` — the customer said "I didn't pay this". Neither paid nor
- *   held; our team looks into it, and the stage is owed again.
+ * - `recorded` — recorded by the studio. Counts as paid.
+ * - `confirmed` — the customer said yes, this arrived (before 22 Nov 2026,
+ *   or an old phone build still sending it). Counts as paid.
+ * - `earlier` — backfilled from `paidPhases` (`recordedById =
+ *   'backfill:paidPhases'`, ids `hpp_…`) or received before the project was
+ *   brought onto One Interiors. Counts as paid.
+ * - `disputed` — the customer said "I didn't pay this", back when they could.
+ *   Neither paid nor held; our team looks into it, and the stage is owed
+ *   again. No new disputes are taken (`disputePayment` refuses).
  *
  * A row replaced by a correction is `replaced` and counts for nothing. A
  * correction to ₹0 is how "recorded by mistake" is said.
  *
  * ## Overpayment
  *
- * A new payment on a stage is refused when it would take paid plus waiting
- * past what the stage is owed, with the difference said in rupees — the
+ * A new payment on a stage is refused when it would take paid past what the
+ * stage is owed, with the difference said in rupees — the
  * `canPay()` rule of studio-practice/ledger.ts, at the keyboard rather than
  * at reconciliation.
  */
@@ -79,11 +80,11 @@ export interface LedgerRowInput {
   recordedAt: string;
   customerConfirmedAt: string | null;
   disputedAt: string | null;
-  /** Backfilled from paidPhases before confirmations existed (see `isBackfilled`). */
+  /** Backfilled from paidPhases, or received before joining (see `isBackfilled`). */
   backfilled: boolean;
 }
 
-export type RowStatus = 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced';
+export type RowStatus = 'recorded' | 'confirmed' | 'earlier' | 'disputed' | 'replaced';
 
 export interface LedgerRow extends LedgerRowInput {
   status: RowStatus;
@@ -93,7 +94,7 @@ export interface LedgerRow extends LedgerRowInput {
   replaces: string | null;
 }
 
-export type StageState = 'paid' | 'waiting' | 'part' | 'due' | 'later';
+export type StageState = 'paid' | 'part' | 'due' | 'later';
 
 export interface LedgerStage {
   index: number;
@@ -106,8 +107,7 @@ export interface LedgerStage {
   /** What the stage is owed now: signed + changes, never below zero. */
   amountPaise: number;
   paidPaise: number;
-  waitingPaise: number;
-  /** Owed, minus paid and waiting: what may still be recorded. */
+  /** Owed, minus paid: what may still be recorded. */
   openPaise: number;
   state: StageState;
   /** The day the last counted payment arrived, once the stage is fully paid. */
@@ -120,8 +120,7 @@ export interface Ledger {
   /** Signed plus changes: what the whole job costs now. */
   totalPaise: number;
   paidPaise: number;
-  waitingPaise: number;
-  /** Total minus paid. Waiting money is not paid yet, so it is still in here. */
+  /** Total minus paid. */
   balancePaise: number;
   stages: LedgerStage[];
   /** Every row, oldest first, with its status. */
@@ -131,11 +130,13 @@ export interface Ledger {
 /**
  * Rows that read as `earlier`: backfilled from `paidPhases`, or received
  * before the project was brought onto One Interiors (`beforeJoining`,
- * docs/studio-os/BRING-IN-PROJECTS.md). Both count as paid without the
- * client's confirmation.
+ * docs/studio-os/BRING-IN-PROJECTS.md).
  */
 export const isBackfilled = (r: { id: string; recordedById?: string | null; beforeJoining?: boolean | null }): boolean =>
   r.beforeJoining === true || r.recordedById === BACKFILL_RECORDER || r.id.startsWith('hpp_');
+
+/** A live row that is not disputed counts as paid. */
+export const countsAsPaid = (s: RowStatus): boolean => s === 'recorded' || s === 'confirmed' || s === 'earlier';
 
 /** The status of each row, given every row on the project. */
 export function rowStatuses(rows: LedgerRowInput[]): LedgerRow[] {
@@ -151,8 +152,8 @@ export function rowStatuses(rows: LedgerRowInput[]): LedgerRow[] {
             ? 'confirmed'
             : r.backfilled
               ? 'earlier'
-              : 'waiting';
-      return { ...r, status, counts: status === 'confirmed' || status === 'earlier', replaces: r.correctsId };
+              : 'recorded';
+      return { ...r, status, counts: countsAsPaid(status), replaces: r.correctsId };
     });
 }
 
@@ -167,14 +168,12 @@ export function ledger(stages: LedgerStageInput[], changes: LedgerChangeInput[],
     const amountPaise = Math.max(0, s.amountPaise + changesPaise);
     const mine = annotated.filter((r) => r.stageIndex === index);
     const paidPaise = mine.filter((r) => r.counts).reduce((n, r) => n + r.amountPaise, 0);
-    const waitingPaise = mine.filter((r) => r.status === 'waiting').reduce((n, r) => n + r.amountPaise, 0);
-    const openPaise = Math.max(0, amountPaise - paidPaise - waitingPaise);
+    const openPaise = Math.max(0, amountPaise - paidPaise);
     let state: StageState;
     if (paidPaise >= amountPaise) state = 'paid';
-    else if (openPaise === 0) state = 'waiting';
-    else if (paidPaise + waitingPaise > 0) state = 'part';
+    else if (paidPaise > 0) state = 'part';
     else state = nextFound ? 'later' : 'due';
-    if (state !== 'paid' && state !== 'waiting') nextFound = true;
+    if (state !== 'paid') nextFound = true;
     const counted = mine.filter((r) => r.counts).map((r) => r.receivedOn).sort();
     return {
       index,
@@ -184,7 +183,6 @@ export function ledger(stages: LedgerStageInput[], changes: LedgerChangeInput[],
       changesPaise,
       amountPaise,
       paidPaise,
-      waitingPaise,
       openPaise,
       state,
       paidOn: state === 'paid' && counted.length ? counted[counted.length - 1]! : null,
@@ -194,8 +192,7 @@ export function ledger(stages: LedgerStageInput[], changes: LedgerChangeInput[],
   const changesPaise = changes.reduce((n, c) => n + c.deltaPaise, 0);
   const totalPaise = out.reduce((n, s) => n + s.amountPaise, 0);
   const paidPaise = annotated.filter((r) => r.counts).reduce((n, r) => n + r.amountPaise, 0);
-  const waitingPaise = annotated.filter((r) => r.status === 'waiting').reduce((n, r) => n + r.amountPaise, 0);
-  return { signedPaise, changesPaise, totalPaise, paidPaise, waitingPaise, balancePaise: totalPaise - paidPaise, stages: out, rows: annotated };
+  return { signedPaise, changesPaise, totalPaise, paidPaise, balancePaise: totalPaise - paidPaise, stages: out, rows: annotated };
 }
 
 /** Indian rupees with Indian grouping, never in lakhs: the exact figure an accountant types. */
@@ -211,15 +208,7 @@ export function canRecord(l: Ledger, stageIndex: number, amountPaise: number): {
   if (!stage) return { ok: false, error: 'That payment stage is not on this project.' };
   if (!Number.isInteger(amountPaise) || amountPaise <= 0) return { ok: false, error: 'Enter the amount received.' };
   if (amountPaise <= stage.openPaise) return { ok: true };
-  if (stage.openPaise === 0) {
-    return {
-      ok: false,
-      error:
-        stage.waitingPaise > 0
-          ? `${stage.label} is already recorded in full; ${rupees(stage.waitingPaise)} is waiting for the customer to confirm.`
-          : `${stage.label} is already paid in full.`,
-    };
-  }
+  if (stage.openPaise === 0) return { ok: false, error: `${stage.label} is already paid in full.` };
   return {
     ok: false,
     error: `That is ${rupees(amountPaise - stage.openPaise)} more than the ${rupees(stage.openPaise)} still due on ${stage.label}. Record the extra against the next stage.`,
@@ -243,8 +232,8 @@ export interface Mark {
 
 /**
  * `paidPhases` with each stage's `paidOn` brought in line with the rows: set
- * when what is paid and waiting covers the stage (the studio has said the
- * money is in, so the old readers stop reminding the customer), cleared when
+ * when what is paid covers the stage (so the old readers stop reminding the
+ * customer), cleared when
  * it no longer does (a dispute, a correction). Due dates and reminder stamps
  * are kept as they are; they are the schedule, not money received.
  * Kept until every reader of `paidPhases` (moneyView, the reminder cron, the
@@ -256,7 +245,7 @@ export function mirrorPaidOn(marksRaw: unknown, l: Ledger): Mark[] {
     : [];
   for (const s of l.stages) {
     const covered = s.amountPaise > 0 && s.openPaise === 0;
-    const live = l.rows.filter((r) => r.stageIndex === s.index && (r.counts || r.status === 'waiting')).map((r) => r.receivedOn).sort();
+    const live = l.rows.filter((r) => r.stageIndex === s.index && r.counts).map((r) => r.receivedOn).sort();
     const paidOn = covered ? (live[live.length - 1] ?? null) : null;
     const at = marks.findIndex((m) => m.index === s.index);
     if (at >= 0) marks[at] = { ...marks[at]!, paidOn };

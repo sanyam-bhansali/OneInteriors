@@ -832,16 +832,17 @@ describe('Phase 5: decisions as rows, money from payment rows, the locker (porta
   });
 
   it('counts paid from the payment rows, with each entry and nothing internal', () => {
-    expect(out.payments).toMatchObject({ paidPaise: 1_00_000_00, waitingPaise: 0, changesPaise: 12_000_00, totalPaise: 10_12_000_00 });
-    expect(out.payments!.entries).toEqual([
-      { id: 'pay1', stageIndex: 0, stage: 'Booking', amountPaise: 1_00_000_00, receivedOn: '2026-09-02', mode: null, status: 'confirmed', receiptDocumentId: null, canAnswer: false },
-    ]);
+    expect(out.payments).toMatchObject({ paidPaise: 1_00_000_00, changesPaise: 12_000_00, totalPaise: 10_12_000_00 });
+    expect(out.payments).not.toHaveProperty('waitingPaise');
+    expect(out.payments!.entries).toEqual([{ id: 'pay1', stageIndex: 0, stage: 'Booking', amountPaise: 1_00_000_00, receivedOn: '2026-09-02', mode: null, status: 'paid', receiptDocumentId: null }]);
     expect(out.money?.contractPaise).toBe(10_12_000_00);
   });
 
-  it('lets only the owner answer for a payment', () => {
-    const asFamily = toCustomerProject(leakyRow(), SECRET.familyUserId, now);
-    expect(asFamily.payments!.entries.every((e) => !e.canAnswer)).toBe(true);
+  it('asks nobody to confirm a payment: it is marked by the studio team (owner, 22 Nov 2026)', () => {
+    for (const viewer of [SECRET.customerId, SECRET.familyUserId]) {
+      const p = toCustomerProject(leakyRow(), viewer, now).payments!;
+      expect(p.entries.every((e) => e.status === 'paid' && !('canAnswer' in e))).toBe(true);
+    }
   });
 
   it('reads the changes so far from the recorded quote changes', () => {

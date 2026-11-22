@@ -18,7 +18,7 @@ import 'server-only';
  *   all know it is owed, and the signed lines stay as signed.
  * - Accounts (or the owner; `payment.record`) records the money with the
  *   existing payment recording (payments-flow.ts `recordPayment`, the row
- *   carrying `changeOrderId`); the client confirms it as any payment. Once
+ *   carrying `changeOrderId`); it counts as paid once recorded. Once
  *   the recorded money covers it the order is PAID: "Ready to release".
  * - The studio releases it to the factory / the work.
  *
@@ -61,7 +61,7 @@ import {
 } from './change-order-rules';
 import { recordEvent, type ProjectActor } from './events';
 import { staffOn } from './flow-access';
-import { isBackfilled, rowStatuses } from './payment-ledger';
+import { isBackfilled, rowStatuses, type RowStatus } from './payment-ledger';
 import { lockProject, recordPayment, type RecordInput } from './payments-flow';
 import { ELECTRICAL, electricalOpen, spreadOverUnpaid } from './electrical-rules';
 import { dayFromDb, dayToDb, istDay } from './working-days';
@@ -141,7 +141,7 @@ const PAY_SELECT = {
 type PayRow = Prisma.HomeProjectPaymentGetPayload<{ select: typeof PAY_SELECT }>;
 
 /** Each order's payment rows with their ledger status, from every row on the project (corrections chain across rows). */
-export function paymentsByOrder(rows: readonly PayRow[]): Map<string, { amountPaise: number; status: 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced'; receivedOn: string }[]> {
+export function paymentsByOrder(rows: readonly PayRow[]): Map<string, { amountPaise: number; status: RowStatus; receivedOn: string }[]> {
   const statuses = rowStatuses(
     rows.map((r) => ({
       id: r.id,
@@ -158,7 +158,7 @@ export function paymentsByOrder(rows: readonly PayRow[]): Map<string, { amountPa
     })),
   );
   const orderOf = new Map(rows.map((r) => [r.id, r.changeOrderId]));
-  const out = new Map<string, { amountPaise: number; status: 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced'; receivedOn: string }[]>();
+  const out = new Map<string, { amountPaise: number; status: RowStatus; receivedOn: string }[]>();
   for (const r of statuses) {
     const order = orderOf.get(r.id);
     if (!order) continue;
@@ -769,7 +769,7 @@ export interface StudioExtras {
 
 const ACTOR_WORD: Record<string, string> = { CUSTOMER: 'Client', STUDIO: 'Studio', OPS: 'One Interiors', SYSTEM: 'System' };
 
-function toStudioExtra(o: OrderRow, rows: Map<string, { amountPaise: number; status: 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced'; receivedOn: string }[]>, photoUrl: string | null): StudioExtra {
+function toStudioExtra(o: OrderRow, rows: Map<string, { amountPaise: number; status: RowStatus; receivedOn: string }[]>, photoUrl: string | null): StudioExtra {
   const totalPaise = fromDb(o.totalPaise);
   const impact = scopeImpactOf({ scopeImpact: o.scopeImpact, daysRequired: o.daysRequired, itemDueOn: o.itemDueOn ? dayFromDb(o.itemDueOn) : null, builderScope: o.scopeQuoteId !== null });
   return {

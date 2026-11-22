@@ -6,8 +6,8 @@
  *
  * - Extra work: what, its size, the price (discount and GST the quotation's
  *   way), why, and Approve / Decline (with a reason). Once approved: the
- *   amount due and how to pay (the studio directly; confirm it under
- *   Payments when they record it).
+ *   amount due and how to pay (the studio directly; it shows under Payments
+ *   once they record it).
  * - To sign: the quotations the studio asked them to sign, opening the
  *   reading and signing page; "Signed by … on …" once signed.
  *

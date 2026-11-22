@@ -40,6 +40,7 @@
  */
 
 import { computeTotals, lineAmount, QTY_SCALE, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
+import { countsAsPaid, type RowStatus } from './payment-ledger';
 
 export const CHANGE_ORDER_STATUSES = ['DRAFT', 'SENT_TO_CLIENT', 'APPROVED', 'DECLINED', 'PAID', 'RELEASED', 'CANCELLED'] as const;
 export type ChangeOrderStatusName = (typeof CHANGE_ORDER_STATUSES)[number];
@@ -262,34 +263,26 @@ export function checkDeclineReason(v: unknown): { ok: true; reason: string } | {
 /** A payment row recorded for the order, with its ledger status (payment-ledger.ts). */
 export interface ExtraPaymentRow {
   amountPaise: number;
-  status: 'confirmed' | 'earlier' | 'waiting' | 'disputed' | 'replaced';
+  status: RowStatus;
 }
 
 export interface ExtraPaid {
-  /** Recorded by the studio and not disputed or replaced (confirmed or waiting). */
+  /** Recorded by the studio and not disputed or replaced: paid (owner, 22 Nov 2026: clients no longer confirm). */
   recordedPaise: number;
-  /** Confirmed by the client. */
-  confirmedPaise: number;
   /** What is still to be recorded. */
   openPaise: number;
   /** Recorded money covers the order. */
   covered: boolean;
-  /** Some of it is waiting for the client's yes. */
-  waiting: boolean;
-  /** The client said they did not pay an entry. */
+  /** The client said they did not pay an entry (before 22 Nov 2026). */
   disputed: boolean;
 }
 
 export function extraPaid(totalPaise: number, rows: readonly ExtraPaymentRow[]): ExtraPaid {
-  const live = rows.filter((r) => r.status === 'confirmed' || r.status === 'earlier' || r.status === 'waiting');
-  const recordedPaise = live.reduce((a, r) => a + r.amountPaise, 0);
-  const confirmedPaise = live.filter((r) => r.status !== 'waiting').reduce((a, r) => a + r.amountPaise, 0);
+  const recordedPaise = rows.filter((r) => countsAsPaid(r.status)).reduce((a, r) => a + r.amountPaise, 0);
   return {
     recordedPaise,
-    confirmedPaise,
     openPaise: Math.max(0, totalPaise - recordedPaise),
     covered: totalPaise > 0 && recordedPaise >= totalPaise,
-    waiting: live.some((r) => r.status === 'waiting'),
     disputed: rows.some((r) => r.status === 'disputed'),
   };
 }
@@ -341,7 +334,7 @@ export interface CustomerExtra {
   gstBps: number;
   gstPaise: number;
   totalPaise: number;
-  /** Recorded so far (waiting for their yes included). */
+  /** Recorded so far by the studio team. */
   paidPaise: number;
   /** Still to pay once approved. */
   duePaise: number;
