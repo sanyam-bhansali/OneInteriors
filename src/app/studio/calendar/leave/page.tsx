@@ -5,7 +5,7 @@ import { parseMonth, shiftMonth } from '@/modules/studio-leave/rules';
 import { istDay } from '@/modules/project/working-days';
 import { currentMember } from '@/modules/studio/access';
 import { mayOpen } from '@/modules/studio/surfaces';
-import { AskLeave, LeaveList, MonthGrid } from './LeaveUi';
+import { AskLeave, HolidayWork, LeaveList, MonthGrid } from './LeaveUi';
 import '../../office-ui.css';
 import '../calendar.css';
 
@@ -56,6 +56,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
       {view.canAsk ? <AskLeave view={view} /> : null}
 
       <LeaveList view={view} />
+      <HolidayWork view={view} />
 
       <div className="cal-bar">
         <div className="cal-nav">

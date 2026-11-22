@@ -84,10 +84,10 @@ export type ProjectEvent =
   | { kind: 'hold-decided'; projectId: string; client: string; by: string; approved: boolean }
   // Leave (owner, 20 Nov 2026: "notification should pop for every approval"), studio staff only: asked, to the
   // owner and the design head; approved or declined, back to the person.
-  | { kind: 'leave-asked'; name: string; from: string; to: string }
+  | { kind: 'leave-asked'; name: string; from: string; to: string; work?: boolean }
   // To the studio (owner, 20 Nov 2026): the client confirmed a payment, or said they did not pay it.
   | { kind: 'payment-answered'; projectId: string; client: string; amountPaise: number; confirmed: boolean }
-  | { kind: 'leave-decided'; by: string; from: string; to: string; approved: boolean }
+  | { kind: 'leave-decided'; by: string; from: string; to: string; approved: boolean; work?: boolean }
   // After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md), studio staff only: a covered warranty claim, to the
   // design head to assign; a booked service visit, to the office and the design head. And to the client: their visit is booked,
   // or the studio moved, cancelled or finished it.
@@ -519,14 +519,15 @@ export function messageFor(e: ProjectEvent): Message {
     case 'leave-asked':
       return {
         template: 'leave.asked',
-        title: `${e.name} asked for leave`,
+        // Working on a holiday (owner, 21 Nov 2026): asked like leave, paid double when approved beforehand.
+        title: e.work ? `${e.name} asks to work on a holiday` : `${e.name} asked for leave`,
         body: `${e.from === e.to ? e.from : `${e.from} to ${e.to}`}. Approve or decline it in Leave and holidays.`,
         url: '/studio/calendar/leave',
       };
     case 'leave-decided':
       return {
         template: e.approved ? 'leave.approved' : 'leave.declined',
-        title: e.approved ? 'Your leave is approved' : 'Your leave was declined',
+        title: e.work ? (e.approved ? 'Your holiday work is approved' : 'Your holiday work was declined') : e.approved ? 'Your leave is approved' : 'Your leave was declined',
         body: `${e.from === e.to ? e.from : `${e.from} to ${e.to}`}, by ${e.by}.`,
         url: '/studio/calendar/leave',
       };

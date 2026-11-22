@@ -183,26 +183,227 @@ export const leaveCalendarDays = (fromDay: string, toDay: string): number => (is
 /** Whether a leave covers a day. */
 export const leaveCovers = (l: Pick<LeaveSpan, 'fromDay' | 'toDay'>, day: string): boolean => daysBetween(l.fromDay, day) >= 0 && daysBetween(day, l.toDay) >= 0;
 
+// ── Casual and sick leave (owner, 21 Nov 2026) ───────────────
+/*
+ * "We provide 1 Casual leave and 1 sick leave every month", and "the leaves
+ * not taken should be accumulated each month": each type earns one day a
+ * month, from November 2026 (when this began) or the month the person joined,
+ * and what is not taken carries on, with no reset. More than the balance may
+ * still be asked; the rest is unpaid ("Allow as unpaid"). "Any casual leave
+ * which is taken but not approved it will be calculated as 2 leaves": a casual
+ * day off that was not approved by that day (still waiting once the day has
+ * passed, or approved only afterwards) counts as two days. Declined and
+ * withdrawn leave counts nothing. Counted in the studio's working days. Leave
+ * before the allowance began takes nothing off it.
+ */
+
+/** The first month leave is earned. */
+export const ALLOWANCE_FROM = '2026-11';
+const monthNo = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+/** Days of a type earned from `startMonth` through `month`, both included (none before the start). */
+export const earnedThrough = (type: LeaveType, startMonth: string, month: string): number =>
+  Math.max(0, monthNo(month) - monthNo(startMonth) + 1) * MONTHLY_ALLOWANCE[type];
+/** Where a person's allowance starts: November 2026, or the month they joined when later. */
+export const allowanceStart = (joinedDay: string | null): string => (joinedDay && joinedDay.slice(0, 7) > ALLOWANCE_FROM ? joinedDay.slice(0, 7) : ALLOWANCE_FROM);
+
+export const LEAVE_TYPES = { CASUAL: 'Casual leave', SICK: 'Sick leave' } as const;
+export type LeaveType = keyof typeof LEAVE_TYPES;
+export const isLeaveType = (v: unknown): v is LeaveType => typeof v === 'string' && v in LEAVE_TYPES;
+/** Paid days of each type every month. */
+export const MONTHLY_ALLOWANCE: Readonly<Record<LeaveType, number>> = { CASUAL: 1, SICK: 1 };
+/** A casual day taken without approval counts as this many. */
+export const UNAPPROVED_CASUAL_WEIGHT = 2;
+
+/** A leave's type; leave from before types (21 Nov 2026) is casual when planned, sick when not. */
+export const typeOfLeave = (type: string | null | undefined, kind: string | null | undefined): LeaveType =>
+  isLeaveType(type) ? type : kind === 'UNPLANNED' ? 'SICK' : 'CASUAL';
+
+export interface CountedLeave {
+  id: string;
+  type: LeaveType;
+  fromDay: string;
+  toDay: string;
+  status: string;
+  /** The IST day it was approved, when it was. */
+  approvedDay: string | null;
+  /** Tie-break for leaves starting the same day. */
+  askedAt: number;
+  /** A half day (owner, 21 Nov 2026): one day, counted as half. */
+  halfDay?: boolean;
+}
+
+/** Who keeps the holiday list (owner, 21 Nov 2026: "admin should have an option to mark any day as holiday"): the owner, the design head, a sales admin. */
+export function mayManageHolidays(m: { role: string; designHead?: boolean | null }, salesSystem: string | null | undefined): boolean {
+  return m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true) || (m.role === 'SALES' && salesSystem === 'ADMIN');
+}
+
+/** Who may mark a half day (owner, 21 Nov 2026: "for sales head and design head"): the owner, the design head, a sales head or admin. */
+export function mayMarkHalfDay(m: { role: string; designHead?: boolean | null }, salesSystem: string | null | undefined): boolean {
+  return m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true) || (m.role === 'SALES' && (salesSystem === 'HEAD' || salesSystem === 'ADMIN'));
+}
+
+/** What one leave counts for. `days` is what it takes off the allowance; `unapprovedDays` the casual days counted twice. */
+export interface LeaveCount {
+  workingDays: number;
+  days: number;
+  paid: number;
+  unpaid: number;
+  unapprovedDays: number;
+}
+
+/** How much one working day of this leave counts: two for a casual day taken without approval, else one. */
+export function dayWeight(l: Pick<CountedLeave, 'type' | 'status' | 'approvedDay' | 'halfDay'>, day: string, today: string): number {
+  const base = l.halfDay ? 0.5 : 1;
+  if (l.type !== 'CASUAL') return base;
+  if (l.status === 'APPROVED') return l.approvedDay !== null && daysBetween(day, l.approvedDay) > 0 ? base * UNAPPROVED_CASUAL_WEIGHT : base;
+  // Still waiting: a day already gone was taken without approval; today and later are not taken yet.
+  return daysBetween(day, today) > 0 ? base * UNAPPROVED_CASUAL_WEIGHT : base;
+}
+
+/**
+ * Paid and unpaid days for one member's leave, type by type, in the order the
+ * leave falls (then the order asked): each day is paid while the days earned
+ * up to its month are not used up, and unpaid after. Asked and approved leave
+ * count; declined and withdrawn count nothing.
+ */
+export function countLeave(leaves: readonly CountedLeave[], cal: StudioCalendar, today: string, startMonth: string = ALLOWANCE_FROM): Map<string, LeaveCount> {
+  const out = new Map<string, LeaveCount>();
+  const used = new Map<LeaveType, number>();
+  const order = [...leaves].sort((a, b) => a.fromDay.localeCompare(b.fromDay) || a.askedAt - b.askedAt);
+  for (const l of order) {
+    const c: LeaveCount = { workingDays: 0, days: 0, paid: 0, unpaid: 0, unapprovedDays: 0 };
+    if (isOpenLeave(l) && isDay(l.fromDay) && isDay(l.toDay)) {
+      for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) {
+        if (!isWorkingDay(d, cal)) continue;
+        const w = dayWeight(l, d, today);
+        c.workingDays++;
+        c.days += w;
+        if (w > (l.halfDay ? 0.5 : 1)) c.unapprovedDays++;
+        // Before the allowance began: nothing earned and nothing used.
+        if (d.slice(0, 7) < startMonth) {
+          c.paid += w;
+          continue;
+        }
+        const before = used.get(l.type) ?? 0;
+        const paid = Math.max(0, Math.min(w, earnedThrough(l.type, startMonth, d.slice(0, 7)) - before));
+        used.set(l.type, before + w);
+        c.paid += paid;
+        c.unpaid += w - paid;
+      }
+    }
+    out.set(l.id, c);
+  }
+  return out;
+}
+
+/**
+ * The balance per type in `month`: days earned so far (carried over from
+ * earlier months), used up to the month's end (as counted, unapproved casual
+ * days twice), and left.
+ */
+export function leaveBalance(
+  leaves: readonly CountedLeave[],
+  month: string,
+  cal: StudioCalendar,
+  today: string,
+  startMonth: string = ALLOWANCE_FROM,
+): Record<LeaveType, { earned: number; used: number; left: number }> {
+  const out = {} as Record<LeaveType, { earned: number; used: number; left: number }>;
+  for (const type of Object.keys(LEAVE_TYPES) as LeaveType[]) {
+    let usedDays = 0;
+    for (const l of leaves) {
+      if (l.type !== type || !isOpenLeave(l) || !isDay(l.fromDay) || !isDay(l.toDay)) continue;
+      for (let d = l.fromDay; daysBetween(d, l.toDay) >= 0; d = addDays(d, 1)) {
+        const m = d.slice(0, 7);
+        if (m >= startMonth && m <= month && isWorkingDay(d, cal)) usedDays += dayWeight(l, d, today);
+      }
+    }
+    const earned = earnedThrough(type, startMonth, month);
+    out[type] = { earned, used: usedDays, left: Math.max(0, earned - usedDays) };
+  }
+  return out;
+}
+
+// ── Working on a holiday (owner, 21 Nov 2026) ────────────────
+/*
+ * "If anyone is working on a holiday 2 day salary will be paid but it needs
+ * to be pre approved." Asked like leave, for days the studio is closed (a
+ * holiday on its list or the weekly off), from today on; approved by the owner
+ * or the design head. A day approved on or before it is paid double; approved
+ * later is not. Kept in the leave table with this type: it never counts as
+ * leave and never moves a plan.
+ */
+export const HOLIDAY_WORK = 'HOLIDAY_WORK';
+/** A day of approved holiday work is paid as this many days. */
+export const HOLIDAY_WORK_PAY = 2;
+
+/** The days in the range the studio is closed (its holidays and weekly off). */
+export function closedDays(fromDay: string, toDay: string, cal: StudioCalendar): string[] {
+  const out: string[] = [];
+  if (!isDay(fromDay) || !isDay(toDay)) return out;
+  for (let d = fromDay; daysBetween(d, toDay) >= 0; d = addDays(d, 1)) if (!isWorkingDay(d, cal)) out.push(d);
+  return out;
+}
+
+export function checkHolidayWorkAsk(
+  input: { fromDay: unknown; toDay: unknown; reason: unknown },
+  today: string,
+  cal: StudioCalendar,
+): { ok: true; fromDay: string; toDay: string; reason: string } | { ok: false; error: string } {
+  const fromDay = typeof input.fromDay === 'string' ? input.fromDay : '';
+  const toDay = typeof input.toDay === 'string' && input.toDay ? input.toDay : fromDay;
+  if (!isDay(fromDay) || !isDay(toDay)) return { ok: false, error: 'Pick the holiday you will work on.' };
+  if (daysBetween(fromDay, toDay) < 0) return { ok: false, error: 'The last day is before the first day.' };
+  if (daysBetween(today, fromDay) < 0) return { ok: false, error: 'Holiday work is approved beforehand: ask for today or a day ahead.' };
+  if (leaveCalendarDays(fromDay, toDay) > 14) return { ok: false, error: 'Ask for up to two weeks at a time.' };
+  const closed = closedDays(fromDay, toDay, cal);
+  if (closed.length === 0) return { ok: false, error: 'Those are working days. Holiday work is for a holiday or the weekly off.' };
+  if (closed.length !== leaveCalendarDays(fromDay, toDay)) return { ok: false, error: 'Pick only holidays or weekly offs: some of those days are working days.' };
+  const reason = typeof input.reason === 'string' ? input.reason.replace(/\s+/g, ' ').trim() : '';
+  if (reason.length < 3) return { ok: false, error: 'Say what the work is, like "Site handover" or "Factory visit".' };
+  if (reason.length > LEAVE_REASON_MAX) return { ok: false, error: `Keep it under ${LEAVE_REASON_MAX} characters.` };
+  return { ok: true, fromDay, toDay, reason };
+}
+
+/** Days of holiday work paid double: closed days approved on or before the day. Waiting, declined or approved late: none. */
+export function holidayWorkPaidDays(l: { fromDay: string; toDay: string; status: string; approvedDay: string | null }, cal: StudioCalendar): { days: number; doublePaid: number } {
+  const days = closedDays(l.fromDay, l.toDay, cal);
+  if (l.status !== 'APPROVED' || !l.approvedDay) return { days: days.length, doublePaid: 0 };
+  return { days: days.length, doublePaid: days.filter((d) => daysBetween(l.approvedDay!, d) >= 0).length };
+}
+
 export function checkLeaveAsk(
-  input: { fromDay: unknown; toDay: unknown; kind: unknown; reason: unknown },
+  input: { fromDay: unknown; toDay: unknown; kind?: unknown; type?: unknown; reason: unknown; halfDay?: unknown },
   today: string,
   /** The member's other leave. */
   existing: readonly LeaveSpan[],
-): { ok: true; fromDay: string; toDay: string; kind: LeaveKind; reason: string } | { ok: false; error: string } {
-  if (!isLeaveKind(input.kind)) return { ok: false, error: 'Say if the leave is planned or unplanned.' };
+): { ok: true; fromDay: string; toDay: string; kind: LeaveKind; type: LeaveType; reason: string; halfDay: boolean } | { ok: false; error: string } {
   const fromDay = typeof input.fromDay === 'string' ? input.fromDay : '';
-  const toDay = typeof input.toDay === 'string' && input.toDay ? input.toDay : fromDay;
+  const halfDay = input.halfDay === true;
+  const toDay = halfDay ? fromDay : typeof input.toDay === 'string' && input.toDay ? input.toDay : fromDay;
   if (!isDay(fromDay) || !isDay(toDay)) return { ok: false, error: 'Pick the first and last day of the leave.' };
+  /* Casual or sick (owner, 21 Nov 2026); planned or not follows: sick leave and leave already taken are unplanned. */
+  let kind: LeaveKind;
+  let type: LeaveType;
+  if (input.type !== undefined && input.type !== null && input.type !== '') {
+    if (!isLeaveType(input.type)) return { ok: false, error: 'Say if it is casual leave or sick leave.' };
+    type = input.type;
+    kind = type === 'SICK' || daysBetween(today, fromDay) < 0 ? 'UNPLANNED' : 'PLANNED';
+  } else {
+    if (!isLeaveKind(input.kind)) return { ok: false, error: 'Say if it is casual leave or sick leave.' };
+    kind = input.kind;
+    type = typeOfLeave(null, kind);
+  }
   if (daysBetween(fromDay, toDay) < 0) return { ok: false, error: 'The last day is before the first day.' };
   if (leaveCalendarDays(fromDay, toDay) > LEAVE_MAX_DAYS) return { ok: false, error: `One leave is at most ${LEAVE_MAX_DAYS} days. Talk to the owner about a longer one.` };
-  if (input.kind === 'PLANNED' && daysBetween(today, fromDay) < 0) return { ok: false, error: 'Planned leave starts today or later. Leave already taken is unplanned.' };
+  if (kind === 'PLANNED' && daysBetween(today, fromDay) < 0) return { ok: false, error: 'Planned leave starts today or later. Leave already taken is unplanned.' };
   if (daysBetween(addDays(today, -LEAVE_BACK_DAYS), fromDay) < 0) return { ok: false, error: `Leave can be entered up to ${LEAVE_BACK_DAYS} days back.` };
   const reason = typeof input.reason === 'string' ? input.reason.replace(/\s+/g, ' ').trim() : '';
   if (reason.length < 3) return { ok: false, error: 'Say why in a few words, like "Sister\'s wedding" or "Fever".' };
   if (reason.length > LEAVE_REASON_MAX) return { ok: false, error: `Keep the reason under ${LEAVE_REASON_MAX} characters.` };
   const clash = existing.find((l) => isOpenLeave(l) && daysBetween(l.fromDay, toDay) >= 0 && daysBetween(fromDay, l.toDay) >= 0);
   if (clash) return { ok: false, error: `This overlaps leave already ${clash.status === 'APPROVED' ? 'approved' : 'asked for'} (${clash.fromDay} to ${clash.toDay}).` };
-  return { ok: true, fromDay, toDay, kind: input.kind, reason };
+  return { ok: true, fromDay, toDay, kind, type, reason, halfDay };
 }
 
 /** What a leave's plan moves say, team only: "On leave 10 Nov to 12 Nov (3 working days)." */

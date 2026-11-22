@@ -1199,6 +1199,12 @@ model StudioLeave {
   toDay           DateTime     @db.Date
   /// PLANNED | UNPLANNED (studio-leave/rules.ts).
   kind            String
+  /// CASUAL | SICK (owner, 21 Nov 2026: one of each a month). Null on leave
+  /// from before: read as casual when planned, sick when not.
+  type            String?
+  /// One day counted as half (owner, 21 Nov 2026); marked by the owner, the
+  /// design head or a sales head. Moves no plan.
+  halfDay         Boolean      @default(false)
   /// Short, the team's words. Seen by the member and the approvers only.
   reason          String
   /// ASKED | APPROVED | DECLINED | WITHDRAWN.
