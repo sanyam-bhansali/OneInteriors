@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ElectricalBillView } from '@/modules/project/electrical-bill';
-import { electricalAmount, parseQty, qtyWords, type ElectricalItem } from '@/modules/project/electrical-rules';
+import { DEFAULT_DISCOUNT_BPS, electricalAmount, electricalTotals, parseDiscount, parseQty, qtyWords, type ElectricalItem } from '@/modules/project/electrical-rules';
 import { cancelElectricalAction, saveElectricalAction, sendElectricalAction } from './electrical-actions';
 
 type Data = { bills: ElectricalBillView[]; items: ElectricalItem[]; canWrite: boolean; open: string | null; gstBps: number };
@@ -35,7 +35,7 @@ export function ElectricalPanel({ projectId, data, customer }: { projectId: stri
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [editing, setEditing] = useState<{ id?: string; rows: Row[] } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; rows: Row[]; discount: string } | null>(null);
   const run = (fn: () => Promise<Result>, after?: () => void) =>
     start(async () => {
       const r = await fn();
@@ -72,13 +72,14 @@ export function ElectricalPanel({ projectId, data, customer }: { projectId: stri
           items={data.items}
           gstBps={data.gstBps}
           initial={editing.rows}
+          initialDiscount={editing.discount}
           pending={pending}
           onCancel={() => setEditing(null)}
-          onSave={(rows) => run(() => saveElectricalAction(projectId, { id: editing.id, lines: rows.map((r) => ({ itemId: r.itemId, qty: r.qty, note: r.note })) }), () => setEditing(null))}
+          onSave={(rows, discount) => run(() => saveElectricalAction(projectId, { id: editing.id, lines: rows.map((r) => ({ itemId: r.itemId, qty: r.qty, note: r.note })), discount }), () => setEditing(null))}
         />
       ) : data.canWrite && !data.open && data.items.length > 0 ? (
         <div>
-          <button type="button" className="btn pri sm" onClick={() => setEditing({ rows: [newRow()] })}>
+          <button type="button" className="btn pri sm" onClick={() => setEditing({ rows: [newRow()], discount: String(DEFAULT_DISCOUNT_BPS / 100) })}>
             New electrical bill
           </button>
         </div>
@@ -102,7 +103,7 @@ export function ElectricalPanel({ projectId, data, customer }: { projectId: stri
                     type="button"
                     className="btn sec sm"
                     disabled={pending}
-                    onClick={() => setEditing({ id: b.id, rows: b.lines.map((l) => ({ key: `r${++seq}`, itemId: l.itemId ?? '', qty: String(l.qtyMilli / 1000), note: l.note ?? '' })) })}
+                    onClick={() => setEditing({ id: b.id, discount: String(b.discountBps / 100), rows: b.lines.map((l) => ({ key: `r${++seq}`, itemId: l.itemId ?? '', qty: String(l.qtyMilli / 1000), note: l.note ?? '' })) })}
                   >
                     Edit
                   </button>
@@ -154,6 +155,14 @@ function BillTable({ bill }: { bill: ElectricalBillView }) {
           </td>
           <td className="mono text-right">{inr(bill.workPaise)}</td>
         </tr>
+        {bill.discountPaise ? (
+          <tr>
+            <td colSpan={3} className="text-right muted">
+              Discount ({bill.discountBps / 100}%)
+            </td>
+            <td className="mono text-right">− {inr(bill.discountPaise)}</td>
+          </tr>
+        ) : null}
         {bill.gstPaise ? (
           <tr>
             <td colSpan={3} className="text-right muted">
@@ -177,6 +186,7 @@ function Builder({
   items,
   gstBps,
   initial,
+  initialDiscount,
   pending,
   onCancel,
   onSave,
@@ -184,11 +194,13 @@ function Builder({
   items: ElectricalItem[];
   gstBps: number;
   initial: Row[];
+  initialDiscount: string;
   pending: boolean;
   onCancel: () => void;
-  onSave: (rows: Row[]) => void;
+  onSave: (rows: Row[], discount: string) => void;
 }) {
   const [rows, setRows] = useState<Row[]>(initial);
+  const [discount, setDiscount] = useState(initialDiscount);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const set = (key: string, patch: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   // Shown as it will be priced: the server prices again from the rate list.
@@ -197,15 +209,15 @@ function Builder({
     const q = parseQty(r.qty);
     return item && q !== null ? electricalAmount(item.ratePaise, q) : 0;
   });
-  const work = amounts.reduce((a, b) => a + b, 0);
-  const gst = Math.round((work * gstBps) / 10_000);
+  const discountBps = parseDiscount(discount);
+  const t = electricalTotals(amounts.map((amountPaise) => ({ amountPaise })), gstBps, discountBps ?? 0);
   return (
     <form
       className="card flex flex-col gap-2"
       aria-label="Electrical bill"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(rows.filter((r) => r.itemId));
+        onSave(rows.filter((r) => r.itemId), discount);
       }}
     >
       <table className="w-full text-[13.5px]">
@@ -258,18 +270,32 @@ function Builder({
           + Add a line
         </button>
       </div>
-      <p className="m-0 text-right text-[13.5px]">
-        Work <b className="mono">{inr(work)}</b>
+      <div className="flex flex-wrap items-center justify-end gap-2 text-[13.5px]">
+        <span>
+          Work <b className="mono">{inr(t.workPaise)}</b>
+        </span>
+        {/* Owner, 22 Nov 2026: 15% off by default; change it, or 0 for none. */}
+        <label className="flex items-center gap-1">
+          · Discount
+          <input className="fld" style={{ width: 64 }} inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} aria-label="Discount percent" />%
+          {t.discountPaise ? <b className="mono">− {inr(t.discountPaise)}</b> : null}
+        </label>
         {gstBps ? (
-          <>
-            {' '}
-            · GST {gstBps / 100}% <b className="mono">{inr(gst)}</b>
-          </>
-        ) : null}{' '}
-        · Total <b className="mono">{inr(work + gst)}</b>
-      </p>
+          <span>
+            · GST {gstBps / 100}% <b className="mono">{inr(t.gstPaise)}</b>
+          </span>
+        ) : null}
+        <span>
+          · Total <b className="mono">{inr(t.totalPaise)}</b>
+        </span>
+      </div>
+      {discountBps === null ? (
+        <p className="m-0 text-[13px]" style={{ color: 'var(--bad)' }}>
+          The discount is a percent from 0 to 50, like 15.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="btn pri sm" disabled={pending || !rows.some((r) => r.itemId)}>
+        <button type="submit" className="btn pri sm" disabled={pending || !rows.some((r) => r.itemId) || discountBps === null}>
           {pending ? 'Saving…' : 'Save draft'}
         </button>
         <button type="button" className="btn ghost sm" onClick={onCancel}>
