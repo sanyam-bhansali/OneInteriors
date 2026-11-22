@@ -18,7 +18,7 @@ import { currentMember, type StudioMemberRef } from '@/modules/studio/access';
 import { recordEvent } from './events';
 import { staffOn } from './flow-access';
 import { lockProject } from './payments-flow';
-import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalOpen, electricalTotals, parseDiscount, parseQty, type ElectricalItem } from './electrical-rules';
+import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalOpen, WHOLE_HOME, electricalTotals, parseDiscount, parseQty, type ElectricalItem } from './electrical-rules';
 
 export type ElectricalResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -120,7 +120,7 @@ export async function saveElectricalDraft(projectId: string, input: { id?: unkno
   const money = { quoteId: terms.quoteId, discountBps, gstBps: terms.gstBps, workPaise: toDb(totals.workPaise), discountPaise: toDb(totals.discountPaise), gstPaise: toDb(totals.gstPaise), totalPaise: toDb(totals.totalPaise) };
   const lineRows = checked.lines.map((l, i) => ({
     productId: null,
-    room: 'Electrical',
+    room: l.room,
     product: l.product,
     details: l.details,
     code: 'ONSITE' as const,
@@ -170,7 +170,7 @@ export interface ElectricalBillView {
   id: string;
   number: number;
   status: string;
-  lines: { product: string; details: string | null; note: string | null; unitLabel: string; qtyMilli: number; ratePaise: number; amountPaise: number; itemId: string | null }[];
+  lines: { room: string; product: string; details: string | null; note: string | null; unitLabel: string; qtyMilli: number; ratePaise: number; amountPaise: number; itemId: string | null }[];
   workPaise: number;
   discountBps: number;
   discountPaise: number;
@@ -193,7 +193,7 @@ const BILL_SELECT = {
   gstBps: true,
   decidedAt: true,
   declineReason: true,
-  lines: { orderBy: { sortOrder: 'asc' }, select: { product: true, details: true, note: true, unitLabel: true, qtyMilli: true, ratePaise: true, amountPaise: true } },
+  lines: { orderBy: { sortOrder: 'asc' }, select: { room: true, product: true, details: true, note: true, unitLabel: true, qtyMilli: true, ratePaise: true, amountPaise: true } },
 } as const;
 
 function toView(
@@ -209,7 +209,7 @@ function toView(
     gstBps: number;
     decidedAt: Date | null;
     declineReason: string | null;
-    lines: { product: string; details: string | null; note: string | null; unitLabel: string | null; qtyMilli: number | null; ratePaise: bigint; amountPaise: bigint }[];
+    lines: { room: string | null; product: string; details: string | null; note: string | null; unitLabel: string | null; qtyMilli: number | null; ratePaise: bigint; amountPaise: bigint }[];
   },
   items: readonly ElectricalItem[],
 ): ElectricalBillView {
@@ -218,6 +218,8 @@ function toView(
     number: o.number,
     status: o.status,
     lines: o.lines.map((l) => ({
+      // Bills made before rooms (22 Nov 2026) carry the old 'Electrical' room: shown as "Whole home".
+      room: l.room && l.room !== 'Electrical' ? l.room : WHOLE_HOME,
       product: l.product,
       details: l.details,
       note: l.note,
@@ -239,7 +241,9 @@ function toView(
 }
 
 /** The project's electrical bills and the rate list, for its Electrical tab. Null when this person may not see the project's money. */
-export async function electricalForProject(projectId: string): Promise<{ bills: ElectricalBillView[]; items: ElectricalItem[]; canWrite: boolean; open: string | null; gstBps: number } | null> {
+export async function electricalForProject(
+  projectId: string,
+): Promise<{ bills: ElectricalBillView[]; items: ElectricalItem[]; canWrite: boolean; open: string | null; gstBps: number; rooms: string[] } | null> {
   const view = await staffOn(projectId, 'payment.read');
   if (!view.ok) return null;
   const write = await staffOn(projectId, 'extras.write');
@@ -251,7 +255,12 @@ export async function electricalForProject(projectId: string): Promise<{ bills: 
     gstOf(view.studioId, project),
   ]);
   const open = electricalOpen(project.closedOutAt !== null);
+  /* The rooms to offer (owner, 22 Nov 2026: "items segregated according to rooms"): the quotation's own rooms, in its order. */
+  const quoteRooms = terms.quoteId
+    ? (await prisma.studioQuoteLine.findMany({ where: { quoteId: terms.quoteId }, orderBy: { sortOrder: 'asc' }, select: { room: true } })).map((l) => l.room)
+    : [];
   return {
+    rooms: [...new Set(quoteRooms.filter((r) => r && r.trim()))],
     bills: orders.map((o) => toView(o, items)),
     items,
     canWrite: write.ok,

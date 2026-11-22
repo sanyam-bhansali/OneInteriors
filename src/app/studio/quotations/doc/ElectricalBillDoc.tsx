@@ -1,5 +1,6 @@
 import type { ElectricalBillView } from '@/modules/project/electrical-bill';
-import { qtyWords } from '@/modules/project/electrical-rules';
+import { Fragment } from 'react';
+import { byRoom, qtyWords } from '@/modules/project/electrical-rules';
 
 const inr = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
 
@@ -28,18 +29,34 @@ export function ElectricalBillDoc({ bills, quotationPaise }: { bills: readonly E
             </tr>
           </thead>
           <tbody>
-            {b.lines.map((l, i) => (
-              <tr key={i}>
-                <td>{i + 1}</td>
-                <td>{l.product}</td>
-                <td>
-                  {l.details}
-                  {l.note ? <div style={{ fontStyle: 'italic' }}>{l.note}</div> : null}
-                </td>
-                <td>{qtyWords(l.qtyMilli, l.unitLabel)}</td>
-                <td>{inr(l.ratePaise)}</td>
-                <td>{inr(l.amountPaise)}</td>
-              </tr>
+            {/* Room by room (owner, 22 Nov 2026). */}
+            {byRoom(b.lines).map((g) => (
+              <Fragment key={g.room}>
+                <tr>
+                  <td colSpan={6} style={{ fontWeight: 700 }}>
+                    {g.room}
+                  </td>
+                </tr>
+                {g.lines.map((l, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>{l.product}</td>
+                    <td>
+                      {l.details}
+                      {l.note ? <div style={{ fontStyle: 'italic' }}>{l.note}</div> : null}
+                    </td>
+                    <td>{qtyWords(l.qtyMilli, l.unitLabel)}</td>
+                    <td>{inr(l.ratePaise)}</td>
+                    <td>{inr(l.amountPaise)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'right' }}>
+                    {g.room} — Sub-total
+                  </td>
+                  <td>{inr(g.subPaise)}</td>
+                </tr>
+              </Fragment>
             ))}
             <tr>
               <td colSpan={5} style={{ textAlign: 'right' }}>

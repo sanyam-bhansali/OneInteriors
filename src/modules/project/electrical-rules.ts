@@ -26,7 +26,12 @@ export interface ElectricalItem {
   ratePaise: number;
 }
 
+/** Each line sits in a room, as on the quotation (owner, 22 Nov 2026: "items segregated according to rooms"). */
+export const WHOLE_HOME = 'Whole home';
+export const ROOM_MAX = 60;
+
 export interface ElectricalLine {
+  room: string;
   itemId: string;
   product: string;
   unitLabel: string;
@@ -60,7 +65,8 @@ export function checkElectricalLines(raw: unknown, items: ReadonlyMap<string, El
     const qtyMilli = parseQty(o.qty);
     if (qtyMilli === null) return { ok: false, error: `Line ${i + 1} (${item.name}): write how many ${item.unit}s, like 12.` };
     const note = typeof o.note === 'string' ? o.note.replace(/\s+/g, ' ').trim().slice(0, NOTE_MAX) || null : null;
-    lines.push({ itemId: item.id, product: item.name, unitLabel: item.unit, details: item.details, note, qtyMilli, ratePaise: item.ratePaise, amountPaise: electricalAmount(item.ratePaise, qtyMilli) });
+    const room = typeof o.room === 'string' ? o.room.replace(/\s+/g, ' ').trim().slice(0, ROOM_MAX) || WHOLE_HOME : WHOLE_HOME;
+    lines.push({ room, itemId: item.id, product: item.name, unitLabel: item.unit, details: item.details, note, qtyMilli, ratePaise: item.ratePaise, amountPaise: electricalAmount(item.ratePaise, qtyMilli) });
   }
   return { ok: true, lines };
 }
@@ -116,6 +122,18 @@ export function spreadOverUnpaid(totalPaise: number, stages: readonly { pct: num
  */
 export function electricalOpen(closedOut: boolean): { ok: true } | { ok: false; error: string } {
   return closedOut ? { ok: false, error: 'This project is closed out: its final payment is fixed, so the electrical bill cannot change.' } : { ok: true };
+}
+
+/** Lines grouped by room, rooms in the order they first appear; each with its sub-total. */
+export function byRoom<T extends { room: string; amountPaise: number }>(lines: readonly T[]): { room: string; lines: T[]; subPaise: number }[] {
+  const groups = new Map<string, { room: string; lines: T[]; subPaise: number }>();
+  for (const l of lines) {
+    const g = groups.get(l.room) ?? { room: l.room, lines: [], subPaise: 0 };
+    g.lines.push(l);
+    g.subPaise += l.amountPaise;
+    groups.set(l.room, g);
+  }
+  return [...groups.values()];
 }
 
 /** "12 points", "2.5 metres". */
