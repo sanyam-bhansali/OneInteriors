@@ -21,6 +21,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { leadForQuote, leadInScope, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
+import { quoteReadOnly } from '@/modules/studio/roles';
 import { record } from '@/modules/studio-practice/events';
 import { readLeadFile, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { canReadPlans } from '@/modules/floorplan/read';
@@ -183,6 +184,8 @@ export async function buildFromPlan(clientId: string, ref: { fileId?: string; st
     config: home?.config ?? lead.config ?? undefined,
     carpetSqft: lead.carpetSqft ?? (read.ok ? read.stored.carpetAreaSqft : null) ?? undefined,
     clientId: lead.id,
+    // Made for the lead even when a sales rep attached the plan (owner, 22 Nov 2026: "created automatically").
+    fromPlan: true,
   });
   if (!created.ok) {
     const message = `${read.ok ? `Read the plan: ${readingSummary(read.stored)}. ` : ''}${created.error}`;
@@ -204,7 +207,7 @@ export async function buildFromPlan(clientId: string, ref: { fileId?: string; st
   let lines = 0;
   let notes: string[] = [];
   if (home) {
-    const built = await applyConfiguration({ quoteId: created.id, home });
+    const built = await applyConfiguration({ quoteId: created.id, home, fromPlan: true });
     if (built.ok) {
       lines = built.added;
       notes = built.notes;
@@ -252,6 +255,8 @@ export async function readRoomsForQuote(quoteId: string): Promise<{ ok: true; me
   const lead = await leadForQuote(scope, quote.clientId);
   if (!lead) return { ok: false, error: NOT_YOURS };
   if (!mayOnLead(scope, 'quote.write', lead)) return { ok: false, error: NOT_ROLE };
+  // It rewrites the draft's kitchen run and bathrooms: not for a sales rep (owner, 22 Nov 2026).
+  if (quoteReadOnly(scope.member)) return { ok: false, error: NOT_ROLE };
   if (!canReadPlans()) return { ok: false, error: planReadMessage('not-configured') };
 
   const file = await prisma.studioClientFile.findFirst({
