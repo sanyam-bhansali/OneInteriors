@@ -38,7 +38,7 @@ import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
-import { can } from '@/modules/studio/roles';
+import { can, quoteReadOnly } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision, sendRefusalFor } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
@@ -427,6 +427,8 @@ export interface NewQuoteInput {
   category?: unknown;
   /** Refuse when `category` is missing (New quotation, filled in by a person). */
   categoryRequired?: boolean;
+  /** The floor plan's automatic draft (from-plan.ts), the one quotation a sales rep's lead gets without them making it. Never from a form. */
+  fromPlan?: boolean;
 }
 
 /**
@@ -434,14 +436,21 @@ export interface NewQuoteInput {
  * owner and PM, the studio's; a salesperson, only those of leads assigned
  * to them. `where` goes into every quotation query here, beside `studioId`.
  */
-export async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null } | null> {
+export async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null; readOnly?: boolean } | null> {
   const lead = await myLeadScope();
   if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return designerQuoteScope();
+  /* A sales rep (owner, 22 Nov 2026): reads their leads' quotations, writes none — `write` matches nothing, so every
+     write below refuses. The floor plan's automatic draft goes through `fromPlan` (createQuote, applyConfiguration). */
+  if (quoteReadOnly(lead.member)) return { studioId: lead.studioId, where: lead.quotes, write: NO_QUOTE, lead, readOnly: true };
   /* Sales roles (owner, 22 Oct 2026): `where` is what they may read, `write`
      what they may change (their `quote.write` reach); every write below
      uses `write`. */
   return { studioId: lead.studioId, where: lead.quotes, write: lead.quotesWritable, lead };
 }
+
+/** A `where` no quotation matches. */
+const NO_QUOTE: Prisma.StudioQuoteWhereInput = { id: { in: [] } };
+export const READ_ONLY_QUOTE = 'Sales reps do not make or change quotations: attach the floor plan on the lead and the quotation is built from it.';
 
 /**
  * A designer's quotations (the design meeting, 24 Oct 2026;
@@ -494,9 +503,9 @@ export async function projectIdOfQuote(q: { id: string; basedOnId: string | null
 }
 
 /** Whether the signed-in person may write quotations at all (for the pages). */
-export async function mayQuote(): Promise<{ seesAll: boolean } | null> {
+export async function mayQuote(): Promise<{ seesAll: boolean; readOnly: boolean } | null> {
   const qs = await quoteScope();
-  return qs ? { seesAll: qs.lead?.seesAll ?? false } : null;
+  return qs ? { seesAll: qs.lead?.seesAll ?? false, readOnly: qs.readOnly === true } : null;
 }
 
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
@@ -504,6 +513,7 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const studioId = qs?.studioId ?? null;
   if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
   if (!qs.lead) return { ok: false, error: 'New quotations are made by sales. Open the Design Final from the project.' };
+  if (qs.readOnly && input.fromPlan !== true) return { ok: false, error: READ_ONLY_QUOTE };
 
   /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
   const leadId = input.link?.clientId ?? input.clientId ?? null;
@@ -1002,15 +1012,17 @@ async function ownedQuote(quoteId: string): Promise<string | null> {
  * (non-cancelled) project runs on it (`write-rules.ts`). Every write to
  * lines, terms or the standard build goes through this.
  */
-async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; feeBps: number; status: string } | { ok: false; error: string }> {
+async function writableQuote(quoteId: string, fromPlan = false): Promise<{ ok: true; id: string; feeBps: number; status: string } | { ok: false; error: string }> {
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
+  /* A sales rep's floor-plan draft (owner, 22 Nov 2026): the empty draft just made for their lead, built once. */
+  const planDraft = fromPlan && qs?.readOnly === true;
   const row = await prisma.studioQuote.findFirst({
-    where: { ...qs?.write, id: quoteId, studioId },
+    where: planDraft ? { ...qs?.where, id: quoteId, studioId, status: 'DRAFT', issuedOn: null, lines: { none: {} } } : { ...qs?.write, id: quoteId, studioId },
     select: { id: true, feeBps: true, status: true },
   });
-  if (!row) return { ok: false, error: 'That quotation is not yours.' };
+  if (!row) return { ok: false, error: qs?.readOnly ? READ_ONLY_QUOTE : 'That quotation is not yours.' };
   const live = await prisma.homeProject.findFirst({ where: { signedQuoteId: row.id, cancelledAt: null }, select: { id: true } });
   const refusal = quoteWriteRefusal({ liveProject: live !== null });
   if (refusal) return { ok: false, error: refusal };
@@ -1409,6 +1421,8 @@ export async function saveQuoteLines(
 export interface ApplyConfigInput {
   quoteId: string;
   home: HomeConfig;
+  /** The floor plan's automatic draft (from-plan.ts), just made: built even for a sales rep, who cannot write quotations. */
+  fromPlan?: boolean;
 }
 
 export type ApplyResult =
@@ -1436,7 +1450,7 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
-  const writable = await writableQuote(input.quoteId);
+  const writable = await writableQuote(input.quoteId, input.fromPlan === true);
   if (!writable.ok) return writable;
 
   /* The plan comes from the client's brief, never from the browser. */

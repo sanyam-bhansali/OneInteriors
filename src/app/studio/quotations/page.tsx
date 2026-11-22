@@ -59,6 +59,8 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   const [quotes, products, gate, quoting] = await Promise.all([myQuotes(search), myProducts(), myRatesGate(), mayQuote()]);
   // A salesperson's quotation is always for a lead (Studio OS Phase 1).
   const leadRequired = quoting?.seesAll === false;
+  /* A sales rep reads quotations and makes none (owner, 22 Nov 2026): the floor plan on the lead builds it. */
+  const viewOnly = quoting?.readOnly === true;
 
   /* Shut until the studio has confirmed the rates filled from its own
      quotations — rates-gate.ts. createQuote refuses as well; this is the
@@ -102,7 +104,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   };
   const empty = quotes.length === 0 && !search;
 
-  const building = sp.new === '1' || empty || template !== null;
+  const building = !viewOnly && (sp.new === '1' || empty || template !== null);
   const templateRow = template?.ok ? quotes.find((q) => q.id === template.id) : undefined;
 
   return (
@@ -116,12 +118,18 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts): the quotations this person sees, after any search. */}
       <KpiRow label="Quotations at a glance" items={quoteKpis(quotes, new Date(), status)} />
 
-      <div className="hcards">
-        <Link href="/studio/quotations/first" className="hcard">
-          <b>Quotation builder</b>
-          <span className="muted">Floor plan, flat and options, then Build: the full draft opens in the builder on your product master rates, to add rooms and fine-tune every line.</span>
-        </Link>
-      </div>
+      {viewOnly ? (
+        <p className="qnote" style={{ margin: 0 }} data-testid="sales-view-only">
+          Your quotations are built for you: attach the client&rsquo;s floor plan on the lead and the quotation is made from it. You can open and read them here.
+        </p>
+      ) : (
+        <div className="hcards">
+          <Link href="/studio/quotations/first" className="hcard">
+            <b>Quotation builder</b>
+            <span className="muted">Floor plan, flat and options, then Build: the full draft opens in the builder on your product master rates, to add rooms and fine-tune every line.</span>
+          </Link>
+        </div>
+      )}
 
       {building ? (
         <div id="new" style={{ scrollMarginTop: 80 }}>
@@ -236,11 +244,13 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                           <td className="r">
                             <span className="hstack" style={{ gap: 10, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                               {/* Owner, 22 Nov 2026: copy this one for a new client — type the name, pick the lead. */}
-                              <Link href={templateHref(q.id)} className="hmini" title="A new quotation with this one's rooms, items, rates and terms, for another client">
-                                Use as template
-                              </Link>
+                              {viewOnly ? null : (
+                                <Link href={templateHref(q.id)} className="hmini" title="A new quotation with this one's rooms, items, rates and terms, for another client">
+                                  Use as template
+                                </Link>
+                              )}
                               <Link href={href} className="hmini">
-                                {q.status === 'DRAFT' ? 'Continue →' : 'Revise →'}
+                                {viewOnly ? 'Open →' : q.status === 'DRAFT' ? 'Continue →' : 'Revise →'}
                               </Link>
                             </span>
                           </td>
