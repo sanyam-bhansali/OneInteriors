@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { projectStatement } from '@/modules/project/statement';
 import { electricalForProject } from '@/modules/project/electrical-bill';
-import { qtyWords } from '@/modules/project/electrical-rules';
+import { byRoom, qtyWords } from '@/modules/project/electrical-rules';
 import { nameWord } from '@/modules/studio-design/documents';
 import { PrintStatement } from '../../statement/PrintStatement';
 import { DocFooter, DocHeader, PaymentNote, SignBlock, longDay } from '../../MoneyDoc';
@@ -78,21 +78,37 @@ export default async function ElectricalBillPage({ params }: { params: Promise<{
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {bill.lines.map((l, i) => (
-                <tr key={i}>
-                  <td>{i + 1}</td>
-                  <td>
-                    <b>{l.product}</b>
-                    {l.details ? <div className="m">{l.details}</div> : null}
-                    {l.note ? <div style={{ fontStyle: 'italic' }}>{l.note}</div> : null}
+            {/* Room by room, as on the quotation (owner, 22 Nov 2026). */}
+            {byRoom(bill.lines).map((g) => (
+              <tbody key={g.room}>
+                <tr>
+                  <td colSpan={5} style={{ fontWeight: 700, background: '#f1eff3' }}>
+                    {g.room}
                   </td>
-                  <td>{qtyWords(l.qtyMilli, l.unitLabel)}</td>
-                  <td className="r">{formatINR(l.ratePaise)}</td>
-                  <td className="r">{formatINR(l.amountPaise)}</td>
                 </tr>
-              ))}
-            </tbody>
+                {g.lines.map((l, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>
+                      <b>{l.product}</b>
+                      {l.details ? <div className="m">{l.details}</div> : null}
+                      {l.note ? <div style={{ fontStyle: 'italic' }}>{l.note}</div> : null}
+                    </td>
+                    <td>{qtyWords(l.qtyMilli, l.unitLabel)}</td>
+                    <td className="r">{formatINR(l.ratePaise)}</td>
+                    <td className="r">{formatINR(l.amountPaise)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={4} className="r">
+                    {g.room} — Sub-total
+                  </td>
+                  <td className="r">
+                    <b>{formatINR(g.subPaise)}</b>
+                  </td>
+                </tr>
+              </tbody>
+            ))}
           </table>
 
           <table className="mdoc-totals mdoc-keep">
