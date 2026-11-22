@@ -47,6 +47,14 @@ export function ElectricalBillDoc({ bills, quotationPaise }: { bills: readonly E
               </td>
               <td>{inr(b.workPaise)}</td>
             </tr>
+            {b.discountPaise ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'right' }}>
+                  Discount ({b.discountBps / 100}%)
+                </td>
+                <td>− {inr(b.discountPaise)}</td>
+              </tr>
+            ) : null}
             {b.gstPaise ? (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'right' }}>

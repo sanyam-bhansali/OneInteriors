@@ -19,7 +19,7 @@ import { extrasOpen } from './change-order-rules';
 import { recordEvent } from './events';
 import { staffOn } from './flow-access';
 import { lockProject } from './payments-flow';
-import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalTotals, parseQty, type ElectricalItem } from './electrical-rules';
+import { checkElectricalLines, ELECTRICAL, ELECTRICAL_TITLE, electricalTotals, parseDiscount, parseQty, type ElectricalItem } from './electrical-rules';
 
 export type ElectricalResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -100,7 +100,7 @@ async function gstOf(studioId: string, p: { designFinalQuoteId: string | null; s
 // ── A bill ────────────────────────────────────────────────────
 
 /** Saves the electrical bill as a draft (new, or a draft changed). Rates come from the list, never from the browser. */
-export async function saveElectricalDraft(projectId: string, input: { id?: unknown; lines: unknown }, now = new Date()): Promise<ElectricalResult> {
+export async function saveElectricalDraft(projectId: string, input: { id?: unknown; lines: unknown; discount?: unknown }, now = new Date()): Promise<ElectricalResult> {
   const staff = await staffOn(projectId, 'extras.write');
   if (!staff.ok) return staff;
   const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { phase: true, closedOutAt: true, paymentPhases: true, designFinalQuoteId: true, signedQuoteId: true } });
@@ -112,9 +112,12 @@ export async function saveElectricalDraft(projectId: string, input: { id?: unkno
   if (items.length === 0) return { ok: false, error: 'The electrical rate list is empty. The owner or the design head adds the items first.' };
   const checked = checkElectricalLines(input.lines, new Map(items.map((i) => [i.id, i])));
   if (!checked.ok) return checked;
+  // 15% off unless the designer changes it (owner, 22 Nov 2026).
+  const discountBps = parseDiscount(input.discount);
+  if (discountBps === null) return { ok: false, error: 'The discount is a percent from 0 to 50, like 15.' };
   const terms = await gstOf(staff.studioId, project);
-  const totals = electricalTotals(checked.lines, terms.gstBps);
-  const money = { quoteId: terms.quoteId, discountBps: 0, gstBps: terms.gstBps, workPaise: toDb(totals.workPaise), discountPaise: toDb(0), gstPaise: toDb(totals.gstPaise), totalPaise: toDb(totals.totalPaise) };
+  const totals = electricalTotals(checked.lines, terms.gstBps, discountBps);
+  const money = { quoteId: terms.quoteId, discountBps, gstBps: terms.gstBps, workPaise: toDb(totals.workPaise), discountPaise: toDb(totals.discountPaise), gstPaise: toDb(totals.gstPaise), totalPaise: toDb(totals.totalPaise) };
   const lineRows = checked.lines.map((l, i) => ({
     productId: null,
     room: 'Electrical',
@@ -169,6 +172,8 @@ export interface ElectricalBillView {
   status: string;
   lines: { product: string; details: string | null; note: string | null; unitLabel: string; qtyMilli: number; ratePaise: number; amountPaise: number; itemId: string | null }[];
   workPaise: number;
+  discountBps: number;
+  discountPaise: number;
   gstPaise: number;
   totalPaise: number;
   gstBps: number;
@@ -181,6 +186,8 @@ const BILL_SELECT = {
   number: true,
   status: true,
   workPaise: true,
+  discountBps: true,
+  discountPaise: true,
   gstPaise: true,
   totalPaise: true,
   gstBps: true,
@@ -195,6 +202,8 @@ function toView(
     number: number;
     status: string;
     workPaise: bigint;
+    discountBps: number;
+    discountPaise: bigint;
     gstPaise: bigint;
     totalPaise: bigint;
     gstBps: number;
@@ -219,6 +228,8 @@ function toView(
       itemId: items.find((i) => i.name === l.product)?.id ?? null,
     })),
     workPaise: fromDb(o.workPaise),
+    discountBps: o.discountBps,
+    discountPaise: fromDb(o.discountPaise),
     gstPaise: fromDb(o.gstPaise),
     totalPaise: fromDb(o.totalPaise),
     gstBps: o.gstBps,

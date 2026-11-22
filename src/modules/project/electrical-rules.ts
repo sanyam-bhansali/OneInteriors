@@ -16,7 +16,7 @@ export const LINES_MAX = 150;
 export const NOTE_MAX = 200;
 /** Quantities are in thousandths, as on every quote line. */
 export const QTY_SCALE = 1000;
-export const UNIT_WORDS = ['point', 'metre', 'nos', 'set', 'box', 'coil', 'lot'] as const;
+export const UNIT_WORDS = ['point', 'board', 'rft', 'metre', 'nos', 'set', 'box', 'coil', 'lot'] as const;
 
 export interface ElectricalItem {
   id: string;
@@ -65,11 +65,31 @@ export function checkElectricalLines(raw: unknown, items: ReadonlyMap<string, El
   return { ok: true, lines };
 }
 
-/** Work, GST (on the project's GST rate) and total. No discount, no fee. */
-export function electricalTotals(lines: readonly Pick<ElectricalLine, 'amountPaise'>[], gstBps: number): { workPaise: number; gstPaise: number; totalPaise: number } {
+/**
+ * The discount on an electrical bill (owner, 22 Nov 2026: Hauspire's bills
+ * take 15% off; "default 15, option to remove or change"): 15% unless the
+ * designer changes it, 0 to 50%.
+ */
+export const DEFAULT_DISCOUNT_BPS = 1500;
+export const MAX_DISCOUNT_BPS = 5000;
+export function parseDiscount(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === '') return DEFAULT_DISCOUNT_BPS;
+  const s = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.replace('%', '').trim() : '';
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  const bps = Math.round(Number(s) * 100);
+  return bps <= MAX_DISCOUNT_BPS ? bps : null;
+}
+
+/** Work, the discount (whole rupees), GST on what is left (the project's rate), and the total. */
+export function electricalTotals(
+  lines: readonly Pick<ElectricalLine, 'amountPaise'>[],
+  gstBps: number,
+  discountBps = 0,
+): { workPaise: number; discountPaise: number; gstPaise: number; totalPaise: number } {
   const workPaise = lines.reduce((a, l) => a + l.amountPaise, 0);
-  const gstPaise = Math.round((workPaise * Math.max(0, gstBps)) / 10_000);
-  return { workPaise, gstPaise, totalPaise: workPaise + gstPaise };
+  const discountPaise = Math.round((workPaise * Math.max(0, discountBps)) / 10_000 / 100) * 100;
+  const gstPaise = Math.round(((workPaise - discountPaise) * Math.max(0, gstBps)) / 10_000);
+  return { workPaise, discountPaise, gstPaise, totalPaise: workPaise - discountPaise + gstPaise };
 }
 
 /**
@@ -92,5 +112,5 @@ export function spreadOverUnpaid(totalPaise: number, stages: readonly { pct: num
 /** "12 points", "2.5 metres". */
 export function qtyWords(qtyMilli: number, unit: string): string {
   const q = (qtyMilli / QTY_SCALE).toFixed(3).replace(/\.?0+$/, '');
-  return `${q} ${unit}${q === '1' || /s$/.test(unit) || unit === 'nos' ? '' : 's'}`;
+  return `${q} ${unit}${q === '1' || /s$/.test(unit) || ['nos', 'rft', 'sqft', 'kg'].includes(unit) ? '' : 's'}`;
 }

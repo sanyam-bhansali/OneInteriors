@@ -15,7 +15,7 @@ function done(projectId: string, r: { ok: boolean; message?: string; error?: str
   return { ok: false, error: r.error ?? 'That did not go through. Try again.' };
 }
 
-export async function saveElectricalAction(projectId: string, input: { id?: string; lines: { itemId: string; qty: string; note: string }[] }): Promise<Result> {
+export async function saveElectricalAction(projectId: string, input: { id?: string; lines: { itemId: string; qty: string; note: string }[]; discount: string }): Promise<Result> {
   return done(projectId, await saveElectricalDraft(projectId, input), 'Saved.');
 }
 

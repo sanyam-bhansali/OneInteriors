@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { checkElectricalLines, electricalAmount, electricalTotals, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
+import { DEFAULT_DISCOUNT_BPS, checkElectricalLines, electricalAmount, electricalTotals, parseDiscount, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
 
 /* Owner, 22 Nov 2026: the electrical bill — picked from the admin's rate list, quantity and note by the designer, approved by the client, spread over the unpaid stages, in one PDF with the quotation. */
 const ITEMS = new Map<string, ElectricalItem>([
@@ -31,7 +31,21 @@ describe('lines from the rate list', () => {
   });
 
   it('GST on the project’s rate, no discount', () => {
-    expect(electricalTotals([{ amountPaise: 10_000_00 }], 1800)).toEqual({ workPaise: 10_000_00, gstPaise: 1_800_00, totalPaise: 11_800_00 });
+    expect(electricalTotals([{ amountPaise: 10_000_00 }], 1800)).toEqual({ workPaise: 10_000_00, discountPaise: 0, gstPaise: 1_800_00, totalPaise: 11_800_00 });
+  });
+
+  it('15% off by default, changeable or removable, before GST (owner, 22 Nov 2026)', () => {
+    expect(parseDiscount('')).toBe(DEFAULT_DISCOUNT_BPS);
+    expect(parseDiscount(undefined)).toBe(1500);
+    expect(parseDiscount('0')).toBe(0);
+    expect(parseDiscount('12.5%')).toBe(1250);
+    expect(parseDiscount('60')).toBeNull();
+    expect(parseDiscount('-5')).toBeNull();
+    expect(parseDiscount('abc')).toBeNull();
+    // ₹10,000 work, 15% off = ₹1,500, GST 18% on ₹8,500 = ₹1,530, total ₹10,030.
+    expect(electricalTotals([{ amountPaise: 10_000_00 }], 1800, 1500)).toEqual({ workPaise: 10_000_00, discountPaise: 1_500_00, gstPaise: 1_530_00, totalPaise: 10_030_00 });
+    // The discount is whole rupees.
+    expect(electricalTotals([{ amountPaise: 333_00 }], 0, 1500).discountPaise).toBe(50_00);
   });
 
   it('quantities and words', () => {
@@ -41,6 +55,8 @@ describe('lines from the rate list', () => {
     expect(qtyWords(12_000, 'point')).toBe('12 points');
     expect(qtyWords(1_000, 'point')).toBe('1 point');
     expect(qtyWords(5_000, 'nos')).toBe('5 nos');
+    expect(qtyWords(2_000, 'rft')).toBe('2 rft');
+    expect(qtyWords(2_000, 'board')).toBe('2 boards');
   });
 });
 
