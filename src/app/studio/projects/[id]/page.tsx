@@ -39,6 +39,8 @@ import { closureFor } from '@/modules/project/closure';
 import { ClosurePanel } from './ClosurePanel';
 /* Change orders and client sign-off (owner, 15 Oct 2026; project/change-orders.ts, project/signoffs.ts). */
 import { extrasForStudio } from '@/modules/project/change-orders';
+import { electricalForProject } from '@/modules/project/electrical-bill';
+import { ElectricalPanel } from './ElectricalPanel';
 import { signoffsForStudio } from '@/modules/project/signoffs';
 import { ExtrasPanel } from './ExtrasPanel';
 import { SignoffCard } from './SignoffCard';
@@ -80,6 +82,8 @@ const TABS = [
   { key: 'closure', label: 'Closure' },
   /* Change orders (owner, 15 Oct 2026): extra work after design sign-off, for those who see the money. */
   { key: 'extras', label: 'Extra work' },
+  /* The electrical bill (owner, 22 Nov 2026): priced from the electrical rate list, approved by the client, spread over the unpaid stages. */
+  { key: 'electrical', label: 'Electrical bill' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
@@ -119,7 +123,9 @@ export default async function ProjectWorkspacePage({
     snagWindowFor(w.id).catch(() => null),
   ]);
   /* Change orders and sign-offs: null for those who do not see the project's money. */
-  const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
+  const [extras, signoffs, electrical] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null), electricalForProject(w.id).catch(() => null)]);
+  /* The project value counts approved electrical bills (owner, 22 Nov 2026). */
+  const electricalPaise = (electrical?.bills ?? []).filter((b) => b.status === 'APPROVED' || b.status === 'PAID').reduce((a, b) => a + b.totalPaise, 0);
   /* A project on hold (owner, 12 Nov 2026): ask, approve, take off. */
   const hold = await holdView(w.id, now).catch(() => null);
   /* Additional scope (owner, 12 Nov 2026; 13 Nov: a simple form, no quotation): after the design final. */
@@ -129,7 +135,7 @@ export default async function ProjectWorkspacePage({
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
-  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen) && (t.key !== 'extras' || (extras !== null && money && (life?.phase !== 'DESIGN' || extras.extras.length > 0))));
+  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen) && (t.key !== 'extras' || (extras !== null && money && (life?.phase !== 'DESIGN' || extras.extras.length > 0))) && (t.key !== 'electrical' || (electrical !== null && money)));
   // A designer (Studio OS Phase 2) opens on the Design tab.
   const fallback: Tab = viewer?.role === 'DESIGNER' ? 'design' : 'plan';
   const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : fallback;
@@ -142,6 +148,7 @@ export default async function ProjectWorkspacePage({
     crews: null,
     closure: life?.phase === 'CLOSURE' ? 'to do' : null,
     extras: extras ? `${extras.extras.filter((e) => e.status !== 'CANCELLED').length}` : null,
+    electrical: electrical?.bills.length ? `${electrical.bills.filter((b) => b.status !== 'CANCELLED').length}` : null,
   };
   const siteMode = viewer !== null && mayOpen(viewer, SITE_HOME);
   const appLine = w.appConnected
@@ -172,7 +179,8 @@ export default async function ProjectWorkspacePage({
             {w.bhk || w.tier ? <span className="chip">{[w.bhk, w.tier].filter(Boolean).join(' · ')}</span> : null}
             {money ? (
               <span className="chip mono">
-                {formatINR(w.contractPaise!)}
+                {formatINR(w.contractPaise! + electricalPaise)}
+                {electricalPaise ? ' incl. electrical' : ''}
                 {w.signedAt ? ` · signed ${shortDay(w.signedAt)}` : ''}
               </span>
             ) : null}
@@ -264,6 +272,7 @@ export default async function ProjectWorkspacePage({
           {tab === 'crews' ? <CrewsSection projectId={w.id} now={now} /> : null}
           {tab === 'closure' && closure ? <ClosurePanel view={closure} customer={w.customerFirst} /> : null}
           {tab === 'extras' && extras ? <ExtrasPanel data={extras} customer={w.customerFirst} /> : null}
+          {tab === 'electrical' && electrical ? <ElectricalPanel projectId={w.id} data={electrical} customer={w.customerFirst} /> : null}
         </div>
         <aside className="wsside" aria-label={`What ${w.customerFirst} sees`}>
           <CustomerPanel w={w} now={now} />

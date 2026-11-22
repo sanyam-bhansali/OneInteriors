@@ -76,6 +76,12 @@ export const lifecycleWords = {
     hi: 'आप स्टूडियो को सीधे भुगतान करते हैं। जब वे इसे दर्ज करें, भुगतान में पक्का करें।',
     mr: 'तुम्ही स्टुडिओला थेट पैसे देता. त्यांनी नोंद केल्यावर पेमेंटमध्ये निश्चित करा.',
   },
+  /* The electrical bill (owner, 22 Nov 2026): spread over the payment stages not yet paid. */
+  'life.extra.inStages': {
+    en: 'Added to your project value and spread over your payment stages not yet paid. You pay it with them.',
+    hi: 'आपकी प्रोजेक्ट वैल्यू में जुड़ गया और बाकी भुगतान चरणों में बाँट दिया गया। आप उन्हीं के साथ भुगतान करेंगे।',
+    mr: 'तुमच्या प्रोजेक्ट मूल्यात जोडले आणि बाकी पेमेंट टप्प्यांमध्ये विभागले. तुम्ही त्यांच्यासोबत पैसे द्याल.',
+  },
   'life.extra.done': { en: 'Thank you. The studio has your answer.', hi: 'धन्यवाद। स्टूडियो को आपका जवाब मिल गया।', mr: 'धन्यवाद. स्टुडिओला तुमचे उत्तर मिळाले.' },
   'life.extra.failed': { en: 'That did not go through. Try again.', hi: 'यह नहीं हो सका। फिर कोशिश करें।', mr: 'हे झाले नाही. पुन्हा प्रयत्न करा.' },
   'life.extra.photo': { en: 'See the drawing', hi: 'ड्रॉइंग देखें', mr: 'ड्रॉइंग पहा' },
