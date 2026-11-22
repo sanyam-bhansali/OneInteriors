@@ -107,6 +107,17 @@ describe('wiring', () => {
   });
 });
 
+describe('a PDF of each electrical bill (owner, 22 Nov 2026)', () => {
+  it('every bill has Generate PDF, opening its own document page', () => {
+    const panel = readFileSync('src/app/studio/projects/[id]/ElectricalPanel.tsx', 'utf8');
+    expect(panel).toContain('href={`/studio/projects/${projectId}/electrical/${b.id}`}');
+    const page = readFileSync('src/app/studio/projects/[id]/electrical/[billId]/page.tsx', 'utf8');
+    expect(page).toContain('title="ELECTRICAL BILL"');
+    expect(page).toContain('Discount ({bill.discountBps / 100}%)');
+    expect(page).toContain('<SignBlock issuer={view.issuer} />');
+  });
+});
+
 describe('open whenever needed after the project is created (owner, 22 Nov 2026)', () => {
   it('any phase, design included; only a closed-out project refuses', () => {
     expect(electricalOpen(false)).toEqual({ ok: true });

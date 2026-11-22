@@ -95,6 +95,12 @@ export function ElectricalPanel({ projectId, data, customer }: { projectId: stri
           </div>
           <BillTable bill={b} />
           {b.declineReason ? <p className="m-0 text-[13px]">Why declined: {b.declineReason}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            {/* Owner, 22 Nov 2026: "it should generate a PDF electrical bill". */}
+            <Link href={`/studio/projects/${projectId}/electrical/${b.id}`} target="_blank" className="btn sec sm">
+              Generate PDF
+            </Link>
+          </div>
           {data.canWrite ? (
             <div className="flex flex-wrap gap-2">
               {b.status === 'DRAFT' ? (
