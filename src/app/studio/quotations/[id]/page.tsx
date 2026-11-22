@@ -11,7 +11,7 @@ import { StatusBar } from './StatusBar';
 import { currentMember } from '@/modules/studio/access';
 import { projectForQuote } from '@/modules/project/own-project';
 import { quoteSalesView } from '@/modules/studio-sales/revisions';
-import { can } from '@/modules/studio/roles';
+import { can, quoteReadOnly } from '@/modules/studio/roles';
 import { Revisions } from './Revisions';
 /* The client's digital sign-off (15 Oct 2026): "Signed by … on …" per revision. */
 import { signaturesOfQuote } from '@/modules/project/signoffs';
@@ -88,7 +88,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   /* A Design Final compares with the sales final as frozen (DESIGN-PROCESS-PLAN.md §4.1). */
   const salesFinal = quote.stage === 'DESIGN' && quote.basedOnId ? await salesFinalSnapshot(quote.basedOnId) : null;
   /* Booked: a live project runs on it, and the server refuses writes (write-rules.ts). */
-  const locked = Boolean(sales?.projectId ?? project.projectId);
+  /* A sales rep reads, never changes (owner, 22 Nov 2026); the server refuses their writes too (quoteScope). */
+  const viewOnly = member !== null && quoteReadOnly(member);
+  const locked = Boolean(sales?.projectId ?? project.projectId) || viewOnly;
   const lastRev = sales?.revisions[sales.revisions.length - 1] ?? null;
   /* The printable Original vs Final: the Sales Final for a Design Final, else the last two revisions sent. */
   const finalHref = quote.basedOnId
@@ -128,7 +130,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             </span>
             <span className="chip">{STAGE_LABELS[quote.stage]}</span>
             {/* Mandatory on every quotation (owner, 13 Nov 2026), One Interiors' too; additional scope takes the project's. */}
-            <CategoryPick quoteId={quote.id} initial={quote.category} canEdit={!quote.scopeForProjectId} />
+            <CategoryPick quoteId={quote.id} initial={quote.category} canEdit={!quote.scopeForProjectId && !viewOnly} />
             {quote.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
             {quote.issuedOn ? (
               <span>
@@ -156,10 +158,19 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           status={quote.status}
           canPrint={quote.lines.length > 0}
           basedOnId={quote.basedOnId}
-          deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
+          deletable={!viewOnly && quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
+          viewOnly={viewOnly}
         />
         )}
       </div>
+
+      {viewOnly ? (
+        <div className="qnote hnoteline" data-testid="sales-view-only">
+          <p>
+            View only. Sales reps don&rsquo;t change quotations: attach the client&rsquo;s floor plan on the lead and the quotation is built from it. Ask your sales head or the quotation team for changes.
+          </p>
+        </div>
+      ) : null}
 
       {project.projectId ? (
         <div className="qnote good hnoteline">
