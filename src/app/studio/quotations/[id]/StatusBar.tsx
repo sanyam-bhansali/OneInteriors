@@ -23,6 +23,7 @@ export function StatusBar({
   canPrint,
   basedOnId,
   deletable,
+  viewOnly = false,
 }: {
   quoteId: string;
   status: QuoteStatusName;
@@ -31,6 +32,8 @@ export function StatusBar({
   basedOnId: string | null;
   /** A draft never sent and not a customer's final quote. */
   deletable: boolean;
+  /** A sales rep (owner, 22 Nov 2026): the PDF opens to read; nothing is saved, and no template or delete. */
+  viewOnly?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +56,7 @@ export function StatusBar({
       return;
     }
     const tab = window.open(`/studio/quotations/${quoteId}/print`, '_blank');
+    if (viewOnly) return;
     start(async () => {
       const result = await generatePdfAction(quoteId, status);
       if (result && 'ok' in result && !result.ok) {
@@ -76,11 +80,12 @@ export function StatusBar({
       {canPrint ? (
         <button type="button" onClick={generate} disabled={pending} className="btn pri" title="Opens the PDF and keeps this copy as the next revision (R1, R2…) when it has changed" data-testid="generate-pdf">
           <LineIcon name="eye" size={16} />
-          {pending ? 'Saving…' : 'Generate PDF'}
+          {pending ? 'Saving…' : viewOnly ? 'View PDF' : 'Generate PDF'}
         </button>
       ) : null}
 
-      {/* Rarely needed, out of the way. */}
+      {/* Rarely needed, out of the way. Not for a sales rep: both make or delete a quotation. */}
+      {viewOnly ? null : (
       <details className="qmore" style={{ position: 'relative' }}>
         <summary className="btn ghost sm" aria-label="More">More</summary>
         <div className="hstack" style={{ position: 'absolute', right: 0, top: 40, zIndex: 20, gap: 6, padding: 8, background: 'var(--paper)', borderRadius: 12, boxShadow: '0 12px 30px -10px rgba(0,0,0,.3), 0 0 0 1px var(--line)', flexWrap: 'wrap', minWidth: 220 }}>
@@ -101,6 +106,7 @@ export function StatusBar({
           ) : null}
         </div>
       </details>
+      )}
     </div>
   );
 }

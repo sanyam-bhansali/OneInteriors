@@ -499,6 +499,17 @@ export interface CanContext {
 export const hasSalesRole = (member: MemberRole): member is MemberRole & { sales: SalesContext } => member.role === 'SALES' && !!member.sales;
 
 /**
+ * A sales rep reads quotations and changes none (owner, 22 Nov 2026: "sales rep shouldn't be able to edit the
+ * quotation … they can't edit at all, they just upload the floor plan on the lead and the quotation is created
+ * automatically"): a salesperson whose role does not build quotations (`quotes.build`; the Admin and Sales head
+ * roles, and a "Sales rep + quotations" role, do). The floor plan's automatic draft is still made for them, and
+ * marking the sales final and Convert keep their own permission.
+ */
+export function quoteReadOnly(member: MemberRole): boolean {
+  return member.role === 'SALES' && !can(member, 'quote.build');
+}
+
+/**
  * The roles that only make sense with the full software (owner, 14 Oct
  * 2026): in a studio without it they can do nothing, and their home says so.
  */
