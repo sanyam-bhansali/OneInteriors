@@ -68,14 +68,20 @@ export default async function PaymentsDeskPage() {
             Every project&rsquo;s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker.
           </p>
         </div>
-        {/* Who owes how much (owner, 13 Nov 2026). */}
-        {seesMoneyDue(member) ? (
-          <div className="hstack">
+        <div className="hstack">
+          {/* Employee records (owner, 21 Nov 2026): owner and accounts only. */}
+          {member && !member.viewOnly && (member.role === 'OWNER' || member.role === 'ACCOUNTS') ? (
+            <Link href="/studio/people" className="btn sec">
+              People
+            </Link>
+          ) : null}
+          {/* Who owes how much (owner, 13 Nov 2026). */}
+          {seesMoneyDue(member) ? (
             <Link href="/studio/payments/due" className="btn sec">
               Money due
             </Link>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}

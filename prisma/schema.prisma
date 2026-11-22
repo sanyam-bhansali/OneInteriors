@@ -6794,3 +6794,92 @@ model StudioInvoice {
   @@unique([studioId, fyStart, seq])
   @@map("studio_invoices")
 }
+
+/// An employee's record (owner, 21 Nov 2026): designation, joining day, address.
+/// Owner and accounts only. One per team member.
+model StudioStaffRecord {
+  id          String    @id @default(cuid())
+  studioId    String
+  /// StudioMember.id.
+  memberId    String    @unique
+  designation String?
+  joinedOn    DateTime? @db.Date
+  address     String?
+  updatedAt   DateTime  @updatedAt
+  updatedById String?
+
+  @@index([studioId])
+  @@map("studio_staff_records")
+}
+
+/// An employee's documents (owner, 21 Nov 2026: Aadhaar, offer letter, PAN,
+/// address proof, photo; up to 50 MB a person). In the private crew-kyc bucket
+/// under `studio_<id>/staff_<memberId>/`. Removing one sets `removedAt`.
+model StudioStaffDoc {
+  id           String    @id @default(cuid())
+  studioId     String
+  memberId     String
+  /// AADHAAR | PAN | OFFER_LETTER | ADDRESS_PROOF | PHOTO | OTHER (staff/rules.ts).
+  kind         String
+  fileName     String
+  path         String
+  bytes        Int
+  contentType  String
+  uploadedById String
+  createdAt    DateTime  @default(now())
+  removedAt    DateTime?
+
+  @@index([studioId, memberId])
+  @@map("studio_staff_docs")
+}
+
+/// Salary from a day on (owner, 21 Nov 2026). Append-only: a raise is a new row; the latest that has started is the salary.
+model StudioStaffSalary {
+  id           String   @id @default(cuid())
+  studioId     String
+  memberId     String
+  monthlyPaise BigInt
+  fromDay      DateTime @db.Date
+  note         String?
+  byId         String
+  createdAt    DateTime @default(now())
+
+  @@index([studioId, memberId])
+  @@map("studio_staff_salaries")
+}
+
+/// An incentive earned for a month, and when it was paid out (owner, 21 Nov 2026).
+model StudioStaffIncentive {
+  id          String    @id @default(cuid())
+  studioId    String
+  memberId    String
+  /// YYYY-MM.
+  month       String
+  amountPaise BigInt
+  reason      String
+  byId        String
+  createdAt   DateTime  @default(now())
+  paidOn      DateTime? @db.Date
+  paidById    String?
+
+  @@index([studioId, memberId])
+  @@map("studio_staff_incentives")
+}
+
+/// A device given to an employee (laptop, phone, SIM…) and when it came back (owner, 21 Nov 2026).
+model StudioStaffDevice {
+  id         String    @id @default(cuid())
+  studioId   String
+  memberId   String
+  kind       String
+  model      String
+  serial     String?
+  givenOn    DateTime  @db.Date
+  returnedOn DateTime? @db.Date
+  note       String?
+  byId       String
+  createdAt  DateTime  @default(now())
+
+  @@index([studioId, memberId])
+  @@map("studio_staff_devices")
+}
