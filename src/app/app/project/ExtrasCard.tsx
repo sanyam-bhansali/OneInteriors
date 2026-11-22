@@ -168,7 +168,7 @@ function ExtraItem({ e, onChanged }: { e: Extra; onChanged: () => void }) {
         </a>
       ) : null}
       {e.state === 'declined' && e.declineReason ? <span className="oa-row-sub">“{e.declineReason}”</span> : null}
-      {e.state === 'approved' ? <span className="oa-row-sub">{lw(lang, 'life.extra.howToPay')}</span> : null}
+      {e.state === 'approved' ? <span className="oa-row-sub">{e.inStages ? lw(lang, 'life.extra.inStages') : lw(lang, 'life.extra.howToPay')}</span> : null}
       {e.canAnswer ? (
         declining ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

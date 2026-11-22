@@ -2025,6 +2025,10 @@ model HomeChangeOrder {
   /// 1, 2, 3… per project: "Extra work 3".
   number          Int
   title           String
+  /// EXTRA (extra work) or ELECTRICAL (the electrical bill, owner 22 Nov 2026:
+  /// priced from the electrical rate list; once the client approves, its total
+  /// is spread over the unpaid payment stages and joins the project value).
+  kind            String            @default("EXTRA")
   /// Why it is needed, in the studio's words to the client. Crosses to the client.
   reason          String?           @db.Text
   status          ChangeOrderStatus @default(DRAFT)
@@ -2119,6 +2123,9 @@ model HomeChangeOrderLine {
   ratePaise     BigInt          @default(0)
   amountPaise   BigInt
   sortOrder     Int             @default(0)
+  /// The designer's note on the line, and the unit word ("point", "metre") on an electrical line.
+  note          String?
+  unitLabel     String?
 
   @@index([changeOrderId])
   @@map("home_change_order_lines")
@@ -6956,4 +6963,25 @@ model StudioPettyExpense {
   @@index([homeProjectId])
   @@index([memberId])
   @@map("studio_petty_expenses")
+}
+
+/// The electrical rate list (owner, 22 Nov 2026): items the designer picks for
+/// a project's electrical bill, with the unit, description and rate set by the
+/// owner or the design head. The rate is copied onto the bill's line when used.
+model StudioElectricalItem {
+  id        String   @id @default(cuid())
+  studioId  String
+  name      String
+  /// The unit word: point, metre, nos, set.
+  unit      String
+  details   String?
+  ratePaise BigInt
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, name])
+  @@index([studioId, isActive])
+  @@map("studio_electrical_items")
 }

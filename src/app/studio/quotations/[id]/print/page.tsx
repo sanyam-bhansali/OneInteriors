@@ -11,6 +11,8 @@ import '../../doc/quote-doc.css';
 /* Change orders (15 Oct 2026): the approved extra work after sign-off, as its own section. */
 import { extrasOnQuote } from '@/modules/project/change-orders';
 import { ExtrasAfterSignOff } from '../../../projects/[id]/ExtrasAfterSignOff';
+import { approvedElectrical, projectOfQuote } from '@/modules/project/electrical-bill';
+import { ElectricalBillDoc } from '../../doc/ElectricalBillDoc';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -55,7 +57,10 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const quote = await getQuote(id);
   if (!quote) notFound();
 
-  const [ctx, extras] = await Promise.all([quoteDocContext(quote), extrasOnQuote(quote.id).catch(() => [])]);
+  const [ctx, extras, projectId] = await Promise.all([quoteDocContext(quote), extrasOnQuote(quote.id).catch(() => []), projectOfQuote(quote.id).catch(() => null)]);
+  /* The approved electrical bill joins the quotation in one PDF (owner, 22 Nov 2026). */
+  const electrical = projectId ? await approvedElectrical(projectId).catch(() => []) : [];
+  const totals = totalsFor(quote);
   const studioName = ctx.studio?.tradeName || ctx.branding?.legalName || '';
 
   return (
@@ -67,7 +72,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         head={docHead(quote, ctx.branding?.city ?? null)}
         lines={quote.lines}
         roomOrder={roomsOfLines(quote.lines)}
-        totals={totalsFor(quote)}
+        totals={totals}
         feeBps={quote.feeBps}
         discountBps={quote.discountBps}
         gstBps={quote.gstBps}
@@ -82,6 +87,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         validDays={ctx.validDays}
         extra={
           <>
+            <ElectricalBillDoc bills={electrical} quotationPaise={totals.totalPaise} />
             <ExtrasAfterSignOff extras={extras} />
             {/* Their flat, from their floor plan, when their brief came with one. */}
             {quote.planRooms.length > 0 ? (

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { myProducts } from '@/modules/studio-quote/store';
 import { ProductTable } from './ProductTable';
@@ -107,6 +108,12 @@ export default async function ProductsPage() {
 
   return (
     <main className="content ppage">
+      {/* The electrical bill's own rate list (owner, 22 Nov 2026). */}
+      <p className="m-0 sm" style={{ textAlign: 'right' }}>
+        <Link href="/studio/products/electrical" className="underline">
+          Electrical rate list →
+        </Link>
+      </p>
       {products.length === 0 ? (
         <>
           <div className="phead">

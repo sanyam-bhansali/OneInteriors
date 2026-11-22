@@ -366,6 +366,8 @@ export interface CustomerExtra {
   impact: ScopeImpactView | null;
   /** The amounts are what the client pays, GST included (simple scope: no GST line, no discount). */
   inclGst: boolean;
+  /** Approved, it is spread over the payment stages (the electrical bill): nothing is due on it by itself. */
+  inStages: boolean;
 }
 
 export interface ExtraRowForCustomer {
@@ -391,6 +393,8 @@ export interface ExtraRowForCustomer {
   impact?: ScopeImpactView | null;
   /** Simple scope: the amounts include GST. */
   inclGst?: boolean;
+  /** The electrical bill (owner, 22 Nov 2026): once approved it is in the payment stages, not paid on its own. */
+  inStages?: boolean;
 }
 
 /** One order as the client sees it, field by field (never the studio's ids, who made it or the rate). */
@@ -411,7 +415,7 @@ export function toCustomerExtra(r: ExtraRowForCustomer, owner: boolean, photoUrl
     gstPaise: r.gstPaise,
     totalPaise: r.totalPaise,
     paidPaise: paid.recordedPaise,
-    duePaise: state === 'approved' ? paid.openPaise : 0,
+    duePaise: state === 'approved' && !r.inStages ? paid.openPaise : 0,
     sentOn: r.sentAt ? r.sentAt.slice(0, 10) : null,
     decidedOn: r.decidedAt ? r.decidedAt.slice(0, 10) : null,
     declineReason: state === 'declined' ? r.declineReason : null,
@@ -421,6 +425,7 @@ export function toCustomerExtra(r: ExtraRowForCustomer, owner: boolean, photoUrl
     dueOn: r.impact && r.impact.kind !== 'MOVES_PROJECT' ? null : (r.dueOn ?? null),
     impact: r.impact ?? null,
     inclGst: r.inclGst === true,
+    inStages: r.inStages === true,
   };
 }
 

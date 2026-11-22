@@ -63,6 +63,7 @@ import { recordEvent, type ProjectActor } from './events';
 import { staffOn } from './flow-access';
 import { isBackfilled, rowStatuses } from './payment-ledger';
 import { lockProject, recordPayment, type RecordInput } from './payments-flow';
+import { ELECTRICAL, spreadOverUnpaid } from './electrical-rules';
 import { dayFromDb, dayToDb, istDay } from './working-days';
 import { holdDays } from '@/modules/studio-hold/rules';
 import { shiftPlanForClient } from '@/modules/studio-hold/store';
@@ -634,6 +635,7 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
       createdById: true,
       scopeQuoteId: true,
       scopeImpact: true,
+      kind: true,
       project: { select: { paymentPhases: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } } } },
     },
   });
@@ -661,7 +663,17 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
     const due = approve && o.scopeImpact !== null ? { dueOn: dayToDb(istDay(now)) } : {};
     const ok = await moveOrder(tx, o, to, actor, now, { decidedAt: now, decidedById: userId, declineReason: reason, ...due }, reason);
     if (!ok) return false;
-    if (approve && stages) {
+    if (approve && stages && o.kind === ELECTRICAL) {
+      // The electrical bill (owner, 22 Nov 2026): spread over the stages not yet paid, by their percentages; it joins the project value.
+      const paid = await tx.homeProjectPayment.groupBy({ by: ['stageIndex'], where: { projectId: o.projectId, amountPaise: { gt: 0 } }, _count: true });
+      for (const part of spreadOverUnpaid(totalPaise, stages, new Set(paid.map((r) => r.stageIndex)))) {
+        const change = await tx.homeQuoteChange.create({
+          data: { projectId: o.projectId, changeOrderId: o.id, label: extraChangeLabel(o.number, o.title), deltaPaise: toDb(part.deltaPaise), stageIndex: part.stageIndex, byId: userId, at: now },
+          select: { id: true },
+        });
+        await recordEvent(tx, { projectId: o.projectId, type: 'quote.changed', actor, refId: change.id, at: now, payload: { changeOrderId: o.id, deltaPaise: part.deltaPaise, stageIndex: part.stageIndex } });
+      }
+    } else if (approve && stages) {
       const change = await tx.homeQuoteChange.create({
         data: { projectId: o.projectId, changeOrderId: o.id, label: extraChangeLabel(o.number, o.title), deltaPaise: toDb(totalPaise), stageIndex: stages.length - 1, byId: userId, at: now },
         select: { id: true },
@@ -685,6 +697,7 @@ export async function answerExtra(userId: string, id: string, answer: { approve:
   const event = { kind: 'extra-answered', projectId: o.projectId, title: `Extra work ${o.number}: ${o.title}`, approved: approve, totalPaise } as const;
   void notifyStudio(o.project.introduction.studioId, event);
   void notify(o.createdById, event, { email: false });
+  if (o.kind === ELECTRICAL) return { ok: true, id: o.id, message: approve ? 'Approved. It is added to your payment stages.' : 'Declined. The studio has your reason.' };
   return { ok: true, id: o.id, message: approve ? (scope ? 'Approved. The payment is due now; the project restarts once it is paid.' : 'Approved. Pay the studio for it; they start once it is paid.') : 'Declined. The studio has your reason.' };
 }
 
@@ -810,7 +823,7 @@ export async function extrasForStudio(projectId: string): Promise<StudioExtras |
   if (!staff.ok) return null;
   const [project, orders, rows] = await Promise.all([
     prisma.homeProject.findUnique({ where: { id: projectId }, select: { phase: true, closedOutAt: true, paymentPhases: true, designFinalQuoteId: true, signedQuoteId: true } }),
-    prisma.homeChangeOrder.findMany({ where: { projectId }, orderBy: { number: 'desc' }, take: 100, select: ORDER_SELECT }),
+    prisma.homeChangeOrder.findMany({ where: { projectId, kind: { not: ELECTRICAL } }, orderBy: { number: 'desc' }, take: 100, select: ORDER_SELECT }),
     prisma.homeProjectPayment.findMany({ where: { projectId }, select: PAY_SELECT }),
   ]);
   if (!project) return null;
@@ -856,7 +869,7 @@ export async function extraCounts(projectIds: readonly string[]): Promise<Map<st
   if (!projectIds.length) return out;
   const rows = await prisma.homeChangeOrder.groupBy({
     by: ['projectId', 'status'],
-    where: { projectId: { in: [...projectIds] }, status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'PAID'] } },
+    where: { projectId: { in: [...projectIds] }, status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'PAID'] }, kind: { not: ELECTRICAL } },
     _count: { _all: true },
   });
   for (const r of rows) {
@@ -892,7 +905,8 @@ export async function extrasToCollect(projectIds: readonly string[]): Promise<Ma
   const out = new Map<string, ExtraToCollect[]>();
   if (!projectIds.length) return out;
   const orders = await prisma.homeChangeOrder.findMany({
-    where: { projectId: { in: [...projectIds] }, status: { in: ['APPROVED', 'PAID'] } },
+    // The electrical bill lands in the stages themselves (owner, 22 Nov 2026): never collected on its own.
+    where: { projectId: { in: [...projectIds] }, status: { in: ['APPROVED', 'PAID'] }, kind: { not: ELECTRICAL } },
     orderBy: { number: 'asc' },
     select: { id: true, projectId: true, number: true, title: true, status: true, totalPaise: true, dueOn: true, scopeQuoteId: true, scopeImpact: true },
   });
@@ -920,7 +934,7 @@ export async function extrasOnQuote(quoteId: string): Promise<{ number: number; 
   const studioId = await quotingStudioId();
   if (!studioId) return [];
   const rows = await prisma.homeChangeOrder.findMany({
-    where: { quoteId, status: { in: [...APPROVED_SET] }, project: { introduction: { studioId } } },
+    where: { quoteId, status: { in: [...APPROVED_SET] }, kind: { not: ELECTRICAL }, project: { introduction: { studioId } } },
     orderBy: { number: 'asc' },
     select: { number: true, title: true, status: true, workPaise: true, discountPaise: true, gstPaise: true, totalPaise: true, decidedAt: true },
   });

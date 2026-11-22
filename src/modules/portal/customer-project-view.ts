@@ -340,6 +340,7 @@ export const CUSTOMER_PROJECT_SELECT = {
       id: true,
       number: true,
       title: true,
+      kind: true,
       reason: true,
       status: true,
       workPaise: true,
@@ -466,6 +467,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
           /* The 12 Nov builder-made scope has a due day and no impact stored: it moved the plan by its days. */
           impact: scopeImpactOf({ scopeImpact: c.scopeImpact, daysRequired: c.daysRequired, itemDueOn: c.itemDueOn ? dayFromDb(c.itemDueOn) : null, builderScope: c.dueOn !== null }),
           inclGst: c.scopeImpact !== null,
+          inStages: c.kind === 'ELECTRICAL',
           lines: c.lines.map((l) => ({ ...l, amountPaise: fromDb(l.amountPaise) })),
           payments: (p.payments ?? [])
             .filter((r) => r.changeOrderId === c.id)
