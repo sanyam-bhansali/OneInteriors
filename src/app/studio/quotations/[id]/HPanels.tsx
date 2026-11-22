@@ -142,7 +142,14 @@ export function AddLine({
           setSize(defaults(active.find((p) => p.id === id) ?? null));
         }}
       />
-      {product ? <p className="hhelp">{productLine(product)}</p> : null}
+      {/* The whole name (owner, 22 Nov 2026: "so the name doesn't get cut"): the box above is narrower than most names. */}
+      {product ? (
+        <p className="hhelp">
+          <b style={{ color: 'var(--ink)', overflowWrap: 'anywhere' }}>{product.name}</b>
+          <br />
+          {productLine(product)}
+        </p>
+      ) : null}
       {product?.unit === 'AREA' ? (
         <div className="hgrid2">
           <label className="hlab">

@@ -39,8 +39,6 @@ export function StatusBar({
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [templating, setTemplating] = useState(false);
-  const [newClient, setNewClient] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   /* The copy and delete actions redirect on success; they only come back to
@@ -111,33 +109,10 @@ export function StatusBar({
         </button>
       ) : null}
 
-      {templating ? (
-        <span className="hstack" style={{ gap: 6 }}>
-          <input
-            value={newClient}
-            onChange={(e) => setNewClient(e.target.value)}
-            placeholder="New client's name"
-            aria-label="New client's name"
-            autoFocus
-            className="fld" style={{ width: '12rem', minHeight: 34 }}
-          />
-          <button
-            type="button"
-            disabled={pending || newClient.trim().length < 2}
-            onClick={() => run(() => copyQuoteAction(quoteId, 'template', newClient))}
-            className="btn sec sm"
-          >
-            Copy
-          </button>
-          <button type="button" onClick={() => setTemplating(false)} className="btn ghost sm">
-            Cancel
-          </button>
-        </span>
-      ) : (
-        <button type="button" disabled={pending} onClick={() => setTemplating(true)} className="btn sec sm">
-          Use as template
-        </button>
-      )}
+      {/* Owner, 22 Nov 2026: the same as on the list — New quotation with this one picked; type the name, pick the lead. */}
+      <Link href={`/studio/quotations?new=1&from=${encodeURIComponent(quoteId)}#new`} className="btn sec sm" title="A new quotation with this one's rooms, items, rates and terms, for another client">
+        Use as template
+      </Link>
 
       {deletable ? (
         <button

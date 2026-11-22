@@ -5,7 +5,9 @@ import { guideContext } from '@/modules/studio/guide-store';
 import { formatINR } from '@/lib/money';
 import { mayQuote, myQuotes, STAGE_LABELS, STATUS_LABELS, type QuoteStatusName, type QuoteSummary } from '@/modules/studio-quote/quotes';
 import { myProducts } from '@/modules/studio-quote/store';
+import { previousQuoteToCopy } from '@/modules/studio-quote/from-previous';
 import { StartQuote } from './NewQuote';
+import { OlderQuotes } from './OlderQuotes';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 import { LineIcon } from '../ui/icons';
@@ -47,8 +49,11 @@ const TABS: { key: 'ALL' | QuoteStatusName; name: string }[] = [
  * together, newest first. The status tabs and the search are links (GET), so a
  * filtered list is a link a studio can keep.
  */
-export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; new?: string }> }) {
+export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; new?: string; from?: string }> }) {
   const sp = await searchParams;
+  /* "Use as template" (owner, 22 Nov 2026): the quotation to copy, read as the picker would (only one this person may copy). */
+  const fromId = String(sp.from ?? '').trim().slice(0, 64);
+  const template = fromId ? await previousQuoteToCopy(fromId) : null;
   const search = String(sp.q ?? '').trim().slice(0, 80);
   const status = TABS.some((t) => t.key === sp.status) ? (sp.status as 'ALL' | QuoteStatusName) : 'ALL';
   const [quotes, products, gate, quoting] = await Promise.all([myQuotes(search), myProducts(), myRatesGate(), mayQuote()]);
@@ -97,7 +102,8 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   };
   const empty = quotes.length === 0 && !search;
 
-  const building = sp.new === '1' || empty;
+  const building = sp.new === '1' || empty || template !== null;
+  const templateRow = template?.ok ? quotes.find((q) => q.id === template.id) : undefined;
 
   return (
     <main className="content qpage hhome">
@@ -119,7 +125,23 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
 
       {building ? (
         <div id="new" style={{ scrollMarginTop: 80 }}>
-          <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
+          {template && !template.ok ? (
+            <p role="alert" className="qerr" style={{ marginBottom: 8 }}>
+              {template.error}
+            </p>
+          ) : null}
+          <StartQuote
+            key={template?.ok ? template.id : 'new'}
+            priced={priced}
+            standard={standard}
+            total={products.length}
+            leadRequired={leadRequired}
+            initialFrom={
+              template?.ok
+                ? { quote: template, label: templateRow ? [templateRow.clientName, templateRow.society, templateRow.config].filter(Boolean).join(' · ') : '' }
+                : undefined
+            }
+          />
         </div>
       ) : null}
 
@@ -189,16 +211,15 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                     </th>
                   </tr>
                 </thead>
-                {/* One group per client, newest first; their versions inside. */}
-                {folders.map((folder) => (
-                  <tbody key={folder.key}>
-                    {folder.quotes.map((q, i) => {
+                {/* One group per client: their newest quotation, the older ones folded away (owner, 22 Nov 2026). */}
+                {folders.map((folder) => {
+                  const rows = folder.quotes.map((q, i) => {
                       const href = `/studio/quotations/${q.id}`;
                       return (
                         <tr key={q.id}>
                           <td>
                             <Link href={href} style={{ fontWeight: 600 }}>
-                              {i === 0 ? q.clientName : `↳ another for ${q.clientName.split(/\s+/)[0]}`}
+                              {i === 0 ? q.clientName : `↳ ${q.clientName}`}
                             </Link>
                             <div className="hstack muted sm" style={{ gap: 6, marginTop: 2 }}>
                               <span className="mono">{q.number}</span>
@@ -213,15 +234,30 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                           <td className="r mono">{q.totalPaise > 0 ? formatINR(q.totalPaise) : '—'}</td>
                           <td className="mono">{isoDate(q.updatedAt)}</td>
                           <td className="r">
-                            <Link href={href} className="hmini">
-                              {q.status === 'DRAFT' ? 'Continue →' : 'Revise →'}
-                            </Link>
+                            <span className="hstack" style={{ gap: 10, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                              {/* Owner, 22 Nov 2026: copy this one for a new client — type the name, pick the lead. */}
+                              <Link href={templateHref(q.id)} className="hmini" title="A new quotation with this one's rooms, items, rates and terms, for another client">
+                                Use as template
+                              </Link>
+                              <Link href={href} className="hmini">
+                                {q.status === 'DRAFT' ? 'Continue →' : 'Revise →'}
+                              </Link>
+                            </span>
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                ))}
+                    });
+                  return (
+                    <tbody key={folder.key}>
+                      {rows[0]}
+                      {rows.length > 1 ? (
+                        <OlderQuotes count={rows.length - 1} name={folder.name}>
+                          {rows.slice(1)}
+                        </OlderQuotes>
+                      ) : null}
+                    </tbody>
+                  );
+                })}
               </table>
             </div>
           )}
@@ -230,6 +266,9 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
     </main>
   );
 }
+
+/** "Use as template": the New quotation form, opened with this quotation already picked to copy. */
+const templateHref = (quoteId: string) => `/studio/quotations?new=1&from=${encodeURIComponent(quoteId)}#new`;
 
 const isoDate = (d: Date) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
