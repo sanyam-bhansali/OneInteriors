@@ -872,7 +872,7 @@ function ClosureDueBox({ due, customer, projectId }: { due: ClosureDue | null; c
   if (!due) {
     return <p className={`m-0 rounded-[10px] bg-[var(--soft)] p-3 ${muted}`}>Collect the handover payment and any late extras before you hand over the keys.</p>;
   }
-  const clear = due.openPaise === 0 && due.waitingPaise === 0;
+  const clear = due.openPaise === 0;
   return (
     <div className={`flex flex-col gap-2 rounded-[10px] p-3 text-[14px] ${clear ? 'bg-[var(--soft)]' : 'bg-[var(--warn-bg)]'}`} role="status" data-testid="closure-due">
       <p className="m-0 font-semibold">{clear ? `${customer} has paid everything due.` : `Still due from ${customer}: ${formatINR(due.openPaise)}`}</p>
@@ -884,10 +884,7 @@ function ClosureDueBox({ due, customer, projectId }: { due: ClosureDue | null; c
                 {s.label}
                 {s.last ? ' (handover payment)' : ''}
               </span>
-              <span className="mono">
-                {formatINR(s.openPaise)}
-                {s.waitingPaise > 0 ? <span className={muted}> · {formatINR(s.waitingPaise)} waiting for {customer} to confirm</span> : null}
-              </span>
+              <span className="mono">{formatINR(s.openPaise)}</span>
             </li>
           ))}
         </ul>

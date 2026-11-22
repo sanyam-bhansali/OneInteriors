@@ -7,9 +7,9 @@
  *
  * Every total is the payment ledger's (payment-ledger.ts `ledger`), the same
  * figures as the Payments tab: Total = `totalPaise`, Paid = `paidPaise`
- * (confirmed, or recorded before confirmations), Remaining = `balancePaise`
- * (total less paid; money waiting for the client's yes is still in it, and
- * is shown on its own line). The sections only break the total down:
+ * (what the team recorded; clients no longer confirm, owner 22 Nov 2026),
+ * Remaining = `balancePaise` (total less paid). The sections only break the
+ * total down:
  *
  * - **Quotation**: the stages as signed, with what is paid on each.
  * - **Electrical**: approved extra work whose title reads as electrical
@@ -24,7 +24,7 @@
  *   total, as it is not in the ledger.
  */
 
-import type { Ledger, RowStatus } from './payment-ledger';
+import { countsAsPaid, type Ledger, type RowStatus } from './payment-ledger';
 
 export const ELECTRICAL_WORDS = /electric|wiring|\bpoints?\b|switch|socket|\bmcb\b|db box/i;
 
@@ -66,9 +66,8 @@ export interface StatementOrder {
   lines: { room: string | null; product: string; amountPaise: number }[];
   /** In the ledger (the price that landed on the last stage), else the order's own total. */
   amountPaise: number;
-  /** Confirmed, or recorded before confirmations: counts as paid. */
+  /** What the team recorded against it. */
   paidPaise: number;
-  waitingPaise: number;
   /** Amount less paid. */
   remainingPaise: number;
   paidLabel: string;
@@ -85,16 +84,13 @@ export interface Statement {
   /** Sent to the client, not approved: not in the total. */
   pending: StatementOrder[];
   otherChanges: { label: string; deltaPaise: number }[];
-  totals: { totalPaise: number; paidPaise: number; waitingPaise: number; remainingPaise: number };
+  totals: { totalPaise: number; paidPaise: number; remainingPaise: number };
 }
 
-const counts = (s: RowStatus) => s === 'confirmed' || s === 'earlier';
-
-function paidLabel(amount: number, paid: number, waiting: number): string {
+function paidLabel(amount: number, paid: number): string {
   if (amount <= 0) return '—';
   if (paid >= amount) return 'Paid';
-  if (paid + waiting >= amount) return 'Recorded · waiting for the client to confirm';
-  if (paid + waiting > 0) return 'Part paid';
+  if (paid > 0) return 'Part paid';
   return 'Not paid';
 }
 
@@ -111,8 +107,7 @@ export function buildStatement(input: {
     const landed = input.changes.filter((c) => c.changeOrderId === o.id).reduce((n, c) => n + c.deltaPaise, 0);
     const amountPaise = inLedger && input.changes.some((c) => c.changeOrderId === o.id) ? landed : o.totalPaise;
     const mine = input.payments.filter((p) => p.changeOrderId === o.id);
-    const paidPaise = mine.filter((p) => counts(p.status)).reduce((n, p) => n + p.amountPaise, 0);
-    const waitingPaise = mine.filter((p) => p.status === 'waiting').reduce((n, p) => n + p.amountPaise, 0);
+    const paidPaise = mine.filter((p) => countsAsPaid(p.status)).reduce((n, p) => n + p.amountPaise, 0);
     return {
       id: o.id,
       number: o.number,
@@ -120,9 +115,8 @@ export function buildStatement(input: {
       lines: o.lines,
       amountPaise,
       paidPaise,
-      waitingPaise,
       remainingPaise: Math.max(0, amountPaise - paidPaise),
-      paidLabel: inLedger ? paidLabel(amountPaise, paidPaise, waitingPaise) : 'Waiting for the client to approve',
+      paidLabel: inLedger ? paidLabel(amountPaise, paidPaise) : 'Waiting for the client to approve',
     };
   };
   const inTotal = input.orders.filter((o) => (IN_TOTAL_STATUSES as readonly string[]).includes(o.status)).map((o) => order(o, true));
@@ -137,7 +131,7 @@ export function buildStatement(input: {
     additional: inTotal.filter((o) => !isElectrical(o.title)),
     pending: input.orders.filter((o) => (PENDING_STATUSES as readonly string[]).includes(o.status)).map((o) => order(o, false)),
     otherChanges: input.changes.filter((c) => !c.changeOrderId && c.deltaPaise !== 0).map((c) => ({ label: c.label, deltaPaise: c.deltaPaise })),
-    totals: { totalPaise: l.totalPaise, paidPaise: l.paidPaise, waitingPaise: l.waitingPaise, remainingPaise: l.balancePaise },
+    totals: { totalPaise: l.totalPaise, paidPaise: l.paidPaise, remainingPaise: l.balancePaise },
   };
 }
 
@@ -156,14 +150,13 @@ export interface MoneyDueRow {
   customer: string;
   totalPaise: number;
   paidPaise: number;
-  waitingPaise: number;
   remainingPaise: number;
   /** The first stage with money still open: what to ask for next. */
   nextStage: string | null;
 }
 
 /** Who owes how much: every project with a signed payment plan, the most owed first. Totals are the sums of the rows. */
-export function moneyDue(projects: readonly MoneyDueInput[]): { rows: MoneyDueRow[]; totals: { totalPaise: number; paidPaise: number; waitingPaise: number; remainingPaise: number } } {
+export function moneyDue(projects: readonly MoneyDueInput[]): { rows: MoneyDueRow[]; totals: { totalPaise: number; paidPaise: number; remainingPaise: number } } {
   const rows: MoneyDueRow[] = projects
     .filter((p): p is MoneyDueInput & { ledger: Ledger } => p.ledger !== null)
     .map((p) => ({
@@ -172,11 +165,10 @@ export function moneyDue(projects: readonly MoneyDueInput[]): { rows: MoneyDueRo
       customer: p.customer,
       totalPaise: p.ledger.totalPaise,
       paidPaise: p.ledger.paidPaise,
-      waitingPaise: p.ledger.waitingPaise,
       remainingPaise: p.ledger.balancePaise,
       nextStage: p.ledger.stages.find((s) => s.openPaise > 0)?.label ?? null,
     }))
     .sort((a, b) => b.remainingPaise - a.remainingPaise || a.label.localeCompare(b.label));
-  const sum = (k: 'totalPaise' | 'paidPaise' | 'waitingPaise' | 'remainingPaise') => rows.reduce((n, r) => n + r[k], 0);
-  return { rows, totals: { totalPaise: sum('totalPaise'), paidPaise: sum('paidPaise'), waitingPaise: sum('waitingPaise'), remainingPaise: sum('remainingPaise') } };
+  const sum = (k: 'totalPaise' | 'paidPaise' | 'remainingPaise') => rows.reduce((n, r) => n + r[k], 0);
+  return { rows, totals: { totalPaise: sum('totalPaise'), paidPaise: sum('paidPaise'), remainingPaise: sum('remainingPaise') } };
 }

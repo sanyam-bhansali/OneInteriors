@@ -43,8 +43,6 @@ export interface CustomerLifecycleStep {
 export type BlockerKind =
   /** Pay a payment stage: `label` is the stage, `amountPaise` what is open on it. */
   | 'pay'
-  /** Confirm a payment the studio recorded (`count` entries). */
-  | 'confirm_payment'
   /** Answer a drawing or 3D render (`label` the first one's title, `count` how many wait). */
   | 'answer_drawing'
   /** The design's next step is the customer's own (`label` its name). */
@@ -123,7 +121,7 @@ const PHASE_OUT: Record<Phase, CustomerPhase> = {
   CLOSED: 'closed',
 };
 
-const openOn = (s: { amountPaise: number; changesPaise: number; paidPaise: number; waitingPaise: number }) => Math.max(0, s.amountPaise + s.changesPaise - s.paidPaise - s.waitingPaise);
+const openOn = (s: { amountPaise: number; changesPaise: number; paidPaise: number }) => Math.max(0, s.amountPaise + s.changesPaise - s.paidPaise);
 
 /** The payment the customer must make now, if any: the one the design waits on, one past its due day, or the final payment after the closure. */
 function paymentBlocker(i: LifecycleInput): CustomerBlocker | null {
@@ -211,11 +209,9 @@ export function customerLifecycle(input: LifecycleInput): CustomerLifecycle {
   else if (extraDue > 0) blocker = { kind: 'pay_extra', label: null, amountPaise: extraDue, count: null };
   else if (toSign) blocker = { kind: toSign.kind === 'SALES_FINAL' ? 'sign_sales_final' : 'sign_design_final', label: null, amountPaise: null, count: null };
   else {
-    const waitingEntries = (i.payments?.entries ?? []).filter((e) => e.status === 'waiting').length;
     const drawings = (i.design?.drawings ?? []).filter((d) => d.state === 'waiting');
     const decision = i.decisions.find((d) => d.state !== 'chosen') ?? null;
-    if (waitingEntries > 0) blocker = { kind: 'confirm_payment', label: null, amountPaise: null, count: waitingEntries };
-    else if (i.phase === 'DESIGN' && drawings.length > 0) blocker = { kind: 'answer_drawing', label: drawings[0]!.title, amountPaise: null, count: drawings.length };
+    if (i.phase === 'DESIGN' && drawings.length > 0) blocker = { kind: 'answer_drawing', label: drawings[0]!.title, amountPaise: null, count: drawings.length };
     else if (i.phase === 'DESIGN' && i.design?.yourStep) blocker = { kind: 'your_step', label: i.design.yourStep, amountPaise: null, count: null };
     else if (decision && ['DESIGN', 'EXECUTION'].includes(i.phase)) blocker = { kind: 'decide', label: decision.title, amountPaise: null, count: null };
   }

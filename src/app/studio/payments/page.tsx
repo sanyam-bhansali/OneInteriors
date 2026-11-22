@@ -26,8 +26,9 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Where an accounts member lands (studio workspace Phase 5): every project's
- * money, computed from the payment rows — what is paid, what is waiting for
- * the customer's confirmation, what is owed — with "Mark a payment received"
+ * money, computed from the payment rows — what is paid (what the team
+ * recorded; clients no longer confirm, owner 22 Nov 2026), what is owed —
+ * with "Mark a payment received"
  * on each, the same control as the project's Payments tab, so there is one
  * way to record money. Nothing else of the project is read for this screen
  * (studio/roles.ts: accounts sees payments across all projects, nothing
@@ -46,12 +47,10 @@ export default async function PaymentsDeskPage() {
     const rows = p.payments?.rows ?? [];
     if (finals.has(p.id) && (p.payments?.ledger.balancePaise ?? 0) > 0) return -1;
     if (rows.some((r) => r.status === 'disputed')) return 0;
-    if (rows.some((r) => r.status === 'waiting')) return 1;
     return (p.payments?.ledger.balancePaise ?? 0) > 0 ? 2 : 3;
   };
   const sorted = [...projects].sort((a, b) => weight(a) - weight(b));
   const owed = projects.reduce((n, p) => n + Math.max(0, p.payments?.ledger.balancePaise ?? 0), 0);
-  const waiting = projects.reduce((n, p) => n + (p.payments?.ledger.waitingPaise ?? 0), 0);
   const disputed = projects.filter((p) => weight(p) === 0).length;
   /* Received this month (IST): what was recorded and not refused. */
   const month = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 7);
@@ -67,7 +66,7 @@ export default async function PaymentsDeskPage() {
         <div>
           <h1>Payments</h1>
           <p className="muted" style={{ maxWidth: '72ch' }}>
-            Every project&rsquo;s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker.
+            Every project&rsquo;s payment stages. Record money the day it arrives, with the receipt. It counts as paid at once, and the receipt files in the client&rsquo;s locker.
           </p>
         </div>
         <div className="hstack">
@@ -97,7 +96,6 @@ export default async function PaymentsDeskPage() {
         label="Money at a glance"
         items={moneyKpis({
           owedPaise: owed,
-          waitingPaise: waiting,
           disputed,
           projects: projects.length,
           receivedThisMonthPaise: received,

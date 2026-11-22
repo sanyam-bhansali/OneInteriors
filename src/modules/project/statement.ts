@@ -21,7 +21,7 @@ import { siteLabel } from '@/modules/studio/team-rules';
 import { dueAtClosure, type ClosureDue, type DueExtra } from './closure-due';
 import { issuerFor, type DocIssuer } from './invoice';
 import { staffOn } from './flow-access';
-import { rowStatuses } from './payment-ledger';
+import { countsAsPaid, rowStatuses } from './payment-ledger';
 import { ledgerOf, toLedgerRow } from './payments-flow';
 import { buildStatement, moneyDue, IN_TOTAL_STATUSES, PENDING_STATUSES, type MoneyDueRow, type Statement } from './statement-rules';
 
@@ -111,7 +111,7 @@ export async function projectStatement(projectId: string, now = new Date()): Pro
       lines: o.lines.map((x) => ({ room: x.room, product: x.product, amountPaise: fromDb(x.amountPaise) })),
     })),
     changes: p.quoteChanges.map((c) => ({ label: c.label, deltaPaise: fromDb(c.deltaPaise), changeOrderId: c.changeOrderId })),
-    payments: p.payments.map((r) => ({ changeOrderId: r.changeOrderId, amountPaise: fromDb(r.amountPaise), status: statuses.get(r.id) ?? 'waiting' })),
+    payments: p.payments.map((r) => ({ changeOrderId: r.changeOrderId, amountPaise: fromDb(r.amountPaise), status: statuses.get(r.id) ?? 'recorded' })),
   });
   return {
     projectId,
@@ -141,10 +141,7 @@ export async function closureDueFor(projectId: string): Promise<ClosureDue | nul
     .map((o) => {
       const recorded = p.payments
         .filter((r) => r.changeOrderId === o.id)
-        .filter((r) => {
-          const s = statuses.get(r.id);
-          return s === 'confirmed' || s === 'earlier' || s === 'waiting';
-        })
+        .filter((r) => countsAsPaid(statuses.get(r.id) ?? 'recorded'))
         .reduce((n, r) => n + fromDb(r.amountPaise), 0);
       return { number: `CO-${o.number}`, title: o.title, openPaise: Math.max(0, fromDb(o.totalPaise) - recorded) };
     });
@@ -157,7 +154,7 @@ export const seesMoneyDue = (m: { role: string; designHead?: boolean; status?: s
 
 export interface MoneyDueView {
   rows: MoneyDueRow[];
-  totals: { totalPaise: number; paidPaise: number; waitingPaise: number; remainingPaise: number };
+  totals: { totalPaise: number; paidPaise: number; remainingPaise: number };
   canOpen: boolean;
 }
 

@@ -13,8 +13,6 @@ export interface DueStage {
   label: string;
   /** Owed and not yet recorded (payment-ledger.ts `openPaise`). */
   openPaise: number;
-  /** Recorded, waiting for the client's yes. */
-  waitingPaise: number;
   /** The last stage: the handover payment. */
   last: boolean;
 }
@@ -31,26 +29,23 @@ export interface ClosureDue {
   extras: DueExtra[];
   /** Every stage's open money: what the team still asks for. */
   openPaise: number;
-  /** Recorded money still waiting for the client's confirmation. */
-  waitingPaise: number;
 }
 
 /**
- * What is still due at the closure: each payment stage with money open or
- * waiting (the last one marked as the handover payment), and approved extra
+ * What is still due at the closure: each payment stage with money open (the
+ * last one marked as the handover payment), and approved extra
  * work not yet paid. Null when nothing was signed in the app (no stages).
  */
 export function dueAtClosure(l: Ledger | null, extras: readonly DueExtra[] = []): ClosureDue | null {
   if (!l) return null;
   const lastIndex = l.stages.length - 1;
   const stages = l.stages
-    .filter((s) => s.openPaise > 0 || s.waitingPaise > 0)
-    .map((s) => ({ label: s.label, openPaise: s.openPaise, waitingPaise: s.waitingPaise, last: s.index === lastIndex }));
+    .filter((s) => s.openPaise > 0)
+    .map((s) => ({ label: s.label, openPaise: s.openPaise, last: s.index === lastIndex }));
   return {
     stages,
     extras: extras.filter((e) => e.openPaise > 0),
     openPaise: l.stages.reduce((n, s) => n + s.openPaise, 0),
-    waitingPaise: l.stages.reduce((n, s) => n + s.waitingPaise, 0),
   };
 }
 

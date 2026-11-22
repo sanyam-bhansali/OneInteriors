@@ -2,8 +2,10 @@ import { fail, gate, json, signedIn } from '@/modules/app-api/http';
 import { confirmPayment } from '@/modules/project/payments-flow';
 
 /**
- * POST /api/app/v1/payments/:id/confirm — the customer (owner of the brief)
- * says yes, this money arrived at the studio. One tap; once.
+ * POST /api/app/v1/payments/:id/confirm — kept for phone builds from before
+ * 22 Nov 2026 that still show "Yes, I paid". The payment already counts as
+ * paid (owner: "it is marked by our team"); this only stamps it. Nothing in
+ * the app calls it.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

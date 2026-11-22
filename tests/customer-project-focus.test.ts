@@ -4,7 +4,7 @@ import { focusOf, projectFocus } from '@/modules/app/project-focus';
 
 /** The customer's Project screen shows only what the phase needs (owner, 1 Nov 2026). */
 
-const base = { designRunning: false, snags: 0, paymentToConfirm: false };
+const base = { designRunning: false, snags: 0 };
 
 describe('what the Project screen shows, by phase', () => {
   it('in design: design progress on top, what is needed, the design, the next payment; no site, no snags', () => {
@@ -36,11 +36,11 @@ describe('what the Project screen shows, by phase', () => {
     }
   });
 
-  it('a payment waiting for their yes keeps the full payments on screen, so they can confirm it', () => {
-    const f = projectFocus({ ...base, phase: 'design', designRunning: true, paymentToConfirm: true });
-    expect(f.main).toContain('payments');
-    expect(f.main).not.toContain('nextPayment');
-    expect(f.folded).not.toContain('payments');
+  it('shows the next payment, never a payment to confirm: the studio team marks payments (owner, 22 Nov 2026)', () => {
+    const f = projectFocus({ ...base, phase: 'design', designRunning: true });
+    expect(f.main).toContain('nextPayment');
+    expect(f.main).not.toContain('payments');
+    expect(f.folded).toContain('payments');
   });
 
   it('never loses anything: every block is on screen or in the whole plan', () => {

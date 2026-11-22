@@ -61,7 +61,7 @@ export interface ClosureView {
   /** Where the contract figure comes from. */
   contractFrom: 'design-final' | 'signed';
   /** What the account comes to right now, before any line is added: the starting point for a new version. */
-  base: { contractPaise: number; changesPaise: number; changeOrdersPaise: number; gstBps: number; paidPaise: number; waitingPaise: number };
+  base: { contractPaise: number; changesPaise: number; changeOrdersPaise: number; gstBps: number; paidPaise: number };
   /** Approved change orders (extra work after sign-off): read-only here, apart from the closure's own extra lines. */
   changeOrders: { id: string; number: number; title: string; status: ChangeOrderStatusName; totalPaise: number }[];
   /** The latest saved version; null before the first save. */
@@ -173,7 +173,7 @@ async function baseOf(db: Prisma.TransactionClient | typeof prisma, p: ProjectRo
   const l = ledgerOf(p);
   return {
     contractFrom: (design ? 'design-final' : 'signed') as ClosureView['contractFrom'],
-    base: { contractPaise, changesPaise, changeOrdersPaise, gstBps: q?.gstBps ?? 0, paidPaise: l?.paidPaise ?? 0, waitingPaise: l?.waitingPaise ?? 0 },
+    base: { contractPaise, changesPaise, changeOrdersPaise, gstBps: q?.gstBps ?? 0, paidPaise: l?.paidPaise ?? 0 },
     ledgerTotalPaise: l?.totalPaise ?? null,
   };
 }

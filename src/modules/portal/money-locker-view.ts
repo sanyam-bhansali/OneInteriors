@@ -12,7 +12,7 @@
 
 import { fromDb } from '@/lib/money';
 import { customerChoice, changesFromRows, type CustomerChoice } from '@/modules/project/decision-rules';
-import { dueDates, isBackfilled, ledger, type Ledger, type PaymentModeName, type RowStatus, type StageState } from '@/modules/project/payment-ledger';
+import { dueDates, isBackfilled, ledger, type Ledger, type PaymentModeName, type StageState } from '@/modules/project/payment-ledger';
 import { decisionOfDoc } from '@/modules/project/locker-rules';
 import type { ChangesView, MoneyView, PayStage } from './payments';
 import { readSignedStages } from './payments';
@@ -93,12 +93,14 @@ export interface CustomerPaymentEntry {
   /** "YYYY-MM-DD". */
   receivedOn: string;
   mode: PaymentModeName | null;
-  /** waiting = asks the customer to confirm; earlier = recorded before confirmations started (counts as paid). */
-  status: Exclude<RowStatus, 'replaced'>;
+  /**
+   * paid = the studio team marked it received; it counts (owner, 22 Nov 2026:
+   * clients no longer confirm). disputed = the client said "I didn't pay
+   * this" back when they could; our team is checking.
+   */
+  status: 'paid' | 'disputed';
   /** The receipt in the locker, when there is one. */
   receiptDocumentId: string | null;
-  /** The owner may confirm or say "I didn't pay this" (family can only see). */
-  canAnswer: boolean;
 }
 
 export interface CustomerPaymentStage {
@@ -108,7 +110,6 @@ export interface CustomerPaymentStage {
   /** Recorded quote changes landing on this stage (decisions, on the last one). */
   changesPaise: number;
   paidPaise: number;
-  waitingPaise: number;
   state: StageState;
   dueOn: string | null;
 }
@@ -120,10 +121,8 @@ export interface CustomerPayments {
   changesPaise: number;
   /** What the job costs now. */
   totalPaise: number;
-  /** Confirmed, or recorded before confirmations started. */
+  /** What the studio team marked received. */
   paidPaise: number;
-  /** Recorded by the studio, waiting for the customer's yes. */
-  waitingPaise: number;
   balancePaise: number;
   stages: CustomerPaymentStage[];
   /** Newest first; corrected-away entries left out. */
@@ -156,7 +155,7 @@ export function customerLedger(p: { paymentPhases: unknown; payments?: readonly 
 }
 
 /** The payments block of the customer's project. `sharedDocs` are the ids of documents the customer can open. */
-export function customerPayments(l: Ledger | null, marks: unknown, owner: boolean, sharedDocs: ReadonlySet<string>): CustomerPayments | null {
+export function customerPayments(l: Ledger | null, marks: unknown, sharedDocs: ReadonlySet<string>): CustomerPayments | null {
   if (!l) return null;
   const due = dueDates(marks);
   return {
@@ -164,7 +163,6 @@ export function customerPayments(l: Ledger | null, marks: unknown, owner: boolea
     changesPaise: l.changesPaise,
     totalPaise: l.totalPaise,
     paidPaise: l.paidPaise,
-    waitingPaise: l.waitingPaise,
     balancePaise: l.balancePaise,
     stages: l.stages.map((s) => ({
       index: s.index,
@@ -172,12 +170,11 @@ export function customerPayments(l: Ledger | null, marks: unknown, owner: boolea
       amountPaise: s.amountPaise,
       changesPaise: s.changesPaise,
       paidPaise: s.paidPaise,
-      waitingPaise: s.waitingPaise,
       state: s.state,
       dueOn: due.get(s.index) ?? null,
     })),
     entries: l.rows
-      .filter((r): r is typeof r & { status: Exclude<RowStatus, 'replaced'> } => r.status !== 'replaced' && r.amountPaise > 0)
+      .filter((r) => r.status !== 'replaced' && r.amountPaise > 0)
       .reverse()
       .map((r) => ({
         id: r.id,
@@ -186,9 +183,8 @@ export function customerPayments(l: Ledger | null, marks: unknown, owner: boolea
         amountPaise: r.amountPaise,
         receivedOn: r.receivedOn,
         mode: r.mode,
-        status: r.status,
+        status: r.status === 'disputed' ? ('disputed' as const) : ('paid' as const),
         receiptDocumentId: r.receiptDocumentId && sharedDocs.has(r.receiptDocumentId) ? r.receiptDocumentId : null,
-        canAnswer: owner && (r.status === 'waiting' || r.status === 'earlier'),
       })),
   };
 }

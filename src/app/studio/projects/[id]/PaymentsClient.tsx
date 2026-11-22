@@ -96,7 +96,7 @@ export function RecordPayment({
       if (receipt) data.set('receipt', receipt);
       const r = await recordPaymentAction(data);
       if (r.ok) {
-        setMessage({ ok: true, text: `Recorded. ${customer} is asked to confirm it, and the receipt is in the locker.` });
+        setMessage({ ok: true, text: `Recorded as paid. ${customer} is told, and the receipt is in the locker.` });
         setShow(false);
         setReceipt(null);
         setNote('');
@@ -209,7 +209,7 @@ export function RecordPayment({
         </button>
         {!mode ? <span className="text-[12.5px] text-[var(--muted)]">Pick how it was paid.</span> : null}
       </div>
-      <p className="m-0 text-[12.5px] text-[var(--muted)]">It counts as paid once {customer} confirms it in the app. Entries are never edited; a mistake is corrected with a new entry.</p>
+      <p className="m-0 text-[12.5px] text-[var(--muted)]">It counts as paid as soon as you record it. Entries are never edited; a mistake is corrected with a new entry.</p>
       {message && !message.ok ? (
         <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {message.text}

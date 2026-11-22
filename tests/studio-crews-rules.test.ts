@@ -193,11 +193,11 @@ describe('execution payment locks for the client', () => {
     expect(execGateIndex({ label: 'Shutters delivered', gatePayment: 1 }, DEFAULT_EXEC_GATES, payments)).toBe(1);
     expect(execGateIndex({ label: 'Shutters delivered', gatePayment: null }, DEFAULT_EXEC_GATES, [{ label: 'Advance' }])).toBeNull();
   });
-  it('locked until the payment is recorded (paid, or waiting for the client’s yes)', () => {
+  it('locked until the payment is recorded in full (recorded is paid: owner, 22 Nov 2026)', () => {
     const step = { label: 'Shutters delivered', gatePayment: null };
-    const st = (state: 'paid' | 'waiting' | 'due' | 'later') => payments.map((p, index) => ({ index, label: p.label, state: index === 4 ? state : ('paid' as const) }));
+    const st = (state: 'paid' | 'part' | 'due' | 'later') => payments.map((p, index) => ({ index, label: p.label, state: index === 4 ? state : ('paid' as const) }));
     expect(execGate(step, DEFAULT_EXEC_GATES, payments, st('due'))).toEqual({ open: false, payment: 'Material dispatch' });
-    expect(execGate(step, DEFAULT_EXEC_GATES, payments, st('waiting'))).toEqual({ open: true });
+    expect(execGate(step, DEFAULT_EXEC_GATES, payments, st('part'))).toEqual({ open: false, payment: 'Material dispatch' });
     expect(execGate(step, DEFAULT_EXEC_GATES, payments, st('paid'))).toEqual({ open: true });
     expect(execGate(step, DEFAULT_EXEC_GATES, payments, null)).toEqual({ open: true });
   });

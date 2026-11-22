@@ -40,7 +40,7 @@ export interface HandoverLedger {
 
 /**
  * The day the handover (last) payment was recorded in full: the latest day
- * money counted or waiting arrived on it. Null while anything is still open
+ * counted money arrived on it. Null while anything is still open
  * on it, or when there are no stages.
  */
 export function handoverPaidOn(l: HandoverLedger | null): string | null {
@@ -48,7 +48,7 @@ export function handoverPaidOn(l: HandoverLedger | null): string | null {
   const last = l.stages[l.stages.length - 1]!;
   if (last.openPaise > 0) return null;
   const days = l.rows
-    .filter((r) => r.stageIndex === last.index && (r.counts || r.status === 'waiting') && isDay(r.receivedOn))
+    .filter((r) => r.stageIndex === last.index && r.counts && isDay(r.receivedOn))
     .map((r) => r.receivedOn)
     .sort();
   return days[days.length - 1] ?? null;

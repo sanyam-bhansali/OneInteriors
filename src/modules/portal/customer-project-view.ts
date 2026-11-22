@@ -430,7 +430,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     progress: customerSnagProgress(s, owner, now),
     warranty: s.warranty === true,
   }));
-  const payments = customerPayments(ledgerOf, p.paidPhases, owner, new Set(p.documents.map((d) => d.id)));
+  const payments = customerPayments(ledgerOf, p.paidPhases, new Set(p.documents.map((d) => d.id)));
   const designOnly = toCustomerDesign(
     (p.stages ?? []).find((s) => s.kind === 'DESIGN') ?? null,
     p,
@@ -471,7 +471,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
           lines: c.lines.map((l) => ({ ...l, amountPaise: fromDb(l.amountPaise) })),
           payments: (p.payments ?? [])
             .filter((r) => r.changeOrderId === c.id)
-            .map((r) => ({ amountPaise: fromDb(r.amountPaise), status: rowStatus.get(r.id)?.status ?? 'waiting' })),
+            .map((r) => ({ amountPaise: fromDb(r.amountPaise), status: rowStatus.get(r.id)?.status ?? 'recorded' })),
         },
         owner,
         c.photoDocumentId && docIndex.has(c.photoDocumentId) ? links.docUrls[docIndex.get(c.photoDocumentId)!] || null : null,

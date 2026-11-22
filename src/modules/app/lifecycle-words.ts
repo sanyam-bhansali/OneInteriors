@@ -34,7 +34,6 @@ export const lifecycleWords = {
   'life.step.stage': { en: 'Work on site', hi: 'साइट पर काम', mr: 'साइटवर काम' },
   'life.block.pay': { en: 'Pay the {label} {amount}', hi: '{label} का भुगतान करें {amount}', mr: '{label} भरा {amount}' },
   'life.block.payFinal': { en: 'Pay the final payment {amount}', hi: 'अंतिम भुगतान करें {amount}', mr: 'अंतिम रक्कम भरा {amount}' },
-  'life.block.confirm_payment': { en: 'Confirm the payment your studio recorded', hi: 'स्टूडियो का दर्ज किया भुगतान पक्का करें', mr: 'स्टुडिओने नोंदवलेले पेमेंट निश्चित करा' },
   'life.block.answer_drawing': { en: 'Answer the {label}', hi: '{label} पर जवाब दें', mr: '{label} वर उत्तर द्या' },
   'life.block.your_step': { en: 'Your step: {label}', hi: 'आपका काम: {label}', mr: 'तुमचे काम: {label}' },
   'life.block.decide': { en: 'Choose: {label}', hi: 'चुनें: {label}', mr: 'निवडा: {label}' },
@@ -78,9 +77,9 @@ export const lifecycleWords = {
   'life.extra.state.paid': { en: 'Paid · the studio starts it', hi: 'भुगतान हुआ · स्टूडियो शुरू करेगा', mr: 'पेमेंट झाले · स्टुडिओ सुरू करेल' },
   'life.extra.state.released': { en: 'Paid · sent to the factory', hi: 'भुगतान हुआ · फ़ैक्टरी भेजा गया', mr: 'पेमेंट झाले · फॅक्टरीला पाठवले' },
   'life.extra.howToPay': {
-    en: 'You pay the studio directly. When they record it, confirm it under Payments.',
-    hi: 'आप स्टूडियो को सीधे भुगतान करते हैं। जब वे इसे दर्ज करें, भुगतान में पक्का करें।',
-    mr: 'तुम्ही स्टुडिओला थेट पैसे देता. त्यांनी नोंद केल्यावर पेमेंटमध्ये निश्चित करा.',
+    en: 'You pay the studio directly. Once they record it, it shows under Payments.',
+    hi: 'आप स्टूडियो को सीधे भुगतान करते हैं। उनके दर्ज करते ही यह भुगतान में दिखेगा।',
+    mr: 'तुम्ही स्टुडिओला थेट पैसे देता. त्यांनी नोंद केल्यावर ते पेमेंटमध्ये दिसेल.',
   },
   /* The electrical bill (owner, 22 Nov 2026): spread over the payment stages not yet paid. */
   'life.extra.inStages': {
