@@ -152,6 +152,21 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
  * Recoverable from git history if a single-line write is ever wanted again.
  */
 
+/**
+ * Generate PDF (owner, 22 Nov 2026: "If I click Generate PDF, it should automatically be my next version, and
+ * automatically should be saved in the revisions"): a draft or sent quotation is marked sent, which keeps the
+ * copy as R1 the first time and R2, R3… when it has changed since (nothing new when it has not). A Design Final
+ * marked this way moves the project's payment stages as "Mark as design final" did. A won or lost quotation only
+ * prints.
+ */
+export async function generatePdfAction(quoteId: string, status: QuoteStatusName): Promise<State> {
+  if (status !== 'DRAFT' && status !== 'ISSUED') return { ok: true };
+  const result = await setQuoteStatus(quoteId, 'ISSUED');
+  if (!result.ok) return result;
+  refresh(quoteId);
+  return { ok: true };
+}
+
 export async function setStatusAction(quoteId: string, status: QuoteStatusName): Promise<State> {
   const result = await setQuoteStatus(quoteId, status);
   if (!result.ok) return result;

@@ -344,7 +344,7 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   /* Quotation requests (owner, 22 Oct 2026): the builder a request on this lead was handed to sends it too. */
   const requestedOfMe = scope.requested !== null && q.clientId !== null && (await prisma.studioClient.findFirst({ where: { AND: [scope.requested], id: q.clientId }, select: { id: true } })) !== null;
   if (!mayOnLead(scope, 'quote.write', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null, requestedOfMe })) return { ok: false, error: 'That quotation is not yours.' };
-  if (q.status !== 'ISSUED') return { ok: false, error: 'Mark it as sent first.' };
+  if (q.status !== 'ISSUED') return { ok: false, error: 'Press Generate PDF on it first.' };
   const noPhoto = await photoGate({ studioId, quoteId: q.id }, 'send');
   if (noPhoto) return { ok: false, error: noPhoto };
   const empty = await sendRefusalFor(q.id, studioId);
