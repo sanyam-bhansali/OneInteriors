@@ -7,7 +7,7 @@ import { CalendarIcon, HomeIcon, PersonIcon, RupeeIcon, WrenchIcon } from './ico
 import { siteWords } from './words';
 
 /**
- * Site mode's bottom bar: Today · Snags · Meetings · Me (Meetings: office
+ * Site mode's bottom bar: Today · Snags · Cash · Meetings · Me, one row (Meetings: office
  * meetings, owner 27 Oct 2026, opens the studio's Meetings page). Fixed to the bottom of the
  * phone, each tab 60 px tall with an icon and a word. Drawn once for every
  * site screen by site/layout.tsx (Snags is Phase 4's /studio/site/snag), and
