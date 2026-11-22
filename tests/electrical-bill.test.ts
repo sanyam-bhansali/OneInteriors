@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_DISCOUNT_BPS, checkElectricalLines, electricalAmount, electricalOpen, electricalTotals, parseDiscount, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
+import { DEFAULT_DISCOUNT_BPS, WHOLE_HOME, byRoom, checkElectricalLines, electricalAmount, electricalOpen, electricalTotals, parseDiscount, parseQty, qtyWords, spreadOverUnpaid, type ElectricalItem } from '@/modules/project/electrical-rules';
 
 /* Owner, 22 Nov 2026: the electrical bill — picked from the admin's rate list, quantity and note by the designer, approved by the client, spread over the unpaid stages, in one PDF with the quotation. */
 const ITEMS = new Map<string, ElectricalItem>([
@@ -20,7 +20,7 @@ describe('lines from the rate list', () => {
   it('priced from the list, never from the browser; quantity and note from the designer', () => {
     const r = checkElectricalLines([{ itemId: 'light', qty: '12', note: ' Living room,  ceiling ', ratePaise: 1 }, { itemId: 'wire', qty: '2.5' }], ITEMS);
     if (!r.ok) throw new Error(r.error);
-    expect(r.lines[0]).toEqual({ itemId: 'light', product: 'Light point', unitLabel: 'point', details: '1.5 sq mm FR wire, modular switch', note: 'Living room, ceiling', qtyMilli: 12_000, ratePaise: 850_00, amountPaise: 10_200_00 });
+    expect(r.lines[0]).toEqual({ room: WHOLE_HOME, itemId: 'light', product: 'Light point', unitLabel: 'point', details: '1.5 sq mm FR wire, modular switch', note: 'Living room, ceiling', qtyMilli: 12_000, ratePaise: 850_00, amountPaise: 10_200_00 });
     expect(r.lines[1]!.amountPaise).toBe(114_00); // 45.50 × 2.5 = 113.75 → ₹114
   });
 
@@ -104,6 +104,42 @@ describe('wiring', () => {
   it('only the owner or the design head keeps the rate list', () => {
     const store = readFileSync('src/modules/project/electrical-bill.ts', 'utf8');
     expect(store).toContain("m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true)");
+  });
+});
+
+describe('room by room, like the quotation (owner, 22 Nov 2026)', () => {
+  it('each line keeps its room; none given is "Whole home"', () => {
+    const r = checkElectricalLines(
+      [
+        { room: '  Master   bedroom ', itemId: 'light', qty: '2', note: '' },
+        { itemId: 'light', qty: '1', note: '' },
+      ],
+      ITEMS,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.lines.map((l) => l.room)).toEqual(['Master bedroom', WHOLE_HOME]);
+  });
+
+  it('groups lines by room in first-seen order, with sub-totals', () => {
+    const g = byRoom([
+      { room: 'Kitchen', amountPaise: 100 },
+      { room: 'Hall', amountPaise: 50 },
+      { room: 'Kitchen', amountPaise: 25 },
+    ]);
+    expect(g.map((x) => [x.room, x.lines.length, x.subPaise])).toEqual([
+      ['Kitchen', 2, 125],
+      ['Hall', 1, 50],
+    ]);
+  });
+
+  it('the builder, the bill and both PDFs show rooms', () => {
+    const panel = readFileSync('src/app/studio/projects/[id]/ElectricalPanel.tsx', 'utf8');
+    expect(panel).toContain('<tr className="hband">');
+    expect(panel).toContain('— Sub-total');
+    expect(panel).toContain('+ add item');
+    expect(readFileSync('src/app/studio/projects/[id]/electrical/[billId]/page.tsx', 'utf8')).toContain('byRoom(bill.lines)');
+    expect(readFileSync('src/app/studio/quotations/doc/ElectricalBillDoc.tsx', 'utf8')).toContain('byRoom(b.lines)');
+    expect(readFileSync('src/modules/project/electrical-bill.ts', 'utf8')).toContain('room: l.room,');
   });
 });
 
