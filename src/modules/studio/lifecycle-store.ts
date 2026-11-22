@@ -26,7 +26,8 @@ import { readCrewSettings } from '@/modules/studio-crews/settings';
 import { effectivePhase, isPhase, PHASE_LABEL, type Phase } from '@/modules/project/lifecycle-rules';
 import { lifecycleCard, type CardBlocker, type CardStep } from '@/modules/project/lifecycle-card';
 import { eventsOrLegacy, snagStatus } from '@/modules/project/snag-status';
-import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { calendarOf, dayFromDb, istDay } from '@/modules/project/working-days';
+import { executionSpan, type ExecutionSpan } from '@/modules/project/execution-span';
 import { fromDb } from '@/lib/money';
 import { progressOf } from '@/modules/project/step-rules';
 
@@ -82,6 +83,8 @@ export interface BoardCard {
   stage: string;
   /** Where that stage sits in the plan, to list the stages in order. */
   stageOrder: number;
+  /** Execution start, handover and the working days between (owner, 22 Nov 2026); null until the execution is planned. */
+  execution: ExecutionSpan | null;
 }
 
 export interface LifecycleBoard {
@@ -106,6 +109,7 @@ const SELECT = {
   category: true,
   onSiteCarcass: true,
   startOn: true,
+  executionPlannedAt: true,
   id: true,
   phase: true,
   warrantyEndsOn: true,
@@ -115,7 +119,7 @@ const SELECT = {
   ...GATE_SELECT,
   introduction: {
     select: {
-      studio: { select: { crewSettings: true } },
+      studio: { select: { crewSettings: true, workingDays: true, holidays: { select: { day: true } } } },
       brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } },
     },
   },
@@ -125,6 +129,7 @@ const SELECT = {
       id: true,
       kind: true,
       name: true,
+      plannedStart: true,
       plannedEnd: true,
       items: { orderBy: { sortOrder: 'asc' }, select: { id: true, weightBp: true, label: true, doneAt: true, inScope: true, plannedOn: true, responsible: true, gatePayment: true } },
     },
@@ -228,6 +233,12 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     startedOn: p.startOn ? istDay(p.startOn) : null,
     pct: pctOf(phase, p.stages),
     ...stageOf(phase, p.stages),
+    /* The Execution tab's dates (owner, 22 Nov 2026): start, handover, working days. */
+    execution: executionSpan(
+      p.stages.map((s) => ({ kind: s.kind, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd) })),
+      { planned: p.executionPlannedAt !== null, handedOverOn: p.provisionalHandoverAt ? istDay(p.provisionalHandoverAt) : null },
+      calendarOf(p.introduction.studio),
+    ),
   };
 }
 
