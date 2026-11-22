@@ -9,9 +9,10 @@ import { CorrectPayment, DueDate, GstBox, RecordPayment } from './PaymentsClient
 /**
  * The Payments tab of the project workspace (studio workspace Phase 5,
  * StudioProject.dc.html): what each stage is owed now (signed, plus the
- * decisions landing on the final one), what is paid, what is waiting for
- * the customer's yes, and every entry with its receipt. Computed from the
- * payment rows each time (project/payment-ledger.ts); nothing typed twice.
+ * decisions landing on the final one), what is paid (what the team
+ * recorded: clients no longer confirm, owner 22 Nov 2026), and every entry
+ * with its receipt. Computed from the payment rows each time
+ * (project/payment-ledger.ts); nothing typed twice.
  * Also the body of the accounts landing (/studio/payments).
  */
 
@@ -19,14 +20,12 @@ const muted = 'text-[12.5px] text-[var(--muted)]';
 const mono = 'mono';
 const shortDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 
-function stageStatus(s: LedgerStage, customer: string, dueOn: string | null): { text: string; tone: string } {
+function stageStatus(s: LedgerStage, dueOn: string | null): { text: string; tone: string } {
   switch (s.state) {
     case 'paid':
       return { text: `Paid${s.paidOn ? ` · ${shortDay(s.paidOn)}` : ''}`, tone: 'var(--good)' };
-    case 'waiting':
-      return { text: `Recorded · waiting for ${customer} to confirm`, tone: 'var(--warn)' };
     case 'part':
-      return { text: `${formatINR(s.paidPaise + s.waitingPaise)} of ${formatINR(s.amountPaise)} recorded`, tone: 'var(--warn)' };
+      return { text: `${formatINR(s.paidPaise)} of ${formatINR(s.amountPaise)} paid`, tone: 'var(--warn)' };
     case 'due':
       return { text: dueOn ? `Due ${shortDay(dueOn)}` : 'Next', tone: 'var(--ink)' };
     default:
@@ -36,12 +35,10 @@ function stageStatus(s: LedgerStage, customer: string, dueOn: string | null): { 
 
 function rowStatus(r: StudioPaymentRow, customer: string): { text: string; tone: string } {
   switch (r.status) {
+    case 'recorded':
     case 'confirmed':
-      return { text: `${customer} confirmed`, tone: 'var(--good)' };
     case 'earlier':
-      return { text: 'Recorded before confirmations started · counts as paid', tone: 'var(--text2)' };
-    case 'waiting':
-      return { text: `Waiting for ${customer} to confirm`, tone: 'var(--warn)' };
+      return { text: 'Paid', tone: 'var(--good)' };
     case 'disputed':
       return { text: `${customer} says this was not paid · One Interiors is looking into it`, tone: 'var(--bad)' };
     default:
@@ -54,13 +51,12 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
   const today = istDay(new Date());
   const tiles = [
     { label: 'Total now', value: l.totalPaise, sub: l.changesPaise ? `${l.changesPaise > 0 ? '+' : '−'}${formatINR(Math.abs(l.changesPaise))} from decisions and extra work` : 'as signed' },
-    { label: 'Paid', value: l.paidPaise, sub: `confirmed by ${customer}` },
-    { label: `Waiting for ${customer}`, value: l.waitingPaise, sub: 'recorded, not confirmed yet' },
+    { label: 'Paid', value: l.paidPaise, sub: 'recorded by your team' },
     { label: 'Balance', value: l.balancePaise, sub: 'total less paid' },
   ];
   return (
     <div className="flex flex-col gap-5">
-      <dl className="m-0 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <dl className="m-0 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-[10px] bg-[var(--fill)] p-3">
             <dt className="text-[12px] font-semibold text-[var(--text2)]">{t.label}</dt>
@@ -84,7 +80,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
           </thead>
           <tbody>
             {l.stages.map((s) => {
-              const st = stageStatus(s, customer, data.dueOn[s.index] ?? null);
+              const st = stageStatus(s, data.dueOn[s.index] ?? null);
               return (
                 <tr key={s.index} id={`pay-${s.index}`} className="border-t border-[var(--fill2)] align-top">
                   <td className="py-3 pr-3">
@@ -105,7 +101,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
                   </td>
                   <td className="py-3 text-[13.5px] font-medium">
                     <span style={{ color: st.tone }}>{st.text}</span>
-                    {data.canSetDue && s.state !== 'paid' && s.state !== 'waiting' ? (
+                    {data.canSetDue && s.state !== 'paid' ? (
                       <span className="mt-1.5 block">
                         <DueDate projectId={data.projectId} index={s.index} value={data.dueOn[s.index] ?? null} label={s.label} />
                       </span>
@@ -199,7 +195,7 @@ export async function PaymentsTab({ projectId, customer }: { projectId: string; 
         </span>
       </div>
       <p className={`m-0 mt-1 mb-4 ${muted}`}>
-        {customer} pays you directly. A payment counts once you record it and {customer} confirms it in the app.
+        {customer} pays you directly. A payment counts as paid once your team records it.
       </p>
       {data ? (
         <PaymentsBody data={data} customer={customer} />

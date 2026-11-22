@@ -40,10 +40,6 @@ export type ProjectEvent =
   | { kind: 'geio-handover'; customer: string; home: string | null; note: string }
   // To ops: a customer asked for the Assured plan (portal/plans.ts). Ops confirms the fee and switches it.
   | { kind: 'assured-requested'; customer: string; studio: string; atSigning: boolean }
-  // Studio workspace Phase 5: the customer confirms a payment the studio recorded…
-  | { kind: 'payment-to-confirm'; stage: string; amountPaise: number; studio: string }
-  // …or says "I didn't pay this", which goes to our team (ops), not the studio.
-  | { kind: 'payment-disputed'; customer: string; studio: string; stage: string; amountPaise: number; note: string | null }
   // To the studio: a decision passed its date with no pick (customer delay from here).
   | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string }
   // Studio OS Phase 1: leads, to the studio's people (never to a customer)
@@ -85,8 +81,6 @@ export type ProjectEvent =
   // Leave (owner, 20 Nov 2026: "notification should pop for every approval"), studio staff only: asked, to the
   // owner and the design head; approved or declined, back to the person.
   | { kind: 'leave-asked'; name: string; from: string; to: string; work?: boolean }
-  // To the studio (owner, 20 Nov 2026): the client confirmed a payment, or said they did not pay it.
-  | { kind: 'payment-answered'; projectId: string; client: string; amountPaise: number; confirmed: boolean }
   | { kind: 'leave-decided'; by: string; from: string; to: string; approved: boolean; work?: boolean }
   // After the handover (owner, 20 Nov 2026; docs/studio-os/AFTERCARE.md), studio staff only: a covered warranty claim, to the
   // design head to assign; a booked service visit, to the office and the design head. And to the client: their visit is booked,
@@ -111,7 +105,6 @@ export interface Message {
   template: string;
 }
 
-const rupeesOf = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
 export function messageFor(e: ProjectEvent): Message {
@@ -264,20 +257,6 @@ export function messageFor(e: ProjectEvent): Message {
           `${e.customer} asked for Assured ${e.atSigning ? 'when signing' : 'after signing'} with ${e.studio}. Confirm the fee with them, then switch the plan.`,
           160,
         ),
-        url: '/ops/introductions',
-      };
-    case 'payment-to-confirm':
-      return {
-        template: 'payment.to-confirm',
-        title: `Did you pay ${formatINR(e.amountPaise)}? · ${e.studio}`,
-        body: clip(`${e.studio} marked ${formatINR(e.amountPaise)} for ${e.stage} as received. Confirm it, or tell us if you didn't pay it.`, 160),
-        url: '/app/project',
-      };
-    case 'payment-disputed':
-      return {
-        template: 'payment.disputed',
-        title: `Payment disputed · ${clip(e.customer, 40)}`,
-        body: clip(`${e.customer} says they did not pay ${formatINR(e.amountPaise)} for ${e.stage} (${e.studio}).${e.note ? ` “${e.note}”` : ''}`, 160),
         url: '/ops/introductions',
       };
     case 'lead-assigned':
@@ -508,13 +487,6 @@ export function messageFor(e: ProjectEvent): Message {
         title: e.approved ? `${e.client} is on hold` : `Hold declined for ${e.client}`,
         body: e.approved ? `${e.by} approved it. Nothing counts as late until it is taken off.` : `${e.by} declined it. The project runs as usual.`,
         url: `/studio/projects/${e.projectId}#hold`,
-      };
-    case 'payment-answered':
-      return {
-        template: e.confirmed ? 'payment.confirmed' : 'payment.questioned',
-        title: e.confirmed ? `${e.client} confirmed a payment` : `${e.client} says a payment was not made`,
-        body: e.confirmed ? `${rupeesOf(e.amountPaise)} confirmed in the app.` : `${rupeesOf(e.amountPaise)}: One Interiors will call to sort it out.`,
-        url: `/studio/projects/${e.projectId}?tab=payments`,
       };
     case 'leave-asked':
       return {

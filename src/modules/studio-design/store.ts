@@ -407,7 +407,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       payment: (() => {
         if (i.gatePayment === null) return null;
         const g = (gates ?? []).find((x) => x.index === i.gatePayment);
-        return g ? { label: g.label, recorded: g.state === 'paid' || g.state === 'waiting' } : null;
+        return g ? { label: g.label, recorded: g.state === 'paid' } : null;
       })(),
       tasks: i.tasks.map((t) => ({ id: t.id, label: t.label, done: t.doneAt !== null })),
     };

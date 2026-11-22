@@ -128,7 +128,7 @@ export function designSteps(
 export interface GateStage {
   index: number;
   label: string;
-  state: 'paid' | 'waiting' | 'part' | 'due' | 'later';
+  state: 'paid' | 'part' | 'due' | 'later';
 }
 
 export type GateState = { open: true } | { open: false; payment: string };
@@ -136,15 +136,14 @@ export type GateState = { open: true } | { open: false; payment: string };
 /**
  * Is the step's payment gate open? Open when it has none, when the project
  * has no payment stages to check (a tracker ops started by hand), when the
- * stage is not on the project, or when the payment is RECORDED: paid, or
- * recorded and waiting for the customer's confirmation (the studio says the
- * money is in; the customer confirming it is a separate question).
+ * stage is not on the project, or when the payment is paid: recorded by the
+ * studio team in full (clients no longer confirm, owner 22 Nov 2026).
  */
 export function gateOf(gatePayment: number | null | undefined, stages: readonly GateStage[] | null): GateState {
   if (gatePayment === null || gatePayment === undefined || !stages) return { open: true };
   const st = stages.find((s) => s.index === gatePayment);
   if (!st) return { open: true };
-  return st.state === 'paid' || st.state === 'waiting' ? { open: true } : { open: false, payment: st.label };
+  return st.state === 'paid' ? { open: true } : { open: false, payment: st.label };
 }
 
 /**

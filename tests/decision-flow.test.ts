@@ -295,7 +295,7 @@ describe('the customer sees the money the pick moved', () => {
       payments: [],
       quoteChanges: [{ id: 'q1', label: 'Shutter: Walnut', deltaPaise: BigInt(14_000_00), stageIndex: 1 }],
     });
-    const p = customerPayments(l, [], true, new Set());
+    const p = customerPayments(l, [], new Set());
     expect(p!.stages[1]).toMatchObject({ amountPaise: 5_14_000_00, changesPaise: 14_000_00 });
     expect(p!.totalPaise).toBe(10_14_000_00);
   });

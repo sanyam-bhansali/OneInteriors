@@ -52,8 +52,6 @@ export interface FocusInput {
   /** The design still runs (not closed). */
   designRunning: boolean;
   snags: number;
-  /** A payment the studio recorded waits for their yes: the full payments stay on screen to confirm it. */
-  paymentToConfirm: boolean;
 }
 
 export function focusOf(phase: CustomerPhase | null | undefined, designRunning: boolean): Focus {
@@ -64,7 +62,8 @@ export function focusOf(phase: CustomerPhase | null | undefined, designRunning: 
 
 export function projectFocus(i: FocusInput): ProjectFocus {
   const focus = focusOf(i.phase, i.designRunning);
-  const pay: Block = i.paymentToConfirm ? 'payments' : 'nextPayment';
+  /* Payments are marked by the studio team, nothing for the client to confirm (owner, 22 Nov 2026): the next payment is enough. */
+  const pay: Block = 'nextPayment';
   let main: Block[];
   if (focus === 'design') main = ['progress', 'lifecycle', 'signoffs', 'decision', 'design', pay];
   else if (focus === 'site') main = ['progress', 'stats', 'lifecycle', 'signoffs', 'decision', 'site', ...(i.snags > 0 ? (['snags'] as Block[]) : []), pay];

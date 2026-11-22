@@ -6,7 +6,7 @@ import { lifecycleLines } from '@/modules/app/lifecycle-words';
 /** The snag window (owner, 15 Oct 2026): after the handover payment, the studio's days; then raising closes until the warranty. */
 
 const stage = (index: number, openPaise: number) => ({ index, amountPaise: 100, openPaise });
-const row = (stageIndex: number, receivedOn: string, status = 'confirmed') => ({ stageIndex, receivedOn, counts: status === 'confirmed' || status === 'earlier', status });
+const row = (stageIndex: number, receivedOn: string, status = 'confirmed') => ({ stageIndex, receivedOn, counts: ['recorded', 'confirmed', 'earlier'].includes(status), status });
 
 describe('the studio’s days', () => {
   it('defaults to 30 and repairs anything that is not 1 to 365 whole days', () => {
@@ -17,8 +17,8 @@ describe('the studio’s days', () => {
 });
 
 describe('the handover payment', () => {
-  it('is the last stage recorded in full: the latest day money arrived on it, waiting for the client’s yes included', () => {
-    expect(handoverPaidOn({ stages: [stage(0, 0), stage(1, 0)], rows: [row(1, '2026-10-20'), row(1, '2026-10-22', 'waiting'), row(0, '2026-11-01')] })).toBe('2026-10-22');
+  it('is the last stage recorded in full: the latest day counted money arrived on it (recorded counts: owner, 22 Nov 2026)', () => {
+    expect(handoverPaidOn({ stages: [stage(0, 0), stage(1, 0)], rows: [row(1, '2026-10-20'), row(1, '2026-10-22', 'recorded'), row(1, '2026-10-25', 'disputed'), row(0, '2026-11-01')] })).toBe('2026-10-22');
   });
 
   it('is not recorded while anything is still open on it, or after a replaced or disputed row only', () => {

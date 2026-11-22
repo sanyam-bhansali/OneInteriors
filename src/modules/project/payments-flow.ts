@@ -9,11 +9,13 @@ import 'server-only';
  *   never edited; a mistake is put right with a correction row.
  * - Overpaying a stage is refused with the difference said in rupees
  *   (payment-ledger.ts `canRecord`, the `canPay()` pattern).
- * - The customer confirms with one tap, or says "I didn't pay this", which
- *   goes to our team (ops) with their words; the studio sees only that it
- *   is being looked into.
+ * - It counts as paid as soon as it is recorded, and the customer is told it
+ *   was received: "Remove the client confirms in app for payments — it is
+ *   marked by our team." (owner, 22 Nov 2026). The old confirm / dispute
+ *   routes stay for old phone builds: a confirm is a harmless stamp, a new
+ *   dispute is refused.
  * - Paid and balance are computed from the rows every time
- *   (payment-ledger.ts). Backfilled rows count as paid (see there).
+ *   (payment-ledger.ts).
  *
  * Every write is one transaction with its `HomeProjectEvent`, and keeps
  * `HomeProject.paidPhases[].paidOn` in step for the readers that still use it
@@ -26,7 +28,7 @@ import type { PaymentMode, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb } from '@/lib/money';
 import { readSignedStages } from '@/modules/portal/payments';
-import { notify, notifyOps, notifyStudio } from '@/modules/notify/service';
+import { notify } from '@/modules/notify/service';
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
 import { currentMember, projectsVisibleTo } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
@@ -278,8 +280,8 @@ async function redateDesign(projectId: string, paidOn: string, byUserId: string)
 
 /**
  * Mark money received against a stage, with the receipt when there is one.
- * Accounts and the owner (`payment.record`); ops too. The customer is asked
- * to confirm it.
+ * Accounts and the owner (`payment.record`); ops too. It counts as paid at
+ * once; the customer is told it was received.
  */
 export async function recordPayment(
   projectId: string,
@@ -303,9 +305,9 @@ export async function recordPayment(
   if (!r.ok) return r;
   // Design steps the payment opens count from today's payment, not the plan (DESIGN-PROCESS-PLAN.md Decision 5).
   if (!opts.changeOrderId) await redateDesign(projectId, check.value.receivedOn, staff.userId);
-  /* Nothing to confirm for a client not in the app yet: it already counts as paid. */
+  /* Money from before the client joined is history, not news. */
   if (staff.customerId && !r.beforeJoining) {
-    void notify(staff.customerId, { kind: 'payment-to-confirm', stage: r.stageLabel, amountPaise: check.value.amountPaise, studio: staff.studioName });
+    void notify(staff.customerId, { kind: 'payment-recorded', stage: r.stageLabel, amountPaise: check.value.amountPaise, studio: staff.studioName });
   }
   return { ok: true, id: r.id };
 }
@@ -313,7 +315,7 @@ export async function recordPayment(
 /**
  * Put a recorded payment right: a new row replacing it, with the corrected
  * amount (0 = recorded by mistake). The original stays, marked replaced.
- * The customer is asked to confirm the new figure.
+ * The customer is told the corrected figure.
  */
 export async function correctPayment(paymentId: string, input: { amount: unknown }): Promise<FlowResult> {
   const original = await prisma.homeProjectPayment.findUnique({
@@ -341,7 +343,7 @@ export async function correctPayment(paymentId: string, input: { amount: unknown
   );
   if (!r.ok) return r;
   if (staff.customerId && amountPaise > 0) {
-    void notify(staff.customerId, { kind: 'payment-to-confirm', stage: r.stageLabel, amountPaise, studio: staff.studioName });
+    void notify(staff.customerId, { kind: 'payment-recorded', stage: r.stageLabel, amountPaise, studio: staff.studioName });
   }
   return { ok: true, id: r.id };
 }
@@ -366,7 +368,7 @@ export async function setStagePaidFromLegacy(projectId: string, index: number, p
     const r = await writePayment(staff, projectId, check.value);
     if (!r.ok) return r;
     await redateDesign(projectId, check.value.receivedOn, staff.userId);
-    if (staff.customerId) void notify(staff.customerId, { kind: 'payment-to-confirm', stage: stage.label, amountPaise: check.value.amountPaise, studio: staff.studioName });
+    if (staff.customerId) void notify(staff.customerId, { kind: 'payment-recorded', stage: stage.label, amountPaise: check.value.amountPaise, studio: staff.studioName });
     return { ok: true, id: r.id };
   }
   const live = l.rows.filter((row) => row.stageIndex === index && row.status !== 'replaced' && row.amountPaise > 0);
@@ -382,29 +384,23 @@ export async function setStagePaidFromLegacy(projectId: string, index: number, p
   return { ok: true };
 }
 
-// ── The customer answers ──────────────────────────────────────
+// ── Old phone builds' answers (before 22 Nov 2026) ───────────────
 
 async function customersPayment(userId: string, paymentId: string) {
   const row = await prisma.homeProjectPayment.findUnique({
     where: { id: paymentId },
-    select: {
-      ...ROW_SELECT,
-      projectId: true,
-      corrections: { select: { id: true } },
-      project: {
-        select: {
-          paymentPhases: true,
-          introduction: { select: { studio: { select: { tradeName: true } }, brief: { select: { userId: true, contactName: true, user: { select: { name: true } } } } } },
-        },
-      },
-    },
+    select: { ...ROW_SELECT, projectId: true, corrections: { select: { id: true } }, project: { select: { introduction: { select: { brief: { select: { userId: true } } } } } } },
   });
-  // Only the owner of the brief answers for money; family can see, not confirm.
+  // Only the owner of the brief answered for money; family could see, not confirm.
   if (!row || row.project.introduction.brief.userId !== userId) return null;
   return row;
 }
 
-/** "Yes, I paid this." One tap; once. */
+/**
+ * "Yes, I paid this", from a phone build that still shows the button. The
+ * row already counts as paid (payment-ledger.ts), so this only stamps it;
+ * nobody is told.
+ */
 export async function confirmPayment(userId: string, paymentId: string, now = new Date()): Promise<FlowResult> {
   const row = await customersPayment(userId, paymentId);
   if (!row) return { ok: false, error: 'That payment is not on your project.' };
@@ -420,58 +416,23 @@ export async function confirmPayment(userId: string, paymentId: string, now = ne
     });
     if (count === 0) return;
     await recordEvent(tx, { projectId: row.projectId, type: 'payment.confirmed', actor, refId: row.id, payload: { stageIndex: row.stageIndex, amountPaise: fromDb(row.amountPaise) } });
-    await mirror(tx, row.projectId);
   });
-  void tellStudioPayment(row.projectId, fromDb(row.amountPaise), true);
   return { ok: true, id: row.id };
 }
 
-/** The client confirmed a payment: the studio hears it (owner, 20 Nov 2026). "I didn't pay this" stays with our team. Logged, never thrown. */
-async function tellStudioPayment(projectId: string, amountPaise: number, confirmed: boolean): Promise<void> {
-  try {
-    const p = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { introduction: { select: { studioId: true, brief: { select: { contactName: true, user: { select: { name: true } } } } } } } });
-    if (!p) return;
-    const client = p.introduction.brief.contactName?.trim() || p.introduction.brief.user?.name?.trim() || 'The client';
-    await notifyStudio(p.introduction.studioId, { kind: 'payment-answered', projectId, client, amountPaise, confirmed });
-  } catch (error) {
-    console.error('[payments] tell studio failed', error instanceof Error ? error.name : 'unknown');
-  }
-}
+/** What a phone build that still offers "I didn't pay this" is told. */
+export const NO_DISPUTES = 'Payments are marked by the studio team. If one looks wrong, ask your expert.';
 
-/** "I didn't pay this." Goes to our team with the customer's words; the stage is owed again. */
-export async function disputePayment(userId: string, paymentId: string, note: unknown, now = new Date()): Promise<FlowResult> {
+/**
+ * "I didn't pay this" is no longer taken: payments are marked by the team
+ * (owner, 22 Nov 2026). Refused, and the row stays paid. A dispute already on
+ * record stays as it is (payment-ledger.ts `disputed`).
+ */
+export async function disputePayment(userId: string, paymentId: string): Promise<FlowResult> {
   const row = await customersPayment(userId, paymentId);
   if (!row) return { ok: false, error: 'That payment is not on your project.' };
-  if (row.corrections.length) return { ok: false, error: 'The studio corrected this entry. Pull down to see the new one.' };
   if (row.disputedAt) return { ok: true, id: row.id };
-  if (row.customerConfirmedAt) return { ok: false, error: 'You confirmed this payment earlier. If that was a mistake, ask your expert.' };
-  const words = typeof note === 'string' ? note.trim().replace(/\s+/g, ' ').slice(0, 600) || null : null;
-  const actor: ProjectActor = { type: 'CUSTOMER', id: userId };
-  let written = false;
-  await prisma.$transaction(async (tx) => {
-    await lockProject(tx, row.projectId);
-    const { count } = await tx.homeProjectPayment.updateMany({
-      where: { id: row.id, customerConfirmedAt: null, disputedAt: null },
-      data: { disputedAt: now, disputedById: userId, disputeNote: words },
-    });
-    if (count === 0) return;
-    written = true;
-    await recordEvent(tx, { projectId: row.projectId, type: 'payment.disputed', actor, refId: row.id, payload: { stageIndex: row.stageIndex, amountPaise: fromDb(row.amountPaise) } });
-    await mirror(tx, row.projectId);
-  });
-  if (written) {
-    const brief = row.project.introduction.brief;
-    const stages = readSignedStages(row.project.paymentPhases);
-    void notifyOps({
-      kind: 'payment-disputed',
-      customer: brief.contactName?.trim() || brief.user?.name?.trim() || 'A customer',
-      studio: row.project.introduction.studio.tradeName,
-      stage: stages?.[row.stageIndex]?.label ?? `Stage ${row.stageIndex + 1}`,
-      amountPaise: fromDb(row.amountPaise),
-      note: words,
-    });
-  }
-  return { ok: true, id: row.id };
+  return { ok: false, error: NO_DISPUTES };
 }
 
 // ── What the studio reads ─────────────────────────────────────

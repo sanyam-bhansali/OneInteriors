@@ -154,12 +154,16 @@ export function documentKpis(folders: readonly { documents: number; approved: nu
 
 // ── Money ─────────────────────────────────────────────────────
 
-export function moneyKpis(i: { owedPaise: number; waitingPaise: number; disputed: number; projects: number; receivedThisMonthPaise: number; bookings: number; finals: number }): Kpi[] {
+/**
+ * Paid is what the team recorded: clients no longer confirm payments (owner,
+ * 22 Nov 2026). "Client says not paid" shows only while an older dispute is
+ * still open; no new ones can be made.
+ */
+export function moneyKpis(i: { owedPaise: number; disputed: number; projects: number; receivedThisMonthPaise: number; bookings: number; finals: number }): Kpi[] {
   return [
     { label: 'Still to come in', value: rupees(i.owedPaise), note: `across ${plural(i.projects, 'project')}`, tone: i.owedPaise ? 'acc' : undefined },
     { label: 'Received this month', value: rupees(i.receivedThisMonthPaise), note: 'recorded', tone: 'good' },
-    { label: 'Waiting to confirm', value: rupees(i.waitingPaise), note: 'the client confirms in the app', tone: i.waitingPaise ? 'warn' : undefined },
-    { label: 'Client says not paid', value: i.disputed, note: i.disputed ? 'One Interiors calls you' : 'none', tone: i.disputed ? 'bad' : 'good' },
+    ...(i.disputed ? [{ label: 'Client says not paid', value: i.disputed, note: 'One Interiors calls you', tone: 'bad' as const }] : []),
     { label: 'Bookings to record', value: i.bookings, note: 'booking advances', tone: i.bookings ? 'warn' : undefined },
     { label: 'Final payments', value: i.finals, note: 'closures to collect', tone: i.finals ? 'acc' : undefined },
   ];

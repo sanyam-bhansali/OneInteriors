@@ -77,10 +77,14 @@ describe('the other apps', () => {
   });
 
   it('Money, Vendors: rupees, in lakhs once they are large', () => {
-    const k = moneyKpis({ owedPaise: 250_000_000, waitingPaise: 0, disputed: 1, projects: 3, receivedThisMonthPaise: 1_000_000, bookings: 0, finals: 1 });
+    const k = moneyKpis({ owedPaise: 250_000_000, disputed: 1, projects: 3, receivedThisMonthPaise: 1_000_000, bookings: 0, finals: 1 });
     expect(k[0]!.value).toMatch(/L|Cr/);
     expect(k[1]!.value).toBe('₹10,000');
-    expect(k[3]).toMatchObject({ value: 1, tone: 'bad' });
+    expect(k[2]).toMatchObject({ label: 'Client says not paid', value: 1, tone: 'bad' });
+    // Paid is what the team recorded (owner, 22 Nov 2026): no "Waiting to confirm" tile, and no disputes tile when none are open.
+    const none = moneyKpis({ owedPaise: 0, disputed: 0, projects: 1, receivedThisMonthPaise: 0, bookings: 0, finals: 0 }).map((x) => x.label);
+    expect(none).toEqual(['Still to come in', 'Received this month', 'Bookings to record', 'Final payments']);
+    expect(k.map((x) => x.label)).not.toContain('Waiting to confirm');
     expect(vendorKpis({ crews: 2, trades: 1, kycMissing: 0, openOrders: 3, billedPaise: 0, owedPaise: 500 }).map((x) => x.label)).toEqual(['Crews', 'Open work orders', 'Billed', 'To pay', 'KYC missing']);
   });
 

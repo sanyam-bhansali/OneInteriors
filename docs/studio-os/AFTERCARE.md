@@ -14,8 +14,8 @@ Code: `src/modules/aftercare/` (`rules.ts` pure and tested, `store.ts`, `reader.
 Both options always show. On submit, the project must be 100% paid: the ledger's balance
 (`project/payment-ledger.ts`) above zero, even ₹1, refuses with "Please clear your payments
 first. ₹X is pending." (HTTP 402, `pendingPaise`). Nothing is read, stored or held before the
-gate. A payment the studio recorded that the client has not confirmed is still pending (the
-message says to confirm it under Payments). Backfilled and before-joining rows count as paid.
+gate. A payment the studio recorded counts as paid at once (owner, 22 Nov 2026: clients no
+longer confirm payments); a payment the client disputed before then is still pending.
 A project with no payment plan in the app is not cleared. (Agreement 5.5: no warranty or
 service when the payment terms were not kept.)
 

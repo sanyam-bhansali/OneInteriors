@@ -234,10 +234,6 @@ export const api = {
   pick: (decisionId: string, optionId: string) => call<{ message?: string | null }>('POST', `/decisions/${encodeURIComponent(decisionId)}`, { optionId }),
   /** A family member's vote; the owner's pick decides. */
   vote: (decisionId: string, optionId: string) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}/vote`, { optionId }),
-  /** "Yes, I paid this." */
-  confirmPayment: (paymentId: string) => call<object>('POST', `/payments/${encodeURIComponent(paymentId)}/confirm`),
-  /** "I didn't pay this": goes to One Interiors' team, with the customer's words. */
-  disputePayment: (paymentId: string, note: string) => call<object>('POST', `/payments/${encodeURIComponent(paymentId)}/dispute`, { note }),
   /** Multipart: projectId, title, room?, photos. */
   raiseSnag: (form: FormData) => call<{ id: string }>('POST', '/snags', form),
   /** The studio's fix looks right (or the customer agrees with its reason): the snag closes. Owner only. */

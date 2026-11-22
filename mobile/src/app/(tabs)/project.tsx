@@ -79,7 +79,6 @@ export default function Project() {
     phase: p.lifecycle?.phase,
     designRunning: Boolean(design && !design.done),
     snags: p.snags.length,
-    paymentToConfirm: (p.payments?.waitingPaise ?? 0) > 0,
   });
   const inDesign = layout.focus === 'design';
   const heading = inDesign ? t('project.title.design') : layout.focus === 'handover' ? t('project.title.handover') : t('project.title.home');
@@ -213,7 +212,7 @@ export default function Project() {
       case 'nextPayment':
         return <NextPayment money={p.money} phases={p.phases} studio={p.studio} t={t} />;
       case 'payments':
-        return p.money ? <Payments money={p.money} changes={p.changes} payments={p.payments ?? null} onChanged={() => void refresh()} t={t} /> : null;
+        return p.money ? <Payments money={p.money} changes={p.changes} payments={p.payments ?? null} t={t} /> : null;
       case 'changes':
         return null; // The phone's payments card carries the changes.
       case 'stages':
@@ -432,20 +431,19 @@ function StageRow({
 /**
  * The payments card. Phase 5: with `payments` (servers since the studio
  * workspace), each stage's line comes from the studio's recorded entries —
- * waiting for you, part paid, paid — the last stage says what your decisions
- * added, and each entry the studio marked received asks you to confirm it.
+ * part paid, paid — the last stage says what your decisions added, and the
+ * entries the studio marked received are listed (nothing to confirm: owner,
+ * 22 Nov 2026).
  */
 function Payments({
   money,
   changes,
   payments,
-  onChanged,
   t,
 }: {
   money: Money;
   changes: ProjectData['changes'];
   payments: PaymentsData | null;
-  onChanged: () => void;
   t: T;
 }) {
   const n = changes?.items.length ?? 0;
@@ -464,9 +462,7 @@ function Payments({
             <Text style={[styles.mono, s.state === 'paid' && { color: color.ok }]}>
               {s.paidOn
                 ? t('project.payPaid', { date: shortDate(s.paidOn) })
-                : ledger(s.index)?.state === 'waiting'
-                  ? t('pay.stageWaiting')
-                  : ledger(s.index)?.state === 'part'
+                : ledger(s.index)?.state === 'part'
                     ? t('pay.stagePart', { paid: inr(ledger(s.index)!.paidPaise), total: inr(s.amountPaise) })
                 : s.dueOn
                   ? t('project.payDue', { date: shortDate(s.dueOn) })
@@ -479,7 +475,7 @@ function Payments({
           <Text style={styles.amt}>{inr(s.amountPaise)}</Text>
         </View>
       ))}
-      {payments ? <PaymentEntries payments={payments} onChanged={onChanged} t={t} /> : null}
+      {payments ? <PaymentEntries payments={payments} t={t} /> : null}
       {changes ? (
         <View style={styles.payRow}>
           <Text style={[styles.payLabel, { flex: 1 }]}>{t('project.changes')}</Text>

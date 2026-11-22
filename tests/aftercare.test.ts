@@ -60,7 +60,7 @@ const row = (id: string, stageIndex: number, amountPaise: number, extra: Partial
 describe('payment gate', () => {
   it('clears a project paid to the rupee', () => {
     const g = paymentGate(ledger(stages, [], [row('a', 0, 10_000_00), row('bb', 1, 90_000_00)]));
-    expect(g).toEqual({ cleared: true, pendingPaise: 0, waitingPaise: 0, message: null });
+    expect(g).toEqual({ cleared: true, pendingPaise: 0, message: null });
   });
 
   it('refuses with ₹1 pending, and says the amount', () => {
@@ -76,11 +76,9 @@ describe('payment gate', () => {
     expect(g.pendingPaise).toBe(5_000_00);
   });
 
-  it('a payment the client has not confirmed is still pending, and says where to confirm it', () => {
+  it('a payment the studio recorded counts, with no confirmation from the client (owner, 22 Nov 2026)', () => {
     const g = paymentGate(ledger(stages, [], [row('a', 0, 10_000_00), row('bb', 1, 90_000_00, { customerConfirmedAt: null })]));
-    expect(g.cleared).toBe(false);
-    expect(g.waitingPaise).toBe(90_000_00);
-    expect(g.message).toMatch(/confirm it under Payments/);
+    expect(g).toEqual({ cleared: true, pendingPaise: 0, message: null });
   });
 
   it('backfilled and before-joining rows count as paid', () => {

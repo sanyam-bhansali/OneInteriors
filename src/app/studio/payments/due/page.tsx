@@ -25,7 +25,7 @@ export default async function MoneyDuePage() {
         <div>
           <h1>Money due</h1>
           <p className="muted" style={{ maxWidth: '72ch' }}>
-            Who owes how much, the most first. Paid counts what the client confirmed (and what was recorded before confirmations started). Remaining is the total less paid.
+            Who owes how much, the most first. Paid is what your team recorded. Remaining is the total less paid.
           </p>
         </div>
         <div className="hstack">
@@ -48,7 +48,6 @@ export default async function MoneyDuePage() {
                 <th>Project</th>
                 <th className="text-right">Total</th>
                 <th className="text-right">Paid</th>
-                <th className="text-right">Waiting to confirm</th>
                 <th className="text-right">Remaining</th>
                 <th>Ask for next</th>
               </tr>
@@ -72,9 +71,8 @@ export default async function MoneyDuePage() {
                   </td>
                   <td className="mono text-right">{formatINR(r.totalPaise)}</td>
                   <td className="mono text-right">{formatINR(r.paidPaise)}</td>
-                  <td className="mono text-right">{r.waitingPaise ? formatINR(r.waitingPaise) : '—'}</td>
                   <td className="mono text-right font-semibold">{formatINR(r.remainingPaise)}</td>
-                  <td className="sm">{r.nextStage ?? (r.remainingPaise > 0 ? 'Waiting for confirmation' : 'Paid in full')}</td>
+                  <td className="sm">{r.nextStage ?? (r.remainingPaise > 0 ? '—' : 'Paid in full')}</td>
                 </tr>
               ))}
               <tr>
@@ -83,7 +81,6 @@ export default async function MoneyDuePage() {
                 </td>
                 <td className="mono text-right font-semibold">{formatINR(t.totalPaise)}</td>
                 <td className="mono text-right font-semibold">{formatINR(t.paidPaise)}</td>
-                <td className="mono text-right font-semibold">{t.waitingPaise ? formatINR(t.waitingPaise) : '—'}</td>
                 <td className="mono text-right font-semibold">{formatINR(t.remainingPaise)}</td>
                 <td />
               </tr>

@@ -123,18 +123,18 @@ describe('the lines, priced like the quotation builder', () => {
 });
 
 describe('paid and released', () => {
-  it('counts recorded money (confirmed or waiting), never a disputed or replaced entry', () => {
+  it('counts recorded money, never a disputed or replaced entry', () => {
     const p = extraPaid(12_000_00, [
       { amountPaise: 5_000_00, status: 'confirmed' },
-      { amountPaise: 7_000_00, status: 'waiting' },
+      { amountPaise: 7_000_00, status: 'recorded' },
       { amountPaise: 9_000_00, status: 'replaced' },
     ]);
-    expect(p).toMatchObject({ recordedPaise: 12_000_00, confirmedPaise: 5_000_00, openPaise: 0, covered: true, waiting: true, disputed: false });
+    expect(p).toEqual({ recordedPaise: 12_000_00, openPaise: 0, covered: true, disputed: false });
     expect(extraPaid(12_000_00, [{ amountPaise: 12_000_00, status: 'disputed' }])).toMatchObject({ recordedPaise: 0, covered: false, disputed: true });
   });
 
   it('releases only once paid in full, with nothing disputed', () => {
-    const full = extraPaid(100, [{ amountPaise: 100, status: 'waiting' }]);
+    const full = extraPaid(100, [{ amountPaise: 100, status: 'recorded' }]);
     expect(releaseRefusal('PAID', full)).toBeNull();
     expect(releaseRefusal('APPROVED', full)).not.toBeNull();
     expect(releaseRefusal('PAID', extraPaid(100, [{ amountPaise: 60, status: 'confirmed' }]))).not.toBeNull();
@@ -175,7 +175,7 @@ describe('what the client sees', () => {
   });
 
   it('says what is due once approved, and nothing internal', () => {
-    const out = toCustomerExtra({ ...row, status: 'APPROVED', payments: [{ amountPaise: 4_000_00, status: 'waiting' }] }, true, null)!;
+    const out = toCustomerExtra({ ...row, status: 'APPROVED', payments: [{ amountPaise: 4_000_00, status: 'recorded' }] }, true, null)!;
     expect(out).toMatchObject({ state: 'approved', paidPaise: 4_000_00, duePaise: 5_876_60 });
     expect(out.lines[0]).toEqual({ product: 'Loft', room: 'Bedroom 2', details: null, size: '1200 × 600 mm', amountPaise: 9_300_00 });
     const json = JSON.stringify(out);

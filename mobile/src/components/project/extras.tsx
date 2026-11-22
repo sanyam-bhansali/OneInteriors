@@ -16,8 +16,8 @@ import type { Extra, Signoff } from '../../lib/types';
  *
  * - Extra work the studio added after design sign-off: what, its size, the
  *   price, why, and Approve / Decline (with a reason). Once approved, the
- *   amount due and how to pay (the studio directly; confirm it under
- *   Payments when they record it). Nothing is made until it is paid.
+ *   amount due and how to pay (the studio directly; it shows under Payments
+ *   once they record it). Nothing is made until it is paid.
  * - Quotations to sign: opens the website's reading and signing page inside
  *   the app (the quotation in its own format, I agree, typed name, Sign).
  *

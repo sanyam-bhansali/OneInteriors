@@ -352,7 +352,6 @@ function ExtraCard({ e, data, customer, onEdit }: { e: StudioExtra; data: Studio
       {['APPROVED', 'PAID', 'RELEASED'].includes(e.status) ? (
         <span className="sm">
           Recorded {formatINR(e.paid.recordedPaise)} of {formatINR(e.totalPaise)}
-          {e.paid.waiting ? ` · waiting for ${customer} to confirm` : ''}
           {e.paid.disputed ? ` · ${customer} says a payment was not made; One Interiors is looking into it` : ''}
           {e.status === 'PAID' && !e.paid.covered ? ' · a correction took the payment below the price: check it before releasing' : ''}
         </span>
