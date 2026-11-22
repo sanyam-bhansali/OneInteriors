@@ -77,6 +77,12 @@ export default async function PaymentsDeskPage() {
               Petty cash{pettyFlags ? ` · ${pettyFlags} to review` : ''}
             </Link>
           ) : null}
+          {/* Employee records (owner, 21 Nov 2026): owner and accounts only. */}
+          {member && !member.viewOnly && (member.role === 'OWNER' || member.role === 'ACCOUNTS') ? (
+            <Link href="/studio/people" className="btn sec">
+              People
+            </Link>
+          ) : null}
           {/* Who owes how much (owner, 13 Nov 2026). */}
           {seesMoneyDue(member) ? (
             <Link href="/studio/payments/due" className="btn sec">
