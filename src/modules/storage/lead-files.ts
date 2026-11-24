@@ -46,7 +46,7 @@ export async function leadUploadTicket(studioId: string, clientId: string, ext: 
   const key = secretKey();
   if (!config || !key) return { ok: false, error: 'File storage is not switched on for this deployment yet.' };
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: '{}',
@@ -68,7 +68,7 @@ export async function signedLeadFileLinks(paths: readonly string[]): Promise<Map
   const wanted = [...new Set(paths.filter((p) => p && !p.startsWith('dev-unstored/')))];
   if (!config || !key || wanted.length === 0) return out;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths: wanted }),
@@ -92,7 +92,7 @@ export async function readLeadFile(path: string): Promise<Uint8Array | null> {
   const key = secretKey();
   if (!config || !key || path.startsWith('dev-unstored/')) return null;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });
     if (!res.ok) return null;
@@ -109,7 +109,7 @@ export async function leadFileExists(path: string): Promise<boolean> {
   const key = secretKey();
   if (!config || !key) return false;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/info/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/info/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });
     return res.ok;
@@ -126,7 +126,7 @@ export async function removeLeadFiles(paths: readonly string[]): Promise<boolean
   const key = secretKey();
   if (!config || !key) return false;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ prefixes: stored }),

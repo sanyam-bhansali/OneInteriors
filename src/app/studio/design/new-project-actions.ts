@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { assignDesigner, type DesignResult } from '@/modules/studio-design/design-flow';
 
@@ -9,6 +11,7 @@ import { assignDesigner, type DesignResult } from '@/modules/studio-design/desig
  * refreshes the pages the project shows on.
  */
 export async function assignNewProjectAction(projectId: string, memberId: string): Promise<DesignResult> {
+  return guarded('assignNewProjectAction', { ok: false, error: SAVE_FAILED }, async () => {
   const id = String(projectId ?? '').slice(0, 64);
   const who = String(memberId ?? '').slice(0, 64);
   if (!who) return { ok: false, error: 'Pick a designer.' };
@@ -19,4 +22,5 @@ export async function assignNewProjectAction(projectId: string, memberId: string
     revalidatePath(`/studio/projects/${id}`);
   }
   return r;
+});
 }

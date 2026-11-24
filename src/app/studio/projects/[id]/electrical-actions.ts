@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { cancelExtra, sendExtra } from '@/modules/project/change-orders';
 import { saveElectricalDraft } from '@/modules/project/electrical-bill';
@@ -16,13 +18,19 @@ function done(projectId: string, r: { ok: boolean; message?: string; error?: str
 }
 
 export async function saveElectricalAction(projectId: string, input: { id?: string; lines: { room: string; itemId: string; qty: string; note: string }[]; discount: string }): Promise<Result> {
+  return guarded('saveElectricalAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(projectId, await saveElectricalDraft(projectId, input), 'Saved.');
+});
 }
 
 export async function sendElectricalAction(projectId: string, id: string): Promise<Result> {
+  return guarded('sendElectricalAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(projectId, await sendExtra(id), 'Sent to the client to approve in the app.');
+});
 }
 
 export async function cancelElectricalAction(projectId: string, id: string): Promise<Result> {
+  return guarded('cancelElectricalAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(projectId, await cancelExtra(id), 'Cancelled.');
+});
 }

@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { dismissAnnouncement } from '@/modules/studio/announcements';
 
@@ -15,7 +17,9 @@ export async function dismissAnnouncementAction(
   _prev: null,
   formData: FormData,
 ): Promise<null> {
+  return guarded('dismissAnnouncementAction', null, async () => {
   await dismissAnnouncement(String(formData.get('id') ?? ''));
   revalidatePath('/studio', 'layout');
   return null;
+});
 }

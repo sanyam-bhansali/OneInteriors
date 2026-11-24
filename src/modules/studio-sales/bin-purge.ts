@@ -41,9 +41,14 @@ export async function purgeBin(now = new Date()): Promise<PurgeRun> {
       keptForRetry += 1;
       continue;
     }
-    const { count } = await prisma.studioClient.deleteMany({
-      where: { id: lead.id, studioId: lead.studioId, deletedAt: { not: null, lte: cutoff } },
-    });
+    /* One lead that fails to erase is kept for tomorrow, never stops the rest (owner, 24 Nov 2026). */
+    const { count } = await prisma.studioClient
+      .deleteMany({ where: { id: lead.id, studioId: lead.studioId, deletedAt: { not: null, lte: cutoff } } })
+      .catch((error: unknown) => {
+        console.error('[cron] bin purge failed', lead.id, error instanceof Error ? error.message : error);
+        keptForRetry += 1;
+        return { count: 0 };
+      });
     erased += count;
     files += count > 0 ? paths.length : 0;
   }

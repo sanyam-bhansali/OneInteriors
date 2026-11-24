@@ -72,6 +72,22 @@ describe('a director', () => {
   });
 });
 
+describe('a director joins with email (owner, 24 Nov 2026)', () => {
+  it('is added by email, gets a team invite link, and turns active when they follow it', () => {
+    const store = readFileSync('src/modules/studio/team-store.ts', 'utf8');
+    expect(store).toContain("if (raw.director === true && typeof raw.email === 'string' && raw.email.trim() !== '') return inviteDirectorByEmail(lead, raw, baseUrl);");
+    expect(store).toContain("data: { studioId: lead.studioId, userId, role: 'OWNER', status: 'INVITED', isOwner: true, director: true, invitedById: lead.id, invitedAt: now }");
+    expect(store).toContain("purpose: 'team-invite'");
+    /* A customer account is never turned into a director by typing its email. */
+    expect(store).toContain("if (existing.role === 'CUSTOMER') return { ok: false, error: 'That email already has a One Interiors customer account.");
+    const link = readFileSync('src/modules/auth/magic-link.ts', 'utf8');
+    expect(link).toContain("await tx.studioMember.updateMany({ where: { userId: user.id, status: 'INVITED' }, data: { status: 'ACTIVE', lastSeenAt: new Date() } });");
+    expect(link).toContain("const sent = meta.purpose === 'team-invite'");
+    const controls = readFileSync('src/app/studio/settings/team/TeamControls.tsx', 'utf8');
+    expect(controls).toContain('data-testid="invite-email"');
+  });
+});
+
 describe('the door on every navigation', () => {
   it('a designer opens a Design Final but not My Quotations, and Back sends them home', () => {
     expect(mayOpen(DESIGNER, '/studio/quotations/q1')).toBe(true);

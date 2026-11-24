@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SiteTodayPage() {
   const now = new Date();
-  const [lang, user, data, crews, member] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now), crewsOnMySites(), currentMember()]);
+  const [lang, user, data, crews, member] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now), crewsOnMySites().catch(() => []), currentMember()]);
   /* My work (owner, 15 Oct 2026): the supervisor's Today, Next 3 days and Missed, first. */
   const work = member?.role === 'SUPERVISOR' ? await workFor(member, now).then((r) => r?.work ?? null).catch(() => null) : null;
   const t = siteWords(lang);

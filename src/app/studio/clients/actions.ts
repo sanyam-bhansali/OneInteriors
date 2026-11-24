@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import {
   addClient,
@@ -49,6 +51,7 @@ function refresh() {
 }
 
 export async function addClientAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('addClientAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await addClient({
     name: str(form, 'name'),
     phone: str(form, 'phone'),
@@ -92,9 +95,11 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
 
   refresh();
   return { ok: true };
+});
 }
 
 export async function updateClientAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('updateClientAction', { ok: false, error: SAVE_FAILED }, async () => {
   const lostReason = (str(form, 'lostReason') || null) as LostReasonName | null;
 
   const result = await updateClient({
@@ -109,6 +114,7 @@ export async function updateClientAction(_prev: State, form: FormData): Promise<
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 /**
@@ -119,10 +125,12 @@ export async function updateClientAction(_prev: State, form: FormData): Promise<
  * one. The card's own form asks.
  */
 export async function setStageAction(id: string, stageId: string): Promise<State> {
+  return guarded('setStageAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await updateClient({ id, stageId });
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 /**
@@ -133,6 +141,7 @@ export async function setStageAction(id: string, stageId: string): Promise<State
  * stopped doing rather than admit it on a screen everyone can see.
  */
 export async function assignAction(ids: string[], memberId: string | null): Promise<State> {
+  return guarded('assignAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Nobody selected.' };
 
   const result = await assignClients(ids, memberId);
@@ -141,6 +150,7 @@ export async function assignAction(ids: string[], memberId: string | null): Prom
   refresh();
   revalidatePath('/studio/clients/pool');
   return { ok: true };
+});
 }
 
 /**
@@ -165,6 +175,7 @@ export async function logContactAction(
    */
   moveToStageId?: string | null,
 ): Promise<State> {
+  return guarded('logContactAction', { ok: false, error: SAVE_FAILED }, async () => {
   /* Validated against the list rather than cast. An outcome arriving from a
      form is a string, and an unrecognised one would be written verbatim into
      a permanent record that nothing can edit afterwards. */
@@ -177,6 +188,7 @@ export async function logContactAction(
   refresh();
   revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
+});
 }
 
 /**
@@ -194,6 +206,7 @@ export async function logPickedUpAction(
   id: string,
   input: { reactions?: unknown; note?: unknown; minutes?: unknown; stageId?: unknown; when?: { day: string; time: string } | null },
 ): Promise<State> {
+  return guarded('logPickedUpAction', { ok: false, error: SAVE_FAILED }, async () => {
   const note = typeof input?.note === 'string' ? input.note.trim().slice(0, 2000) : '';
   if (!note) return { ok: false, error: 'Write a line about the call before logging it.' };
   const reactions = cleanReactions(input.reactions);
@@ -214,6 +227,7 @@ export async function logPickedUpAction(
   refresh();
   revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
+});
 }
 
 /** If the stage picked is a lost one, why: from what they said on the call. */
@@ -246,39 +260,47 @@ function refreshBin() {
  * this is the one delete in the product that does not go via the bin.
  */
 export async function removeDemoLeadAction(): Promise<State> {
+  return guarded('removeDemoLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await removeDemoLead();
   if (!result.ok) return result;
   revalidatePath('/studio/clients');
   revalidatePath('/studio');
   return { ok: true };
+});
 }
 
 export async function binAction(ids: string[]): Promise<State> {
+  return guarded('binAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 
   const result = await binClients(ids);
   if (!result.ok) return result;
   refreshBin();
   return { ok: true };
+});
 }
 
 export async function restoreAction(ids: string[]): Promise<State> {
+  return guarded('restoreAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 
   const result = await restoreClients(ids);
   if (!result.ok) return result;
   refreshBin();
   return { ok: true };
+});
 }
 
 /** Gone for good, now rather than in thirty days. Only ever from the bin. */
 export async function eraseAction(ids: string[]): Promise<State> {
+  return guarded('eraseAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 
   const result = await eraseClients(ids);
   if (!result.ok) return result;
   refreshBin();
   return { ok: true };
+});
 }
 
 /**
@@ -289,6 +311,7 @@ export async function eraseAction(ids: string[]): Promise<State> {
  * guessed ids folds nothing.
  */
 export async function mergeAction(keepId: string, loserId: string): Promise<State> {
+  return guarded('mergeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await mergeClients(keepId, loserId);
   if (!result.ok) return result;
 
@@ -297,6 +320,7 @@ export async function mergeAction(keepId: string, loserId: string): Promise<Stat
   revalidatePath(`/studio/clients/${loserId}`);
   revalidatePath('/studio/clients/bin');
   return { ok: true };
+});
 }
 
 /** Accept or decline a client One Interiors introduced. */
@@ -305,6 +329,7 @@ export async function answerIntroductionAction(
   answer: 'accept' | 'decline',
   reason: string,
 ): Promise<IntroAnswer> {
+  return guarded('answerIntroductionAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (answer !== 'accept' && answer !== 'decline') return { ok: false, error: 'Accept or decline.' };
   const result = await answerIntroduction(String(introductionId), answer, String(reason ?? ''));
   if (result.ok) {
@@ -312,6 +337,7 @@ export async function answerIntroductionAction(
     revalidatePath('/studio');
   }
   return result;
+});
 }
 
 /**
@@ -320,9 +346,11 @@ export async function answerIntroductionAction(
  * person decides; nothing marks a lead lost by itself.
  */
 export async function markLostAction(id: string, reason: string): Promise<State> {
+  return guarded('markLostAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await markLost(String(id ?? ''), String(reason ?? ''));
   if (!result.ok) return result;
   refresh();
   revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
+});
 }

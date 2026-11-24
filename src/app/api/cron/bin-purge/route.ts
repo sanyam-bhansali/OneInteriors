@@ -28,7 +28,14 @@ export async function GET(req: Request) {
     return Response.json({ ok: false }, { status: 401 });
   }
   if (!hasDatabase()) return Response.json({ ok: true, erased: 0 });
-  const run = await purgeBin();
-  const conversions = await retryConversions();
+  /* Each half on its own (owner, 24 Nov 2026): a failed purge never stops the conversion retries. */
+  const run = await purgeBin().catch((error: unknown) => {
+    console.error('[cron] purgeBin failed', error instanceof Error ? error.message : error);
+    return { erased: 0, failed: true };
+  });
+  const conversions = await retryConversions().catch((error: unknown) => {
+    console.error('[cron] retryConversions failed', error instanceof Error ? error.message : error);
+    return null;
+  });
   return Response.json({ ok: true, ...run, conversions });
 }

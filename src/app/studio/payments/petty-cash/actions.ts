@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { giveCash, reviewExpense, type PettyResult } from '@/modules/petty-cash/store';
 
@@ -15,9 +17,13 @@ function done(r: PettyResult): PettyResult {
 }
 
 export async function giveCashAction(input: { memberId: string; amount: string; givenOn: string; note: string }): Promise<PettyResult> {
+  return guarded('giveCashAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await giveCash(input));
+});
 }
 
 export async function reviewExpenseAction(id: string, action: 'clear' | 'reject' | 'undo', note: string): Promise<PettyResult> {
+  return guarded('reviewExpenseAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await reviewExpense(id, action, note));
+});
 }

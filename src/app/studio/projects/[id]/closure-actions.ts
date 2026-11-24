@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * The project closure (owner, 13 Oct 2026; docs/studio-os/PROJECT-LIFECYCLE.md).
  * Every check is in the module (project/closure.ts): `project.closure` on the
@@ -12,6 +14,7 @@ import { saveClosure } from '@/modules/project/closure';
 export type ClosureActionResult = { ok: true; message: string } | { ok: false; error: string };
 
 export async function saveClosureAction(projectId: string, input: { lines: unknown; note: unknown; fix: boolean }): Promise<ClosureActionResult> {
+  return guarded('saveClosureAction', { ok: false, error: SAVE_FAILED }, async () => {
   const id = String(projectId ?? '').slice(0, 64);
   const r = await saveClosure(id, { lines: input.lines, note: input.note, fix: input.fix === true });
   if (r.ok) {
@@ -22,4 +25,5 @@ export async function saveClosureAction(projectId: string, input: { lines: unkno
     return { ok: true, message: r.message };
   }
   return { ok: false, error: r.error };
+});
 }

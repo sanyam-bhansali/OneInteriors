@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { cancelExtra, sendAdditionalScope, sendSimpleScope } from '@/modules/project/change-orders';
 
@@ -24,6 +26,7 @@ export interface SimpleScopeForm {
 
 /** The simple form (13 Nov 2026): lines, the impact, days or a date. */
 export async function sendSimpleScopeAction(projectId: string, form: SimpleScopeForm): Promise<ScopeActionResult> {
+  return guarded('sendSimpleScopeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const rows = Array.isArray(form?.lines) ? form.lines.slice(0, 20) : [];
   const r = await sendSimpleScope(id(projectId), {
     lines: rows.map((l) => ({ item: text(l?.item, 200), details: text(l?.details, 800), amount: text(l?.amount, 20) })),
@@ -33,18 +36,23 @@ export async function sendSimpleScopeAction(projectId: string, form: SimpleScope
   });
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 /** Take back a scope the client has not answered yet. */
 export async function cancelScopeAction(projectId: string, orderId: string): Promise<ScopeActionResult> {
+  return guarded('cancelScopeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await cancelExtra(id(orderId));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 /** A 12 Nov builder-made scope draft: still sendable with its days. */
 export async function sendScopeAction(projectId: string, quoteId: string, days: string): Promise<ScopeActionResult> {
+  return guarded('sendScopeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await sendAdditionalScope(id(projectId), id(quoteId), String(days ?? '').slice(0, 6));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }

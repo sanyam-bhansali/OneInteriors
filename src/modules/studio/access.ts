@@ -153,19 +153,33 @@ export interface ProjectAccess {
  * need it, so an owner costs one query.
  */
 export async function accessTo(member: StudioMemberRef, homeProjectId: string): Promise<ProjectAccess | null> {
+  const facts = await projectFacts(member.studioId, member.id, needsAssignment(member.role), homeProjectId);
+  if (!facts) return null;
+  const { assigned } = facts;
+  return { assigned, may: (action) => can(member, action, { assigned }) };
+}
+
+/**
+ * Whether the project is this studio's and this member is on it, read once per
+ * page render (React `cache`; speed, owner 24 Nov 2026). The project page asked
+ * it about twelve times, one panel after another. Keyed on plain values, so the
+ * same answer is never reused for another member or studio; server actions are
+ * not memoised, so a write always reads fresh.
+ */
+const projectFacts = cache(async (studioId: string, memberId: string, needsAssign: boolean, homeProjectId: string): Promise<{ assigned: boolean } | null> => {
   const project = await prisma.homeProject.findUnique({
     where: { id: homeProjectId },
     select: { introduction: { select: { studioId: true } } },
   });
-  if (!project || project.introduction.studioId !== member.studioId) return null;
-  const assigned = needsAssignment(member.role)
+  if (!project || project.introduction.studioId !== studioId) return null;
+  const assigned = needsAssign
     ? (await prisma.studioProjectMember.findUnique({
-        where: { homeProjectId_memberId: { homeProjectId, memberId: member.id } },
+        where: { homeProjectId_memberId: { homeProjectId, memberId } },
         select: { id: true },
       })) !== null
     : false;
-  return { assigned, may: (action) => can(member, action, { assigned }) };
-}
+  return { assigned };
+});
 
 export const ACCESS_ERRORS = {
   signIn: 'Sign in as your studio first.',

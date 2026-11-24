@@ -88,7 +88,7 @@ export async function sendOtp(
   try {
     const res = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${cfg.phoneNumberId}/messages`,
-      {
+      { signal: AbortSignal.timeout(10000),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${cfg.accessToken}`,
@@ -149,7 +149,7 @@ export async function sendTemplate(
   const cfg = config();
   if (!cfg) return { delivered: false, reason: 'no_provider' };
   try {
-    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${cfg.phoneNumberId}/messages`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${cfg.phoneNumberId}/messages`, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({

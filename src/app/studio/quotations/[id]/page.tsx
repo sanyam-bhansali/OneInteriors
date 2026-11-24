@@ -54,16 +54,18 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     getQuote(id),
     myProducts(),
     myBranding(),
-    myTier(),
-    myPlan(),
+    myTier().catch(() => null),
+    myPlan().catch(() => null),
   ]);
 
   if (!quote) notFound();
 
-  const member = await currentMember();
-  const [logoUrl, project, sales, planReader, docCtx] = await Promise.all([
+  const [member, photoStudioId] = await Promise.all([currentMember(), quotingStudioId()]);
+  /* Everything below needs only the quotation, so it is read at once (speed, owner 24 Nov 2026); the side panels
+     (logo, photos, signatures, the way back to the project, the frozen sales final) degrade to empty on their own. */
+  const [logoUrl, project, sales, planReader, docCtx, backFound, noPhotos, signatures, salesFinal] = await Promise.all([
     /* The studio's logo for anyone who may quote for it, sales included (owner, 13 Oct 2026). */
-    quotingStudioId().then((sid) => signedQuoteLogoUrl(branding?.logoPath ?? null, sid)),
+    signedQuoteLogoUrl(branding?.logoPath ?? null, photoStudioId).catch(() => null),
     // A project running on this quotation, or whether one can start from it (own client, sent or won).
     projectForQuote(member, quote.id),
     // Revisions sent and the sales final (Studio OS Phase 1).
@@ -72,23 +74,21 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     planReaderFor(quote.clientId),
     // The PDF preview tab: brand pages, payment stages, material specification, terms (13 Oct 2026).
     quoteDocContext(quote),
+    /* "Back to project" (owner, 13 Nov 2026): a quotation that belongs to a project leads back to it. */
+    photoStudioId && !quote.scopeForProjectId ? projectIdOfQuote(quote, photoStudioId).catch(() => null) : Promise.resolve(null),
+    /* Every line needs a photo before it is sent (owner, 10 Nov 2026): what is missing, worked out on the server like the refusal itself. */
+    photoStudioId && quote.lines.length > 0 && photosRequired() ? missingPhotosOnQuote(quote.id, photoStudioId).catch(() => []) : Promise.resolve([]),
+    photoStudioId ? signaturesOfQuote(quote.id, photoStudioId).catch(() => new Map<number, string>()) : Promise.resolve(new Map<number, string>()),
+    /* A Design Final compares with the sales final as frozen (DESIGN-PROCESS-PLAN.md §4.1). */
+    quote.stage === 'DESIGN' && quote.basedOnId ? salesFinalSnapshot(quote.basedOnId) : Promise.resolve(null),
   ]);
-  /* Every line needs a photo before it is sent (owner, 10 Nov 2026): what is missing, worked out on the server like the refusal itself. */
-  const photoStudioId = await quotingStudioId();
-  /* "Back to project" (owner, 13 Nov 2026): a quotation that belongs to a project leads back to it. */
-  const backProjectId = quote.scopeForProjectId ?? project.projectId ?? (photoStudioId ? await projectIdOfQuote(quote, photoStudioId).catch(() => null) : null);
-  const noPhotos = photoStudioId && quote.lines.length > 0 && photosRequired() ? await missingPhotosOnQuote(quote.id, photoStudioId) : [];
-  const signatures = await quotingStudioId()
-    .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
-    .catch(() => new Map<number, string>());
+  const backProjectId = quote.scopeForProjectId ?? project.projectId ?? backFound;
   /* Owner and PM may add a typed line to the product list; a salesperson asks. */
   const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM') && !quoteReadOnly(member);
   const mayBook = member !== null && can(member, 'booking.record');
 
   const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
 
-  /* A Design Final compares with the sales final as frozen (DESIGN-PROCESS-PLAN.md §4.1). */
-  const salesFinal = quote.stage === 'DESIGN' && quote.basedOnId ? await salesFinalSnapshot(quote.basedOnId) : null;
   /* Booked: a live project runs on it, and the server refuses writes (write-rules.ts). */
   /* A sales rep reads, never changes (owner, 22 Nov 2026); the server refuses their writes too (quoteScope). */
   const viewOnly = member !== null && quoteReadOnly(member);

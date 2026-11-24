@@ -57,7 +57,7 @@ export async function sendMagicLink(to: string, link: string): Promise<SendResul
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,
@@ -164,7 +164,7 @@ export async function sendStudioWelcome(
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,
@@ -188,6 +188,54 @@ export async function sendStudioWelcome(
     return { delivered: true };
   } catch (err) {
     console.error('[studio] Welcome send failed:', err instanceof Error ? err.message : err);
+    return { delivered: false, reason: 'network' };
+  }
+}
+
+/**
+ * Joining a studio's team by email (owner, 24 Nov 2026: a director joins with
+ * their email). Plain text like the welcome: who added them, the link (seven
+ * days), and how to sign in after it.
+ */
+export async function sendTeamInvite(to: string, link: string, invite: { contactName: string | null; studioName: string }): Promise<SendResult> {
+  const cfg = config();
+  const text = [
+    invite.contactName ? `Hello ${invite.contactName},` : 'Hello,',
+    '',
+    `You have been added to ${invite.studioName}'s team on One Interiors.`,
+    '',
+    'Open the studio:',
+    link,
+    '',
+    'That link is good for seven days and signs you straight in.',
+    'After that, sign in at studio.oneinteriors.in: pick Owner / admin, then Email, and we send you a fresh link.',
+    '',
+    'One Interiors',
+  ].join('\n');
+
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[studio] ${cfg.message} — team invite NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[studio] Team invite for ${to}:\n  ${link}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+
+  try {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: cfg.from, to, subject: `You're on ${invite.studioName}'s team`, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`[studio] Resend ${res.status}: ${body.slice(0, 300)}`);
+      return { delivered: false, reason: `provider_${res.status}` };
+    }
+    return { delivered: true };
+  } catch (err) {
+    console.error('[studio] Team invite send failed:', err instanceof Error ? err.message : err);
     return { delivered: false, reason: 'network' };
   }
 }
@@ -417,7 +465,7 @@ async function send(
   attachments?: { filename: string; content: string }[],
 ): Promise<SendResult> {
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,

@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { createDecision } from '@/modules/project/decision-flow';
 
@@ -9,6 +11,7 @@ import { createDecision } from '@/modules/project/decision-flow';
  * (two or three), the date, the amounts.
  */
 export async function createDecisionAction(form: FormData): Promise<{ ok: boolean; id?: string; error?: string }> {
+  return guarded('createDecisionAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = String(form.get('projectId') ?? '').slice(0, 64);
   let options: unknown = null;
   try {
@@ -27,4 +30,5 @@ export async function createDecisionAction(form: FormData): Promise<{ ok: boolea
   );
   if (r.ok) revalidatePath(`/studio/projects/${projectId}`);
   return r.ok ? { ok: true, id: r.id } : { ok: false, error: r.error };
+});
 }

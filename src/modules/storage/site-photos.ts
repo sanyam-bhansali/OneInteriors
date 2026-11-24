@@ -48,7 +48,7 @@ export async function storeSitePhoto(projectId: string, file: File): Promise<Sit
 
   const path = `project_${projectId}/${crypto.randomUUID()}.${extension}`;
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type, 'x-upsert': 'false' },
       body: await file.arrayBuffer(),
@@ -66,7 +66,7 @@ export async function signedSitePhotoUrls(paths: string[]): Promise<string[]> {
   const key = secretKey();
   if (!config || !key || paths.length === 0) return [];
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths }),

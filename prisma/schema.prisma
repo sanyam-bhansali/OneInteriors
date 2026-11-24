@@ -3981,6 +3981,9 @@ model StudioQuote {
   /// whole quotation history.
   @@index([clientId])
   @@index([scopeForProjectId])
+  /// Speed (owner, 24 Nov 2026): Design Finals and sign-offs look quotations up by the one they came from; My Quotations orders by updatedAt with no status.
+  @@index([basedOnId])
+  @@index([studioId, updatedAt])
   @@map("studio_quotes")
 }
 
@@ -4452,6 +4455,8 @@ model StudioClient {
   /// "By campaign" on lead analytics (20261022100000_lead_routing_attribution).
   @@index([studioId, campaignId])
   @@index([studioId, poolTeamId])
+  /// Speed (owner, 24 Nov 2026): a board column is one stage, newest first.
+  @@index([studioId, stageId, createdAt])
   @@map("studio_clients")
 }
 

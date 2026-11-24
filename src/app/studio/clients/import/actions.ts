@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { countExistingPhones, importClients } from '@/modules/studio-practice/clients';
 import { parseCsv, planImport, type ColumnKey } from '@/modules/studio-practice/csv';
@@ -60,6 +62,7 @@ const KEYS: ColumnKey[] = [
  * (`custom:<key>`); values are checked against the field on write.
  */
 export async function importCsvAction(text: string, mapping: string[], source = 'OTHER', leadSourceId: string | null = null): Promise<ImportState> {
+  return guarded('importCsvAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (typeof text !== 'string' || text.trim().length === 0) {
     return { ok: false, error: 'No file.' };
   }
@@ -99,6 +102,7 @@ export async function importCsvAction(text: string, mapping: string[], source = 
     skippedNoName: plan.skippedNoName,
     duplicatesInFile: plan.duplicatesInFile,
   };
+});
 }
 
 /**
