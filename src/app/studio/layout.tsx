@@ -165,7 +165,7 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
     const path = (await headers()).get(PATH_HEADER);
     /* A one-time password from the owner (owner, 27 Oct 2026): choose your
        own before anything else. Not while staff view as someone (read only). */
-    if (path && !view && !path.startsWith(PASSWORD_PATH) && (await mustChoosePassword(user.id))) redirect(PASSWORD_PATH);
+    if (path && !view && !path.startsWith(PASSWORD_PATH) && (await mustChoosePassword(user.id).catch(() => false))) redirect(PASSWORD_PATH);
     /* No header (middleware did not run) means no redirect: redirecting on a
        guess could loop. The module layer still holds. */
     const door = path ? doorFor(member, path) : null;
@@ -189,7 +189,8 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
     }
   }
 
-  const context = await shellContext(view ? { id: view.memberId } : { userId: user.id });
+  /* The frame's counts and the To build badge together (speed, owner 24 Nov 2026): they waited for each other. */
+  const [context, builtApps] = await Promise.all([shellContext(view ? { id: view.memberId } : { userId: user.id }), member ? withToBuild(appsFor(member), member) : Promise.resolve(null)]);
 
   /* A studio still in setup keeps the setup frame: the software opens when they
      submit (crmIsOpen), and until then Setup is the only thing in their way. */
@@ -216,7 +217,7 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
      member's apps (`appsFor` asks `mayOpen` for each, so a tile never points
      at a screen the door above would bounce). No membership row (an ops
      account looking in) sees every app, as the old rail did. */
-  const apps = member ? await withToBuild(appsFor(member), member) : [...APPS];
+  const apps = builtApps ?? [...APPS];
   const office = !member || usesOfficeShell(member);
   return (
     <Themed>
@@ -584,7 +585,8 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
  */
 async function withToBuild(apps: ReturnType<typeof appsFor>, member: { id: string; studioId: string }): Promise<ReturnType<typeof appsFor>> {
   if (!apps.some((a) => a.tabs.some((t) => t.href === TO_BUILD_PATH))) return apps;
-  const count = await toBuildCount(member);
+  /* A badge, never a reason for every studio page to fail (owner, 24 Nov 2026: protect from crashing). */
+  const count = await toBuildCount(member).catch(() => 0);
   if (count === 0) return apps;
   return apps.map((a) => ({ ...a, tabs: a.tabs.map((t) => (t.href === TO_BUILD_PATH ? { ...t, count } : t)) }));
 }

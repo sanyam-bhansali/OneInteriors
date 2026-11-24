@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * The leads list and board's server actions (leads at scale, 12 Oct 2026):
  * bulk actions, claiming from the pool, and the board's "show more". Every
@@ -40,45 +42,63 @@ async function done(p: Promise<{ ok: true; message: string } | { ok: false; erro
 }
 
 export async function bulkClaimAction(t: unknown): Promise<Done> {
+  return guarded('bulkClaimAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkClaim(target(t)));
+});
 }
 
 export async function bulkAssignAction(t: unknown, memberId: string | null): Promise<Done> {
+  return guarded('bulkAssignAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkAssign(target(t), typeof memberId === 'string' && memberId ? memberId : null));
+});
 }
 
 export async function bulkSplitAction(t: unknown, memberIds: string[]): Promise<Done> {
+  return guarded('bulkSplitAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkSplit(target(t), Array.isArray(memberIds) ? memberIds : []));
+});
 }
 
 export async function bulkMoveAction(t: unknown, stageId: string, lostReason: string | null): Promise<Done> {
+  return guarded('bulkMoveAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkMove(target(t), String(stageId ?? ''), typeof lostReason === 'string' ? lostReason : null));
+});
 }
 
 export async function bulkFollowUpAction(t: unknown, day: string, time: string, action: string): Promise<Done> {
+  return guarded('bulkFollowUpAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkFollowUp(target(t), String(day ?? ''), typeof time === 'string' ? time : '', typeof action === 'string' ? action : ''));
+});
 }
 
 export async function bulkBinAction(t: unknown): Promise<Done> {
+  return guarded('bulkBinAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await done(bulkBin(target(t)));
   if (r.ok) revalidatePath('/studio/clients/bin');
   return r;
+});
 }
 
 /** The board's "Show more": the next 50 cards of one column, with the same filters. */
 export async function moreCardsAction(query: string, stageId: string, offset: number): Promise<ClientRow[]> {
+  return guarded('moreCardsAction', [], async () => {
   const filters = parseLeadFilters(new URLSearchParams(typeof query === 'string' ? query.slice(0, 2000) : ''));
   return moreCards(filters, String(stageId ?? ''), Number(offset));
+});
 }
 
 /** The stale-lead review: snooze 7 days. */
 export async function bulkSnoozeAction(t: unknown): Promise<Done> {
+  return guarded('bulkSnoozeAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkSnooze(target(t)));
+});
 }
 
 /** The stale-lead review: mark lost, one reason for the batch. */
 export async function bulkMarkLostAction(t: unknown, reason: string): Promise<Done> {
+  return guarded('bulkMarkLostAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(bulkMarkLost(target(t), String(reason ?? '')));
+});
 }
 
 /**
@@ -122,11 +142,13 @@ export async function columnPageAction(query: string, stageId: string, after: st
 
 /** Move a lead to a column (board drop, the list's stage dropdown). A lost column needs the reason. */
 export async function moveLeadAction(id: string, stageId: string, lostReason: string | null): Promise<Done> {
+  return guarded('moveLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await updateClient({ id: String(id ?? ''), stageId: String(stageId ?? ''), lostReason: (typeof lostReason === 'string' && lostReason ? lostReason : null) as LostReasonName | null });
   if (!r.ok) return r;
   refresh();
   revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
+});
 }
 
 async function onLead(id: unknown, p: Promise<{ ok: true; message?: string } | { ok: false; error: string }>): Promise<Done> {
@@ -139,17 +161,27 @@ async function onLead(id: unknown, p: Promise<{ ok: true; message?: string } | {
 }
 
 export async function addTagsAction(id: string, tags: string[]): Promise<Done> {
+  return guarded('addTagsAction', { ok: false, error: SAVE_FAILED }, async () => {
   return onLead(id, addLeadTags(id, tags));
+});
 }
 export async function removeTagAction(id: string, tag: string): Promise<Done> {
+  return guarded('removeTagAction', { ok: false, error: SAVE_FAILED }, async () => {
   return onLead(id, removeLeadTag(id, tag));
+});
 }
 export async function editNoteAction(id: string, noteId: string, text: string): Promise<Done> {
+  return guarded('editNoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   return onLead(id, editLeadNote(id, noteId, text));
+});
 }
 export async function deleteNoteAction(id: string, noteId: string): Promise<Done> {
+  return guarded('deleteNoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   return onLead(id, deleteLeadNote(id, noteId));
+});
 }
 export async function followUpDoneAction(id: string): Promise<Done> {
+  return guarded('followUpDoneAction', { ok: false, error: SAVE_FAILED }, async () => {
   return onLead(id, followUpDone(id));
+});
 }

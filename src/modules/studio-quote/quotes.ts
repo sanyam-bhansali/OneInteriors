@@ -176,7 +176,8 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
           : {}),
       },
       orderBy: { updatedAt: 'desc' },
-      include: { lines: true },
+      /* Only what the total needs (`toLineInput`), not whole lines (speed, owner 24 Nov 2026): up to 500 quotations of dozens of lines each. */
+      include: { lines: { select: { code: true, unit: true, ratePaise: true, widthMm: true, heightMm: true, qtyMilli: true, amountPaise: true } } },
       take: 500,
     });
 

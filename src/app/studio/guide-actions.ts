@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded } from '@/lib/action-guard';
+
 /**
  * Skipping, and bringing it back.
  *
@@ -14,7 +16,9 @@ import { setDismissed } from '@/modules/studio/guide-store';
 import type { GuideId } from '@/modules/studio/guide';
 
 export async function dismissGuideAction(guide: GuideId, dismissed: boolean): Promise<void> {
+  return guarded('dismissGuideAction', undefined, async () => {
   await setDismissed(guide, dismissed);
   revalidatePath(guide === 'leads' ? '/studio/clients' : '/studio/quotations');
   revalidatePath('/studio');
+});
 }

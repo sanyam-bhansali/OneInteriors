@@ -67,7 +67,7 @@ export async function uploadTicket(projectId: string, kind: 'site' | 'voice', co
   if (!config || !key) return { ok: false, error: 'storage' };
   const path = uploadPath(projectId, kind, uuid, ext);
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: '{}',
@@ -94,7 +94,7 @@ export async function signedPhotoMap(paths: readonly string[]): Promise<Map<stri
   const wanted = [...new Set(paths.filter((p) => p && !p.startsWith('dev-unstored/')))];
   if (!config || !key || wanted.length === 0) return out;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths: wanted }),
@@ -118,7 +118,7 @@ export async function readVoice(path: string): Promise<Uint8Array | null> {
   const key = secretKey();
   if (!config || !key || path.startsWith('dev-unstored/')) return null;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });
     if (!res.ok) return null;

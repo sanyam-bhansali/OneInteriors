@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
 import { saveBranding, parseMaterialSpec } from '@/modules/studio-quote/store';
@@ -27,6 +29,7 @@ function toBps(raw: string): number | null {
 }
 
 export async function saveBrandingAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('saveBrandingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const str = (k: string) => String(form.get(k) ?? '').trim();
 
   const feeBps = toBps(str('feePct') || '0');
@@ -65,6 +68,7 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
   // The modular discount is on customers' first quotes, read from the cached roster.
   await revalidateRoster();
   return { ok: true };
+});
 }
 
 // ── Logo and the attribution mark ──────────────────────────────

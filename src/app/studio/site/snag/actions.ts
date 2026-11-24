@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { hearSnagFix, markSnagFixed } from '@/modules/project/snag-flow';
 
@@ -14,7 +16,9 @@ import { hearSnagFix, markSnagFixed } from '@/modules/project/snag-flow';
 export type Heard = { transcript: string; transcriptLang: string; customerText: string; customerLang: string; provider: string } | null;
 
 export async function hearFixAction(snagId: string, voicePath: string, lang: string): Promise<{ ok: true; heard: Heard } | { ok: false; error: string }> {
+  return guarded('hearFixAction', { ok: false, error: SAVE_FAILED }, async () => {
   return hearSnagFix(String(snagId).slice(0, 64), String(voicePath).slice(0, 200), String(lang).slice(0, 4));
+});
 }
 
 export async function markFixedAction(
@@ -25,6 +29,7 @@ export async function markFixedAction(
     voice: { path: string; transcript: string; lang: string | null; customerText: string } | null;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  return guarded('markFixedAction', { ok: false, error: SAVE_FAILED }, async () => {
   const id = String(snagId).slice(0, 64);
   const r = await markSnagFixed(id, {
     photoPaths: Array.isArray(input?.photoPaths) ? input.photoPaths.map((p) => String(p).slice(0, 200)).slice(0, 4) : [],
@@ -42,4 +47,5 @@ export async function markFixedAction(
   revalidatePath('/studio/site/snag');
   revalidatePath(`/studio/site/snag/${id}`);
   return { ok: true };
+});
 }

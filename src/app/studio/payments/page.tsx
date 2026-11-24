@@ -36,13 +36,13 @@ export const dynamic = 'force-dynamic';
  * says they did not make, then money waiting for their yes.
  */
 export default async function PaymentsDeskPage() {
-  const [projects, member, toBook, recent] = await Promise.all([paymentsDesk(), currentMember(), bookingsToRecord(), recentBookings()]);
+  const [projects, member, toBook, recent] = await Promise.all([paymentsDesk(), currentMember(), bookingsToRecord().catch(() => []), recentBookings().catch(() => [])]);
   /* Studio OS Phase 1: the booking advance is recorded here too, on the
      sales final, with the same form as the lead page. */
   /* The project lifecycle — TO BE SPECIFIED (owner): the accounts flow for the closure's final payment. For now it shows here, first, and is recorded with the same payment recording. */
-  const [finals, extras] = await Promise.all([finalPayments(projects.map((p) => p.id)), extrasToCollect(projects.map((p) => p.id))]);
-  const pettyFlags = member && can(member, 'payment.record') ? await flaggedCount(member.studioId) : 0;
-  const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId)] as const)));
+  const [finals, extras] = await Promise.all([finalPayments(projects.map((p) => p.id)).catch(() => new Map()), extrasToCollect(projects.map((p) => p.id)).catch(() => new Map())]);
+  const pettyFlags = member && can(member, 'payment.record') ? await flaggedCount(member.studioId).catch(() => 0) : 0;
+  const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId).catch(() => null)] as const)));
   const weight = (p: (typeof projects)[number]) => {
     const rows = p.payments?.rows ?? [];
     if (finals.has(p.id) && (p.payments?.ledger.balancePaise ?? 0) > 0) return -1;

@@ -59,7 +59,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
   /* The person's own home (profile menu): their tile order, hidden tiles and
      the "Right now" strip. Only ever a subset of `appsFor`. */
   const allApps = member ? appsFor(member) : [...APPS];
-  const prefs = member ? await myHomePrefs(member.id) : DEFAULT_HOME_PREFS;
+  const prefs = member ? await myHomePrefs(member.id).catch(() => DEFAULT_HOME_PREFS) : DEFAULT_HOME_PREFS;
   const tiles = homeTiles(allApps, prefs);
   /* A director (owner, 24 Nov 2026): projects first; Leads and Quotations under More, read only. */
   const director = member ? isDirector(member) : false;
@@ -76,7 +76,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
     /* A director's home is projects, not the day's calls (owner, 24 Nov 2026). */
-    member && ['OWNER', 'PM', 'SALES'].includes(member.role) && !isDirector(member) ? myToday() : Promise.resolve(null),
+    member && ['OWNER', 'PM', 'SALES'].includes(member.role) && !isDirector(member) ? myToday().catch(() => null) : Promise.resolve(null),
     getLang(),
     member && ['OWNER', 'PM', 'DESIGNER'].includes(member.role) ? mySitesToday().catch(() => null) : Promise.resolve(null),
     member?.role === 'PM' ? crewsOnMySites().catch(() => []) : Promise.resolve([]),
@@ -87,7 +87,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     /* My work (owner, 15 Oct 2026): Today, Next 3 days, Missed — the first thing on every home. */
     member ? workFor(member, new Date()).then((r) => r?.work ?? null).catch(() => null) : Promise.resolve(null),
     /* Office meetings (owner, 27 Oct 2026): ones asked of them, and suggested times on theirs. */
-    member ? meetingsWaiting(member) : Promise.resolve(0),
+    /* Each panel degrades to empty on its own (owner, 24 Nov 2026: protect from crashing): a failed count never takes the home down. */
+    member ? meetingsWaiting(member).catch(() => 0) : Promise.resolve(0),
     searchParams,
     /* New projects to assign a designer to (owner, 13 Nov 2026): null for those who do not assign. */
     member && ['OWNER', 'PM', 'DESIGNER'].includes(member.role) ? newProjectsForMe().catch(() => null) : Promise.resolve(null),

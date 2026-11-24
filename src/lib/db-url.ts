@@ -13,7 +13,11 @@
  * database (the test copy is a single-connection PGlite) is left alone.
  * `DB_POOL_SIZE` overrides the default.
  */
-export const DEFAULT_POOL_SIZE = 5;
+/* 8 (owner, 24 Nov 2026: speed and crash protection): the busiest pages ask for about a dozen things at once. */
+export const DEFAULT_POOL_SIZE = 8;
+
+/** Seconds a query may wait for a free connection before Prisma gives up (P2024); its default is 10. */
+export const POOL_TIMEOUT_SECONDS = 20;
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
@@ -35,5 +39,6 @@ export function withPoolSize(url: string | undefined, size: number): string | nu
   const current = Number.parseInt(parsed.searchParams.get('connection_limit') ?? '', 10);
   if (!Number.isFinite(current) || current >= size) return null;
   parsed.searchParams.set('connection_limit', String(size));
+  if (!parsed.searchParams.has('pool_timeout')) parsed.searchParams.set('pool_timeout', String(POOL_TIMEOUT_SECONDS));
   return parsed.toString();
 }

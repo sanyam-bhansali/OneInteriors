@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded } from '@/lib/action-guard';
+
 import { findClients, type FoundClient } from '@/modules/studio-practice/clients';
 import { searchEverything, type FoundThing } from '@/modules/studio/search';
 
@@ -16,12 +18,16 @@ import { searchEverything, type FoundThing } from '@/modules/studio/search';
  * in, her number — which fit in a panel.
  */
 export async function searchAction(query: string): Promise<FoundClient[]> {
+  return guarded('searchAction', [], async () => {
   if (typeof query !== 'string') return [];
   return findClients(query);
+});
 }
 
 /** Projects, quotations, documents and notes (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §5). */
 export async function searchMoreAction(query: string): Promise<FoundThing[]> {
+  return guarded('searchMoreAction', [], async () => {
   if (typeof query !== 'string') return [];
   return searchEverything(query);
+});
 }

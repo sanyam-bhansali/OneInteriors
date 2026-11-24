@@ -113,7 +113,7 @@ export async function storePublicImage(folder: string, file: File): Promise<Imag
   const path = `${folder}/${crypto.randomUUID()}.${extension}`;
 
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key}`,
@@ -159,7 +159,7 @@ export async function removePortfolioImage(url: string): Promise<void> {
   const path = url.slice(at + marker.length);
 
   try {
-    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${path}`, {
+    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${path}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });
