@@ -609,7 +609,7 @@ const MAX_BUDGET_PAISE = 50n * 1_00_00_000n * 100n;
  */
 export function budgetPaiseFrom(raw: string | null): bigint | null {
   if (!raw) return null;
-  const v = raw.toLowerCase().replace(/₹|rs\.?|inr|rupees?/g, ' ').replace(/,/g, '').trim();
+  const v = raw.toLowerCase().replace(/_/g, ' ').replace(/₹|rs\.?|inr|rupees?/g, ' ').replace(/,/g, '').replace(/\s+/g, ' ').trim();
   if (/\d\s*(?:-|–|to|and)\s*\d/.test(v) || /\d\s*[a-z]+\s*(?:-|–|to)\s*\d/.test(v)) return null;
   const m = /^(?:upto|up to|under|below|about|around|approx\.?)?\s*(\d+)(?:\.(\d{1,3}))?\s*([a-z]+)?\s*\+?$/.exec(v);
   if (!m) return null;
@@ -623,6 +623,29 @@ export function budgetPaiseFrom(raw: string | null): bigint | null {
   const paise = rupees * 100n;
   if (paise < MIN_BUDGET_PAISE || paise > MAX_BUDGET_PAISE) return null;
   return paise;
+}
+
+/**
+ * The low end of a budget range, in paise: "10–15 lakhs" and Meta's
+ * "10–15_lakhs" → ₹10 lakh, "15 lakh - 25 lakh" → ₹15 lakh, "15 to 25 lakhs"
+ * → ₹15 lakh. Either side borrows the other's unit when it has none.
+ * Null for anything that is not a range of two amounts.
+ *
+ * The owner wants the card's Budget filled from Meta's ranges (24 Nov 2026).
+ * The low end is the one figure the person did say they would spend; the
+ * words stay in the notes.
+ */
+export function budgetFloorPaise(raw: string | null): bigint | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().replace(/_/g, ' ').replace(/₹|rs\.?|inr|rupees?/g, ' ').replace(/,/g, '').replace(/\s+/g, ' ').trim();
+  const m = /^(?:between\s+)?(\d+(?:\.\d{1,3})?)\s*([a-z]+)?\s*(?:-|–|—|to|and)\s*(\d+(?:\.\d{1,3})?)\s*([a-z]+)?\s*\+?$/.exec(v);
+  if (!m) return null;
+  const leftUnit = m[2] ?? m[4] ?? '';
+  const low = budgetPaiseFrom(leftUnit ? `${m[1]} ${leftUnit}` : m[1]!);
+  const rightUnit = m[4] ?? m[2] ?? '';
+  const high = budgetPaiseFrom(rightUnit ? `${m[3]} ${rightUnit}` : m[3]!);
+  if (low === null || high === null || low > high) return null;
+  return low;
 }
 
 /** "PUNE" and "pune " → "Pune". */
@@ -670,7 +693,8 @@ export function shapeLead(lead: IncomingLead): Shaped {
   const rawArea = lead.locality?.trim().slice(0, CAPS.locality) ?? '';
   const slug = rawArea ? localitySlug(rawArea) : null;
   const config = configFrom(lead.config);
-  const budgetPaise = budgetPaiseFrom(lead.budget);
+  const exactBudget = budgetPaiseFrom(lead.budget);
+  const budgetPaise = exactBudget ?? budgetFloorPaise(lead.budget);
   const city = lead.city ? titleCase(lead.city.trim()).slice(0, 40) : null;
 
   const lines: string[] = [];
@@ -678,7 +702,7 @@ export function shapeLead(lead: IncomingLead): Shaped {
   if (lead.message) lines.push(lead.message.trim());
   if (rawArea && !slug) lines.push(`Area given as: ${rawArea}`);
   if (lead.config && !config) lines.push(`Home given as: ${lead.config}`);
-  if (lead.budget && budgetPaise === null) lines.push(`Budget given as: ${lead.budget}`);
+  if (lead.budget && exactBudget === null) lines.push(`Budget given as: ${lead.budget}`);
   if (lead.phone && !phone) lines.push(`Phone given as: ${lead.phone.slice(0, 30)}`);
   if (rawEmail && !email) lines.push(`Email given as: ${rawEmail.slice(0, 120)}`);
   for (const a of lead.answers) lines.push(`${a.question}: ${a.answer}`);
@@ -847,5 +871,84 @@ export function graphError(body: unknown, status: number): string {
 export function formToObject(params: URLSearchParams): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of params) if (!(k in out)) out[k] = v;
+  return out;
+}
+
+// ── 4. The studio's own fields (owner, 24 Nov 2026) ─────────────
+
+/**
+ * Months from a "when will you start" answer: "1–3 months" → 3, "within
+ * 6 months" → 6, "6+ months" → 6, "1 year" → 12, "immediately" → 1. The
+ * longest figure said, because that is the window the person gave.
+ * "Just exploring" and anything without a figure → null.
+ */
+export function timelineMonths(raw: string | null): number | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().replace(/_/g, ' ');
+  if (/immediate|right away|asap|urgent|this month/.test(v)) return 1;
+  const nums = [...v.matchAll(/\d+/g)].map((m) => Number(m[0])).filter((n) => n > 0 && n < 100);
+  if (!nums.length) return null;
+  const top = Math.max(...nums);
+  if (/year|yr/.test(v)) return top * 12 <= 120 ? top * 12 : null;
+  if (/month|mon\b|mo\b/.test(v)) return top <= 120 ? top : null;
+  return null;
+}
+
+/** A studio field as `fieldsFromLead` reads it (StudioField). */
+export interface FieldDef {
+  key: string;
+  label: string;
+  type: 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT';
+  options: string[];
+}
+
+const isRole = (def: FieldDef, re: RegExp): boolean => re.test(normKey(def.key)) || re.test(normKey(def.label));
+
+/** "2 BHK" against the studio's own choices ("2BHK", "4BHK+", "Villa"). */
+function pickOption(options: string[], config: string): string | null {
+  const want = config.toLowerCase();
+  const villa = /villa|row/.test(want);
+  const n = /(\d)/.exec(want)?.[1];
+  for (const o of options) {
+    const ol = o.toLowerCase();
+    if (villa && /villa|row/.test(ol)) return o;
+    if (!villa && n && /bhk/.test(ol) && /(\d)/.exec(ol)?.[1] === n) return o;
+  }
+  return null;
+}
+
+/**
+ * What a lead form said, put into the studio's own fields ("More details" on
+ * the card) where the studio has one for it: the area as written, society,
+ * BHK, carpet area and when they want to start. Matched by the field's key or
+ * label, so it works for any studio that names them plainly. Values are what
+ * `field-values.cleanValues` would accept; the caller cleans them again.
+ */
+export function fieldsFromLead(defs: FieldDef[], lead: IncomingLead, draft: LeadDraft): Record<string, string> {
+  const out: Record<string, string> = {};
+  const answer = (re: RegExp): string | null => lead.answers.find((a) => re.test(normKey(a.question)))?.answer ?? null;
+  const timeline = answer(/when|start|timeline|planning|possession_of_interior/);
+  const carpet = answer(/carpet|sq_?ft|sqft|square/);
+  for (const def of defs) {
+    if (out[def.key]) continue;
+    let value: string | null = null;
+    if (isRole(def, /^(area|locality|location)$/)) value = lead.locality?.trim() || null;
+    else if (isRole(def, /^(society|society_name|project|building|building_name)$/)) value = draft.society;
+    else if (isRole(def, /bhk|property_type|config/)) {
+      value = draft.config ? (def.type === 'SELECT' ? pickOption(def.options, draft.config) : draft.config) : null;
+    } else if (isRole(def, /carpet/)) {
+      const n = carpet ? /\d{3,5}/.exec(carpet.replace(/,/g, ''))?.[0] : null;
+      value = def.type === 'NUMBER' ? (n ?? null) : carpet;
+    } else if (isRole(def, /timeline|start/)) {
+      if (def.type === 'NUMBER') {
+        const m = timelineMonths(timeline);
+        value = m === null ? null : String(m);
+      } else if (def.type === 'TEXT') value = timeline;
+    }
+    if (!value) continue;
+    if (def.type === 'SELECT' && def.options.length > 0 && !def.options.includes(value)) continue;
+    if (def.type === 'DATE') continue;
+    out[def.key] = value.slice(0, 200);
+  }
   return out;
 }

@@ -98,6 +98,12 @@ export interface LandInput {
   /** Which ad, as columns (`payloads.adColumns`). */
   ads?: AdColumns | null;
   /**
+   * The studio's own fields ("More details"), already cleaned against its
+   * definitions. A new card takes them all; a card already on the board gets
+   * only the ones it has empty (owner, 24 Nov 2026).
+   */
+  fields?: Record<string, string>;
+  /**
    * Past leads brought in all at once (Meta, owner 12 Nov 2026): nobody is
    * told, and a person already on the board gets no "came in again" line
    * (only the ad columns, when their card has none).
@@ -111,6 +117,20 @@ export type LandResult =
   | { kind: 'attached'; clientId: string; alerted: Promise<void> }
   /** The studio has no columns and they could not be made. */
   | { kind: 'no-stage' };
+
+/** Give a card already on the board the form's answers it has no value for; never overwrite. */
+async function fillEmptyFields(studioId: string, clientId: string, incoming: Record<string, string>): Promise<void> {
+  try {
+    const row = await prisma.studioClient.findFirst({ where: { id: clientId, studioId }, select: { fields: true } });
+    if (!row) return;
+    const have = row.fields && typeof row.fields === 'object' && !Array.isArray(row.fields) ? (row.fields as Record<string, unknown>) : {};
+    const add = Object.fromEntries(Object.entries(incoming).filter(([k]) => have[k] === undefined || have[k] === null || have[k] === ''));
+    if (Object.keys(add).length === 0) return;
+    await prisma.studioClient.update({ where: { id: clientId }, data: { fields: { ...have, ...add } as Prisma.InputJsonObject } });
+  } catch (error) {
+    console.error('[land] fields not filled', error instanceof Error ? error.message : 'unknown');
+  }
+}
 
 /** Land one lead. Throws only on a database failure; the caller says what that means to its sender. */
 export async function landLead(input: LandInput): Promise<LandResult> {
@@ -136,6 +156,7 @@ export async function landLead(input: LandInput): Promise<LandResult> {
         data: ads,
       }).catch((error: unknown) => console.error('[land] ad columns not filled', error instanceof Error ? error.message : 'unknown'));
     }
+    if (input.fields && Object.keys(input.fields).length > 0) await fillEmptyFields(studioId, landing.id, input.fields);
     if (input.quiet) return { kind: 'attached', clientId: landing.id, alerted: Promise.resolve() };
     const match = matches.find((m) => m.id === landing.id)!;
     const event = { kind: 'lead-new' as const, clientId: landing.id, name: match.name, source: input.how, again: true };
@@ -180,6 +201,7 @@ export async function landLead(input: LandInput): Promise<LandResult> {
         nextAction: 'Call them back',
         nextActionOn: new Date(),
         ...(ads ?? {}),
+        ...(input.fields && Object.keys(input.fields).length > 0 ? { fields: input.fields } : {}),
       },
       select: { id: true },
     });
