@@ -8,7 +8,7 @@ import { docHead, docRooms, quoteFileName } from '@/modules/studio-quote/documen
 import { DocFrame, DocOpening, DocSummary, LineNote, TermsSheet } from '../../doc/QuotationDocument';
 import '../../doc/quote-doc.css';
 import { changeSentence, deltaText, finalCounts, finalRooms, withKnownDetails, type FinalKind, type FinalLineInput } from '@/modules/studio-quote/final-doc';
-import { roomsOfLines } from '@/modules/studio-quote/rooms';
+import { discountedPaise, roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from '../print/PrintButton';
 import { revisionPair } from '@/modules/studio-sales/revisions';
 import { revisionLabel, type RevisionTotals } from '@/modules/studio-sales/revision-rules';
@@ -25,6 +25,15 @@ const TAG: Record<FinalKind, string> = { ADDED: 'New', REMOVED: 'Removed', CHANG
 const ROW_CLASS: Record<FinalKind, string | undefined> = { ADDED: 'qd-added', REMOVED: 'qd-removed', CHANGED: 'qd-changed', UNCHANGED: undefined };
 
 const n = (paise: number) => formatINR(paise, { symbol: false });
+/** A line's figure after its quotation's modular discount: MO-01 only, as the builder works it (rooms.ts). */
+const discOf = (paise: number, shortCode: string, bps: number) => discountedPaise(paise, shortCode === 'MO-01' ? 'MODULAR' : 'ONSITE', bps);
+type CmpRow = { kind: FinalKind; wasPaise: number; nowPaise: number; code: string; codeWas: string | null };
+/** A room's discounted sub-total on one side. */
+const roomDisc = (rows: readonly CmpRow[], side: 'was' | 'now', bps: number) =>
+  rows.reduce((t, x) => t + (side === 'was' ? (x.kind === 'ADDED' ? 0 : discOf(x.wasPaise, x.codeWas ?? x.code, bps)) : x.kind === 'REMOVED' ? 0 : discOf(x.nowPaise, x.code, bps)), 0);
+function DiffCell({ paise }: { paise: number }) {
+  return <td className={`r ${paise > 0 ? 'qd-up' : paise < 0 ? 'qd-down' : 'qd-same'}`}>{diff(paise)}</td>;
+}
 const diff = (paise: number) => (paise === 0 ? '—' : `${paise > 0 ? '+' : '−'} ${formatINR(Math.abs(paise), { symbol: false })}`);
 
 /**
@@ -56,6 +65,9 @@ export default async function ComparePage({
   let nowLines: FinalLineInput[];
   let was: Pick<RevisionTotals, 'workPaise' | 'feePaise' | 'discountPaise' | 'onSpotPaise' | 'gstPaise' | 'totalPaise'>;
   let now: typeof was;
+  /* Each side's modular discount, for its Discounted column (owner, 24 Nov 2026). */
+  let wasBps = 0;
+  let nowBps = 0;
 
   if (a !== undefined && b !== undefined) {
     const revs = await revisionPair(id, Number(a), Number(b));
@@ -67,6 +79,8 @@ export default async function ComparePage({
     nowLines = revs.b.lines;
     was = revs.a.totals;
     now = revs.b.totals;
+    wasBps = revs.a.discountBps;
+    nowBps = revs.b.discountBps;
   } else {
     const pair = await quotesToCompare(id, withId);
     if (!pair) notFound();
@@ -79,6 +93,8 @@ export default async function ComparePage({
     nowLines = current.lines;
     was = totalsFor(base);
     now = totalsFor(current);
+    wasBps = base.discountBps;
+    nowBps = current.discountBps;
   }
 
 
@@ -155,28 +171,37 @@ export default async function ComparePage({
           {rooms.map((r) => (
             <table key={r.room} className="qd-tbl qd-room qd-final">
               <colgroup>
+                <col style={{ width: '4%' }} />
+                <col style={{ width: '12%' }} />
                 <col style={{ width: '6%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '23%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '11%' }} />
-                <col style={{ width: '11%' }} />
-                <col style={{ width: '11%' }} />
+                <col style={{ width: '19%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '9.4%' }} />
+                <col style={{ width: '9.4%' }} />
+                <col style={{ width: '9.4%' }} />
+                <col style={{ width: '9.4%' }} />
+                <col style={{ width: '9.4%' }} />
               </colgroup>
               <thead>
                 <tr className="qd-band">
-                  <th colSpan={8}>{r.room}</th>
+                  <th colSpan={10}>{r.room}</th>
+                </tr>
+                {/* Original and discounted for each side, as in the builder (owner, 24 Nov 2026). */}
+                <tr className="qd-cols">
+                  <th rowSpan={2}>S.No.</th>
+                  <th rowSpan={2}>Product</th>
+                  <th rowSpan={2}>Work Code</th>
+                  <th rowSpan={2}>Details</th>
+                  <th rowSpan={2}>Size / Units</th>
+                  <th colSpan={2} style={{ textAlign: 'center' }}>{left} (₹)</th>
+                  <th colSpan={2} style={{ textAlign: 'center' }}>{right} (₹)</th>
+                  <th className="r" rowSpan={2}>Difference (₹)</th>
                 </tr>
                 <tr className="qd-cols">
-                  <th>S.No.</th>
-                  <th>Product</th>
-                  <th>Work Code</th>
-                  <th>Details</th>
-                  <th>Size / Units</th>
-                  <th className="r">{left} (₹)</th>
-                  <th className="r">{right} (₹)</th>
-                  <th className="r">Difference (₹)</th>
+                  <th className="r">Original</th>
+                  <th className="r">Discounted</th>
+                  <th className="r">Original</th>
+                  <th className="r">Discounted</th>
                 </tr>
               </thead>
               <tbody>
@@ -222,15 +247,19 @@ export default async function ComparePage({
                       )}
                     </td>
                     <td className="r">{row.kind === 'ADDED' ? '—' : n(row.wasPaise)}</td>
+                    <td className="r">{row.kind === 'ADDED' ? '—' : n(discOf(row.wasPaise, row.codeWas ?? row.code, wasBps))}</td>
                     <td className="r">{row.kind === 'REMOVED' ? '—' : n(row.nowPaise)}</td>
-                    <td className={`r ${row.deltaPaise > 0 ? 'qd-up' : row.deltaPaise < 0 ? 'qd-down' : 'qd-same'}`}>{diff(row.deltaPaise)}</td>
+                    <td className="r">{row.kind === 'REMOVED' ? '—' : n(discOf(row.nowPaise, row.code, nowBps))}</td>
+                    <DiffCell paise={(row.kind === 'REMOVED' ? 0 : discOf(row.nowPaise, row.code, nowBps)) - (row.kind === 'ADDED' ? 0 : discOf(row.wasPaise, row.codeWas ?? row.code, wasBps))} />
                   </tr>
                 ))}
                 <tr className="qd-sub">
                   <td colSpan={5}>{r.room} (Sub-total)</td>
                   <td className="r">{n(r.wasPaise)}</td>
+                  <td className="r">{n(roomDisc(r.rows, 'was', wasBps))}</td>
                   <td className="r">{n(r.nowPaise)}</td>
-                  <td className="r">{diff(r.deltaPaise)}</td>
+                  <td className="r">{n(roomDisc(r.rows, 'now', nowBps))}</td>
+                  <td className="r">{diff(roomDisc(r.rows, 'now', nowBps) - roomDisc(r.rows, 'was', wasBps))}</td>
                 </tr>
               </tbody>
             </table>
@@ -255,7 +284,14 @@ export default async function ComparePage({
               schedule={ctx.schedule}
               salesTotalPaise={ctx.salesTotalPaise}
               spec={ctx.spec}
-              compare={{ initialLabel: left, initialPaise: was.totalPaise, finalLabel: right, finalPaise: now.totalPaise }}
+              compare={{
+                initialLabel: left,
+                initialPaise: was.totalPaise,
+                initialPricePaise: was.workPaise + was.feePaise + was.gstPaise,
+                finalLabel: right,
+                finalPaise: now.totalPaise,
+                finalPricePaise: now.workPaise + now.feePaise + now.gstPaise,
+              }}
             />
           ) : null}
 

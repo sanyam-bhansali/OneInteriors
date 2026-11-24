@@ -160,6 +160,13 @@ export function QuoteTable({
 
 const UNIT_WORD: Record<QuoteUnitName, string> = { AREA: 'sqft', SQFT: 'sqft', RFT: 'rft', UNIT: 'nos' };
 const RATE_WORD: Record<QuoteUnitName, string> = { AREA: '/sqft', SQFT: '/sqft', RFT: '/rft', UNIT: '/unit' };
+/** The units a new item can be priced in, as the builder offers them (owner, 24 Nov 2026). */
+const NEW_ITEM_UNITS: readonly (readonly [QuoteUnitName, string])[] = [
+  ['UNIT', '/ each (nos)'],
+  ['RFT', '/ running ft'],
+  ['SQFT', '/ sq ft'],
+  ['AREA', '/ sq ft by W × H (mm)'],
+];
 const squash = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 function Row({
@@ -318,7 +325,28 @@ function Row({
               onUpdate(line.key, { ratePaise: v.trim() === '' || !Number.isFinite(num) || num < 0 ? 0 : rupeesToPaise(num) });
             }}
           />
-          <span>{RATE_WORD[line.unit]}</span>
+          {/* A new item not in the products picks its unit, then fills what that unit needs (owner, 24 Nov 2026:
+              "they should have option to select unit rft, sft, etc and then fill up required fields"). */}
+          {!known && !readOnly ? (
+            <select
+              value={line.unit}
+              onChange={(e) => {
+                const unit = e.target.value as QuoteUnitName;
+                onUpdate(line.key, unit === 'AREA' ? { unit, widthMm: null, heightMm: null, qtyMilli: null } : { unit, widthMm: null, heightMm: null, qtyMilli: unit === 'UNIT' ? 1000 : null });
+              }}
+              aria-label={`Unit for ${line.product}`}
+              className="hcell hunitpick"
+              data-testid="new-item-unit"
+            >
+              {NEW_ITEM_UNITS.map(([u, word]) => (
+                <option key={u} value={u}>
+                  {word}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{RATE_WORD[line.unit]}</span>
+          )}
           {overridden ? (
             <span className="chip oi hchip" title="This figure was agreed, not calculated">
               agreed
