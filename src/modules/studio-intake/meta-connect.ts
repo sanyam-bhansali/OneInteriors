@@ -197,6 +197,32 @@ export function readAdAccounts(body: unknown): { id: string; name: string }[] {
     .map((a) => ({ id: a.id, name: str(a.name, 120) ?? a.id }));
 }
 
+/** `GET /{page}?fields=business`: the business portfolio that owns the Page, or null. */
+export function readPageBusiness(body: unknown): string | null {
+  const b = body && typeof body === 'object' ? (body as { business?: unknown }).business : null;
+  const id = b && typeof b === 'object' ? (b as { id?: unknown }).id : null;
+  return isMetaId(id) ? id : null;
+}
+
+/**
+ * `GET /act_X/adsets?fields=campaign_id,promoted_object`: the campaigns with
+ * an ad set that advertises this Page. A lead ad's ad set names its Page in
+ * `promoted_object.page_id`; that is how the picker keeps out the campaigns
+ * of other Pages a login can also see (an agency login sees its other
+ * clients' ad accounts; owner, 24 Nov 2026).
+ */
+export function campaignsOnPage(body: unknown, pageId: string): Set<string> {
+  const out = new Set<string>();
+  for (const s of listOf(body)) {
+    const po = s.promoted_object;
+    const pid = po && typeof po === 'object' ? (po as { page_id?: unknown }).page_id : null;
+    const pidText = typeof pid === 'number' ? String(pid) : pid;
+    const cid = typeof s.campaign_id === 'number' ? String(s.campaign_id) : s.campaign_id;
+    if (pidText === pageId && isMetaId(cid)) out.add(cid);
+  }
+  return out;
+}
+
 /** `GET /{page}/leadgen_forms?fields=id,name,status`. */
 export function readForms(body: unknown): { id: string; name: string }[] {
   return listOf(body)

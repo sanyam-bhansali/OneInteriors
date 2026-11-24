@@ -12,6 +12,8 @@ import {
   metaApp,
   readAdAccounts,
   readCampaigns,
+  readPageBusiness,
+  campaignsOnPage,
   readPages,
   readToken,
   seal,
@@ -66,6 +68,24 @@ describe('the login', () => {
   it('reads the configuration id only when it is a number', () => {
     expect(metaApp({ META_APP_ID: '123456789', META_APP_SECRET: 's', META_LOGIN_CONFIG_ID: '2497939097366329' })).toEqual({ appId: '123456789', appSecret: 's', configId: '2497939097366329' });
     expect(metaApp({ META_APP_ID: '123456789', META_APP_SECRET: 's', META_LOGIN_CONFIG_ID: 'abc' })).toEqual({ appId: '123456789', appSecret: 's' });
+  });
+  it('keeps only the campaigns whose ad sets advertise the connected Page', () => {
+    const sets = {
+      data: [
+        { campaign_id: '111', promoted_object: { page_id: '1072583829261816' } },
+        { campaign_id: '222', promoted_object: { page_id: '999' } },
+        { campaign_id: 333, promoted_object: { page_id: 1072583829261816 } },
+        { campaign_id: '444' },
+        { campaign_id: 'x', promoted_object: { page_id: '1072583829261816' } },
+      ],
+    };
+    expect([...campaignsOnPage(sets, '1072583829261816')].sort()).toEqual(['111', '333']);
+    expect(campaignsOnPage(null, '1').size).toBe(0);
+  });
+  it('reads the business that owns a Page', () => {
+    expect(readPageBusiness({ id: '1', business: { id: '1413913856594503', name: 'h' } })).toBe('1413913856594503');
+    expect(readPageBusiness({ id: '1' })).toBeNull();
+    expect(readPageBusiness({ business: { id: 'abc' } })).toBeNull();
   });
   it('needs both the app id and its secret', () => {
     expect(metaApp({ META_APP_ID: '123456789' })).toBeNull();

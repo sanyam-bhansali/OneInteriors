@@ -24,10 +24,12 @@ import {
   NO_CAMPAIGN_NAME,
   cleanCampaignPick,
   loginUrl,
+  campaignsOnPage,
   mergeCampaigns,
   metaApp,
   readAdAccounts,
   readCampaigns,
+  readPageBusiness,
   readPages,
   readSavedCampaigns,
   readToken,
@@ -249,6 +251,32 @@ export interface CampaignChoice extends MetaCampaign {
   landed: number;
 }
 
+/**
+ * The ad accounts to look for this Page's campaigns in: those of the business
+ * portfolio that owns the Page (owned and client accounts), else every ad
+ * account the login can see. Campaigns are then kept only when they advertise
+ * the Page (campaignsOnPage), so a wider list is slower, never wrong.
+ */
+async function pageAdAccounts(pageId: string | null, token: string): Promise<{ ok: true; ids: string[] } | Fail> {
+  const ids = new Set<string>();
+  if (pageId) {
+    const page = await graphJson(`${GRAPH}/${pageId}?fields=business`, bearer(token));
+    const business = page.ok ? readPageBusiness(page.body) : null;
+    if (business) {
+      for (const edge of ['owned_ad_accounts', 'client_ad_accounts']) {
+        const got = await graphJson(`${GRAPH}/${business}/${edge}?fields=id,name&limit=100`, bearer(token));
+        if (got.ok) for (const a of readAdAccounts(got.body)) ids.add(a.id);
+      }
+    }
+  }
+  if (ids.size === 0) {
+    const mine = await graphJson(`${GRAPH}/me/adaccounts?fields=id,name&limit=100`, bearer(token));
+    if (!mine.ok) return mine;
+    for (const a of readAdAccounts(mine.body)) ids.add(a.id);
+  }
+  return { ok: true, ids: [...ids].slice(0, 40) };
+}
+
 export type CampaignScreen =
   | { ok: true; only: boolean; picked: string[]; campaigns: CampaignChoice[]; note: string | null }
   | Fail;
@@ -264,7 +292,7 @@ export async function campaignScreen(connectionId: unknown): Promise<CampaignScr
   if (typeof connectionId !== 'string') return { ok: false, error: 'That connection is not yours.' };
   const conn = await prisma.studioLeadConnection.findFirst({
     where: { id: connectionId, studioId: member.studioId, kind: 'META_PAGE' },
-    select: { id: true, metaOnlyCampaigns: true, metaCampaignIds: true, metaCampaigns: true },
+    select: { id: true, metaPageId: true, metaOnlyCampaigns: true, metaCampaignIds: true, metaCampaigns: true },
   });
   if (!conn) return { ok: false, error: 'That connection is not yours.' };
 
@@ -273,13 +301,23 @@ export async function campaignScreen(connectionId: unknown): Promise<CampaignScr
   const login = await loginToken(member.studioId);
   if (!login) note = 'Log in with Facebook again (Connect Facebook) to see campaigns that have no leads yet.';
   else {
-    const accounts = await graphJson(`${GRAPH}/me/adaccounts?fields=id,name&limit=25`, bearer(login.token));
+    const accounts = await pageAdAccounts(conn.metaPageId, login.token);
     if (!accounts.ok) note = `Your ad accounts could not be read: ${accounts.error}`;
-    else {
-      for (const acct of readAdAccounts(accounts.body).slice(0, 8)) {
-        const camps = await graphJson(`${GRAPH}/${acct.id}/campaigns?fields=id,name,effective_status,objective&limit=200`, bearer(login.token));
-        if (camps.ok) live.push(...readCampaigns(camps.body));
-      }
+    else if (conn.metaPageId) {
+      const pageId = conn.metaPageId;
+      const found = await Promise.all(
+        accounts.ids.map(async (acct) => {
+          const [camps, sets] = await Promise.all([
+            graphJson(`${GRAPH}/${acct}/campaigns?fields=id,name,effective_status,objective&limit=200`, bearer(login.token)),
+            graphJson(`${GRAPH}/${acct}/adsets?fields=campaign_id,promoted_object&limit=500`, bearer(login.token)),
+          ]);
+          if (!camps.ok || !sets.ok) return [];
+          /* Only the campaigns whose ad sets advertise this Page: a login can see other Pages' ad accounts. */
+          const onPage = campaignsOnPage(sets.body, pageId);
+          return readCampaigns(camps.body).filter((c) => onPage.has(c.id));
+        }),
+      );
+      for (const list of found) live.push(...list);
     }
   }
 
