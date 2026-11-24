@@ -20,7 +20,7 @@ import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { recordMany } from '@/modules/studio-practice/events';
 import { assignedSummary, lostSummary, stageSummary } from '@/modules/studio-practice/event-copy';
 import { BIN_DAYS, LOST_LABELS, type LostReasonName } from '@/modules/studio-practice/vocabulary';
-import { actingMember, fenceFor, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, fenceFor, myLeadScope, refusalForMe, type LeadScope } from '@/modules/studio/lead-scope';
 import { hasSalesRole } from '@/modules/studio/roles';
 import { mayAssignTo } from '@/modules/studio/sales-access';
 import { poolTarget } from '@/modules/studio-practice/clients';
@@ -101,7 +101,7 @@ function actionFences(scope: LeadScope, action: BulkAction): Prisma.StudioClient
  */
 export async function bulkClaim(target: BulkTarget): Promise<BulkResult> {
   const scope = await who('claim');
-  if (!scope) return { ok: false, error: 'Your role does not include taking leads from the pool.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include taking leads from the pool.') };
   try {
     const ids = await targetIds(scope, target, 'claim', { assignedToId: null });
     if ('error' in ids) return { ok: false, error: ids.error };
@@ -192,7 +192,7 @@ async function giveTo(scope: LeadScope, ids: string[], to: { id: string; userId:
 /** Give to one person, or (null) back to the pool. Owner and PM. */
 export async function bulkAssign(target: BulkTarget, memberId: string | null): Promise<BulkResult> {
   const scope = await who('assign');
-  if (!scope) return { ok: false, error: 'Your role does not include giving leads out.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include giving leads out.') };
   try {
     const to = memberId ? ((await assignees(scope, [memberId]))[0] ?? null) : null;
     if (memberId && !to) return { ok: false, error: 'That person cannot take leads from you (not active, not on the sales team, or not in your team).' };
@@ -210,7 +210,7 @@ export async function bulkAssign(target: BulkTarget, memberId: string | null): P
 /** Deal the leads out evenly among the chosen people. Owner and PM. */
 export async function bulkSplit(target: BulkTarget, memberIds: string[]): Promise<BulkResult> {
   const scope = await who('split');
-  if (!scope) return { ok: false, error: 'Your role does not include sharing leads out.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include sharing leads out.') };
   if (!Array.isArray(memberIds) || memberIds.length < 2) return { ok: false, error: 'Pick at least two people to split between.' };
   try {
     const wanted = [...new Set(memberIds.filter((m) => typeof m === 'string' && ID.test(m)))].slice(0, 50);
@@ -235,7 +235,7 @@ export async function bulkSplit(target: BulkTarget, memberIds: string[]): Promis
 /** Move to one column. A lost column asks why; a closed one clears the follow-up. */
 export async function bulkMove(target: BulkTarget, stageId: string, lostReason: string | null): Promise<BulkResult> {
   const scope = await who('move');
-  if (!scope) return { ok: false, error: 'Your role does not include moving leads.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include moving leads.') };
   try {
     const stage = typeof stageId === 'string' ? await prisma.studioStage.findFirst({ where: { id: stageId, studioId: scope.studioId }, select: { id: true, name: true, kind: true } }) : null;
     if (!stage) return { ok: false, error: 'Pick a column.' };
@@ -284,7 +284,7 @@ export async function bulkMove(target: BulkTarget, stageId: string, lostReason: 
  */
 export async function bulkFollowUp(target: BulkTarget, day: string, time: string, action: string): Promise<BulkResult> {
   const scope = await who('followup');
-  if (!scope) return { ok: false, error: 'Your role does not include changing follow-ups.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include changing follow-ups.') };
   if (!isDay(day)) return { ok: false, error: 'Pick the day.' };
   const at = time ? parseMeeting(day, time) : dayToDb(day);
   if (!at) return { ok: false, error: 'That time did not read. Use the picker.' };
@@ -323,7 +323,7 @@ export async function bulkFollowUp(target: BulkTarget, day: string, time: string
  */
 export async function bulkBin(target: BulkTarget): Promise<BulkResult> {
   const scope = await who('bin');
-  if (!scope) return { ok: false, error: 'Your role does not include deleting leads.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include deleting leads.') };
   try {
     const all = await targetIds(scope, target, 'bin');
     if ('error' in all) return { ok: false, error: all.error };
@@ -364,7 +364,7 @@ export const SNOOZE_DAYS = 7;
  */
 export async function bulkSnooze(target: BulkTarget): Promise<BulkResult> {
   const scope = await who('followup');
-  if (!scope) return { ok: false, error: 'Your role does not include changing follow-ups.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include changing follow-ups.') };
   try {
     const ids = await targetIds(scope, target, 'followup', { stage: { kind: { in: ['OPEN', 'WON'] } } });
     if ('error' in ids) return { ok: false, error: ids.error };
@@ -392,7 +392,7 @@ export async function bulkSnooze(target: BulkTarget): Promise<BulkResult> {
 /** Mark lost, with one reason for the batch: the studio's Lost column (vocabulary.ts mainLostStage). */
 export async function bulkMarkLost(target: BulkTarget, reason: string): Promise<BulkResult> {
   const scope = await who('move');
-  if (!scope) return { ok: false, error: 'Your role does not include moving leads.' };
+  if (!scope) return { ok: false, error: await refusalForMe('Your role does not include moving leads.') };
   const lost = mainLostStage(await prisma.studioStage.findMany({ where: { studioId: scope.studioId, kind: 'LOST' }, orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, name: true, sortOrder: true } }));
   if (!lost) return { ok: false, error: 'Your pipeline has no lost column. Settings → Pipeline.' };
   return bulkMove(target, lost.id, reason);

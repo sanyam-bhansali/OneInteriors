@@ -41,7 +41,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 /* Sales roles and teams (owner, 22 Oct 2026): merging is `lead.merge`, on two leads they may work. Was `myStudioId()`. */
-import { fenceFor, scopeFor } from '@/modules/studio/lead-scope';
+import { fenceFor, refusalForMe, scopeFor } from '@/modules/studio/lead-scope';
 import { LIVE } from './demo-lead';
 import { record } from './events';
 import { normalisePhone } from './csv';
@@ -140,7 +140,7 @@ export async function duplicatesOf(clientId: string): Promise<DuplicateCandidate
 export async function mergeClients(keepId: string, loserId: string): Promise<MergeResult> {
   const scope = await scopeFor('lead.merge');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include merging leads.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include merging leads.') };
   if (keepId === loserId) return { ok: false, error: 'That is the same card.' };
   const fence = fenceFor(scope, 'lead.edit');
 

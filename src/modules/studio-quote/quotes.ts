@@ -36,9 +36,9 @@ import { planUseFrom } from '@/modules/brief/mapping';
 import type { PlanRoomSize } from '@/modules/brief/types';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
-import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, leadForQuote, mayOnLead, myLeadScope, refusalForMe, type LeadScope } from '@/modules/studio/lead-scope';
 import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
-import { can, isDirector, quoteReadOnly } from '@/modules/studio/roles';
+import { can, DIRECTOR_CHANGE_REFUSED, isDirector, quoteReadOnly, refusalFor } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision, sendRefusalFor } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
@@ -454,7 +454,8 @@ export async function quoteScope(): Promise<{ studioId: string; where: Prisma.St
 /** A `where` no quotation matches. */
 const NO_QUOTE: Prisma.StudioQuoteWhereInput = { id: { in: [] } };
 export const READ_ONLY_QUOTE = 'Sales reps do not make or change quotations: attach the floor plan on the lead and the quotation is built from it.';
-export const DIRECTOR_READ_ONLY = 'Directors see quotations and leads read only. Ask the owner or the sales head to change this.';
+/** What a director is told when a quotation write is refused (owner, 24 Nov 2026; roles.ts `DIRECTOR_CHANGE_REFUSED`). */
+export const DIRECTOR_READ_ONLY = DIRECTOR_CHANGE_REFUSED;
 
 /**
  * A designer's quotations (the design meeting, 24 Oct 2026;
@@ -526,7 +527,7 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const lead = leadId ? await leadForQuote(qs.lead, leadId) : null;
   if (leadId && !lead) return { ok: false, error: 'That lead is not one of yours.' };
   /* Sales roles: seeing the lead is not enough; writing its quotation is `quote.write` on it. */
-  if (lead && !mayOnLead(qs.lead, 'quote.write', lead)) return { ok: false, error: 'Your role does not include quotations for that lead.' };
+  if (lead && !mayOnLead(qs.lead, 'quote.write', lead)) return { ok: false, error: refusalFor(qs.lead, 'Your role does not include quotations for that lead.') };
   if (!lead && !qs.lead.seesAll) return { ok: false, error: 'Pick the lead this quotation is for.' };
 
   /* Shut until the studio has confirmed the rates filled from its own
@@ -705,7 +706,7 @@ export interface QuoteClientInput {
  * name, the flat number, the society. What prints on the document.
  */
 export async function saveQuoteClient(quoteId: string, input: QuoteClientInput): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: await refusalForMe('That quotation is not yours.') };
   const name = input.clientName.trim().slice(0, 120);
   if (name.length < 2) return { ok: false, error: 'Who is it for?' };
   const email = input.clientEmail.trim().slice(0, 200);
@@ -900,7 +901,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
     where: { ...qs?.write, id: quoteId, studioId },
     select: { status: true, issuedOn: true, introductionId: true },
   });
-  if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  if (!q) return { ok: false, error: refusalFor(qs?.lead, 'That quotation is not yours.') };
   if (q.status !== 'DRAFT' || q.issuedOn) return { ok: false, error: 'Only a draft that was never sent can be deleted.' };
   if (q.introductionId) return { ok: false, error: 'This is a One Interiors client\'s final quote — mark it lost instead.' };
   try {
@@ -1056,7 +1057,7 @@ export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<A
   const q =
     (await prisma.studioQuote.findFirst({ where: { ...qs.write, id: quoteId, studioId }, select: { id: true, basedOnId: true } })) ??
     (qs.lead === null ? await prisma.studioQuote.findFirst({ where: { ...qs.where, id: quoteId, studioId, category: null }, select: { id: true, basedOnId: true } }) : null);
-  if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  if (!q) return { ok: false, error: refusalFor(qs.lead, 'That quotation is not yours.') };
   try {
     await prisma.$transaction([
       prisma.studioQuote.update({ where: { id: q.id }, data: { category } }),
@@ -1118,7 +1119,7 @@ export async function setQuoteStatus(
   quoteId: string,
   status: QuoteStatusName,
 ): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: await refusalForMe('That quotation is not yours.') };
 
   /* A project runs on this quotation (signed in the app, or started for the
      studio's own client): its plan and payment stages were built from it, so
