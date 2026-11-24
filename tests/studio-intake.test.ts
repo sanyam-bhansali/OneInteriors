@@ -7,6 +7,9 @@ import {
   hasAds,
   platformWord,
   budgetPaiseFrom,
+  budgetFloorPaise,
+  fieldsFromLead,
+  timelineMonths,
   configFrom,
   formToObject,
   graphError,
@@ -396,7 +399,8 @@ describe('shaping a lead into a card', () => {
     if (!r.ok) return;
     expect(r.draft.locality).toBeNull();
     expect(r.draft.config).toBeNull();
-    expect(r.draft.budgetPaise).toBeNull();
+    /* A range lands its low end (owner, 24 Nov 2026); the words stay in the notes. */
+    expect(r.draft.budgetPaise).toBe(1_500_000n * 100n);
     expect(r.draft.notes).toBe('Call after 6\nArea given as: Somewhere New\nHome given as: Penthouse\nBudget given as: 15-25 lakh\nPossession: March');
   });
 
@@ -484,5 +488,76 @@ describe('where a lead counts', () => {
     expect(attributionFor('PORTAL', 'Zapier', lead('facebook')).source).toBe('FACEBOOK');
     expect(attributionFor('PORTAL', 'Zapier', lead('Instagram')).source).toBe('INSTAGRAM');
     expect(attributionFor('PORTAL', 'Zapier', lead('referral')).source).toBe('REFERRAL');
+  });
+});
+
+describe('Meta answers into the card (owner, 24 Nov 2026)', () => {
+  it('a budget range gives its low end; a single amount or junk gives none', () => {
+    expect(budgetFloorPaise('10–15 lakhs')).toBe(1_000_000n * 100n);
+    expect(budgetFloorPaise('10–15_lakhs')).toBe(1_000_000n * 100n);
+    expect(budgetFloorPaise('15 lakh - 25 lakh')).toBe(1_500_000n * 100n);
+    expect(budgetFloorPaise('15 to 25 lakhs')).toBe(1_500_000n * 100n);
+    expect(budgetFloorPaise('15 lakh - 25')).toBe(1_500_000n * 100n);
+    expect(budgetFloorPaise('25 lakh')).toBeNull();
+    expect(budgetFloorPaise('above 25 lakhs')).toBeNull();
+    expect(budgetFloorPaise('25-15 lakh')).toBeNull();
+    expect(budgetPaiseFrom('25_lakh')).toBe(2_500_000n * 100n);
+  });
+
+  it('reads months from a start answer', () => {
+    expect(timelineMonths('1–3 months')).toBe(3);
+    expect(timelineMonths('3–6 months')).toBe(6);
+    expect(timelineMonths('within 1 month')).toBe(1);
+    expect(timelineMonths('6+ months')).toBe(6);
+    expect(timelineMonths('1 year')).toBe(12);
+    expect(timelineMonths('immediately')).toBe(1);
+    expect(timelineMonths('just exploring')).toBeNull();
+    expect(timelineMonths(null)).toBeNull();
+  });
+
+  /* Hauspire's own fields on live, 24 Nov 2026. */
+  const hauspire = [
+    { key: 'bhk', label: 'BHK / Property type', type: 'SELECT' as const, options: ['1BHK', '2BHK', '3BHK', '4BHK+', 'Villa'] },
+    { key: 'carpet_area_sqft', label: 'Carpet area (sqft)', type: 'NUMBER' as const, options: [] },
+    { key: 'timeline_months', label: 'Timeline (months)', type: 'NUMBER' as const, options: [] },
+    { key: 'society', label: 'Society', type: 'TEXT' as const, options: [] },
+    { key: 'possession_month', label: 'Possession Month', type: 'DATE' as const, options: [] },
+    { key: 'tag', label: 'Tag', type: 'TEXT' as const, options: [] },
+    { key: 'area', label: 'Area', type: 'TEXT' as const, options: [] },
+  ];
+
+  it("fills Hauspire's fields from a real Meta form", () => {
+    const lead = parseMetaLead({
+      id: '987654321012399',
+      field_data: [
+        { name: 'full_name', values: ['Test Person'] },
+        { name: 'phone_number', values: ['+919765432100'] },
+        { name: 'area', values: ['nasarapur'] },
+        { name: 'flat_type', values: ['2_bhk'] },
+        { name: 'budget_range', values: ['10–15_lakhs'] },
+        { name: 'what_are_you_looking_for?', values: ['full_home_interior'] },
+        { name: 'when_are_you_planning_to_start_your_interiors?', values: ['1–3_months'] },
+      ],
+    });
+    const r = shapeLead(lead);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.draft.budgetPaise).toBe(1_000_000n * 100n);
+    expect(fieldsFromLead(hauspire, lead, r.draft)).toEqual({ bhk: '2BHK', timeline_months: '3', area: 'nasarapur' });
+  });
+
+  it('leaves a field empty when the answer does not fit it', () => {
+    const lead = parseMetaLead({
+      id: '987654321012398',
+      field_data: [
+        { name: 'phone_number', values: ['+919765432100'] },
+        { name: 'flat_type', values: ['penthouse'] },
+        { name: 'when_are_you_planning_to_start_your_interiors?', values: ['just_exploring'] },
+      ],
+    });
+    const r = shapeLead(lead);
+    if (!r.ok) throw new Error('shape');
+    expect(fieldsFromLead(hauspire, lead, r.draft)).toEqual({});
+    expect(fieldsFromLead([], lead, r.draft)).toEqual({});
   });
 });

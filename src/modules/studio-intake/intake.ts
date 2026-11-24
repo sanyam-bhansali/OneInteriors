@@ -45,11 +45,13 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { consume, bucketFor, type Limit } from '@/modules/rate-limit/store';
 import { landLead, leadSourceIdFor } from '@/modules/studio-practice/land';
+import { cleanValues } from '@/modules/studio-practice/field-values';
 import { fallbackExternalId, secretMatches, verifyMetaSignature } from './secrets';
 import { BACKFILL_DAYS, GRAPH, afterCursor, campaignAllowed, campaignKey, formLeadsUrl, readForms, readLeadPage, sealingKey, unseal } from './meta-connect';
 import {
   adColumns,
   attributionFor,
+  fieldsFromLead,
   graphError,
   graphLeadUrl,
   onSeenAgain,
@@ -237,6 +239,9 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead, 
     const where = attributionFor(door.kind, door.label, incoming);
     const leadSourceId = where.leadSourceName ? await leadSourceIdFor(door.studioId, where.leadSourceName) : null;
     const said = draft.notes ? `: “${draft.notes.slice(0, 300)}”` : '';
+    /* The studio's own fields, filled from the form (owner, 24 Nov 2026). */
+    const defs = await prisma.studioField.findMany({ where: { studioId: door.studioId }, orderBy: { sortOrder: 'asc' }, select: { key: true, label: true, type: true, options: true } });
+    const fields = cleanValues(defs, fieldsFromLead(defs, incoming, draft)).values;
     const landed = await landLead({
       studioId: door.studioId,
       lead: {
@@ -258,6 +263,7 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead, 
       againSummary: `Came in again through ${where.how}${said}`,
       connectionId: door.id,
       ads: adColumns(incoming.ads),
+      fields,
       quiet: opts.quiet === true,
     });
     if (landed.kind === 'no-stage') return fail('Your board has no columns to put the lead in.');
