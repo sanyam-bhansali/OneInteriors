@@ -17,7 +17,7 @@ import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { quotingStudioId, actingMember } from '@/modules/studio/lead-scope';
 import { currentMember } from '@/modules/studio/access';
-import { isDirector, quoteReadOnly } from '@/modules/studio/roles';
+import { isDirector, quoteReadOnly, refusalFor } from '@/modules/studio/roles';
 import { addProduct, myStudioId } from './store';
 import { categoryOfRoom, cleanProposal, mayReview, sameProductName } from './proposal-rules';
 import type { QuoteUnitName, WorkCodeName } from './pricing';
@@ -42,7 +42,7 @@ export async function proposeProduct(raw: unknown, quoteId?: string | null): Pro
   if (!studioId) return { ok: false, error: 'Your role in the studio does not include that.' };
   /* Read only (a sales rep, a director) proposes nothing (audit, 24 Nov 2026). Designers revise the design final, so they still may. */
   const me = await currentMember();
-  if (me && quoteReadOnly(me)) return { ok: false, error: 'Your role in the studio does not include that.' };
+  if (me && quoteReadOnly(me)) return { ok: false, error: refusalFor(me, 'Your role in the studio does not include that.') };
   const clean = cleanProposal(raw);
   if (!clean.ok) return clean;
   const p = clean.value;

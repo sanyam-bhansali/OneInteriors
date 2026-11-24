@@ -15,6 +15,7 @@ import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { computeTotals } from './pricing';
 import { readPhases } from '@/modules/studio/payment-phases';
+import { refusalFor } from '@/modules/studio/roles';
 import { quoteScope } from './quotes';
 import { myProducts } from './store';
 import { copiedLines, fillRefusal, previousQuotesWhere, templateSourceWhere, rateChanges, templateLines, templateTerms, type CopiedLine, type RateChange } from './from-previous-rules';
@@ -167,7 +168,8 @@ export async function fillFromPrevious(targetId: string, sourceId: string, withL
       select: { id: true, status: true, issuedOn: true, category: true, _count: { select: { lines: true, revisions: true } } },
     }),
   ]);
-  if (!source || !target || target.id === sourceId) return { ok: false, error: NOT_YOURS };
+  /* A director writes no quotation (owner, 24 Nov 2026), so the target is never theirs: say why. */
+  if (!source || !target || target.id === sourceId) return { ok: false, error: refusalFor(qs.lead, NOT_YOURS) };
   const refusal = fillRefusal({ status: target.status, issuedOn: target.issuedOn, lineCount: target._count.lines, revisionCount: target._count.revisions }, withLines);
   if (refusal) return { ok: false, error: refusal };
 

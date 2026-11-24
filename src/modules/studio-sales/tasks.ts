@@ -10,6 +10,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { currentMember } from '@/modules/studio/access';
 import { leadInScope, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
+import { refusalFor } from '@/modules/studio/roles';
 import { defaultTaskAssignee, mayAssignTaskTo, mayChangeTask, mayUseTasks, readTask, tasksVisibleTo, type TaskMember } from './task-rules';
 
 /** What a task write says back (the same shape as app/studio/sales-types.ts `Done`). */
@@ -157,7 +158,7 @@ export async function createTask(input: TaskWrite): Promise<Done> {
       const lead = scope ? await leadInScope(scope, input.leadId) : null;
       if (!lead) return { ok: false, error: 'That lead is not yours.' };
       /* A task on a lead is working it: `lead.edit` on that lead (sales roles, owner 22 Oct 2026). */
-      if (!scope || !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: 'Your role does not include working that lead.' };
+      if (!scope || !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: refusalFor(scope, 'Your role does not include working that lead.') };
       leadId = lead.id;
       leadOwnerId = lead.assignedToId;
     }

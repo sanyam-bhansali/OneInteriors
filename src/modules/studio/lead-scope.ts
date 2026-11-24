@@ -41,7 +41,7 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember, type StudioMemberRef } from './access';
-import { can, hasSalesRole, leadsVisibleTo, leadsWhereFor, poolVisibleTo, quotesVisibleTo, type LeadWriteAction, type StudioAction } from './roles';
+import { can, hasSalesRole, leadsVisibleTo, leadsWhereFor, poolVisibleTo, quotesVisibleTo, refusalFor, type LeadWriteAction, type StudioAction } from './roles';
 import { STUDIO_POOL_ONLY, poolAccessOf, reachOf, reachWhere, type LeadFacts, type PoolAccess } from './sales-access';
 import type { SalesReach } from './sales-permissions';
 
@@ -159,6 +159,17 @@ export function fenceFor(scope: LeadScope, action: LeadWriteAction): Prisma.Stud
 export async function scopeFor(action: StudioAction): Promise<LeadScope | null> {
   const scope = await myLeadScope();
   return scope && can(scope.member, action) ? scope : null;
+}
+
+/**
+ * The refusal for a lead or quotation write when the caller has no scope or
+ * member in hand (a `scopeFor` that came back null): the director's message
+ * (owner, 24 Nov 2026; roles.ts `refusalFor`) when the signed-in person is a
+ * director, else `fallback`. Only on the refusal path, so it costs nothing
+ * when the write goes through.
+ */
+export async function refusalForMe(fallback: string): Promise<string> {
+  return refusalFor(await currentMember(), fallback);
 }
 
 /**

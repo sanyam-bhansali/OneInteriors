@@ -14,8 +14,8 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
-import { actingMember, fenceFor, myLeadScope, scopeFor, type LeadScope } from '@/modules/studio/lead-scope';
-import { can, hasSalesRole } from '@/modules/studio/roles';
+import { actingMember, fenceFor, myLeadScope, refusalForMe, scopeFor, type LeadScope } from '@/modules/studio/lead-scope';
+import { can, hasSalesRole, refusalFor } from '@/modules/studio/roles';
 import { mayAssignTo, reachOf } from '@/modules/studio/sales-access';
 import { notify } from '@/modules/notify/service';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -436,7 +436,7 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
   const scope = await myLeadScope();
   const studioId = scope?.studioId ?? null;
   if (!scope || !studioId) return { ok: false, error: 'No studio on this account.' };
-  if (!can(scope.member, 'lead.add')) return { ok: false, error: 'Your role in the studio does not include adding leads.' };
+  if (!can(scope.member, 'lead.add')) return { ok: false, error: refusalFor(scope, 'Your role in the studio does not include adding leads.') };
 
   const name = input.name.trim();
   if (name.length < 2) return { ok: false, error: 'Who is it?' };
@@ -637,7 +637,7 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
       },
     });
 
-    if (count === 0) return { ok: false, error: 'That client is not yours.' };
+    if (count === 0) return { ok: false, error: refusalFor(scope, 'That client is not yours.') };
 
     /* Only the stage move and the loss are worth a line. An edited follow-up
        date or a retyped notes box is housekeeping, and a timeline padded with
@@ -732,7 +732,7 @@ export async function assignClients(ids: string[], memberId: string | null, opts
      only to people within it (team: their team). Was `myStudioId()`. */
   const scope = await scopeFor('lead.assign');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include giving leads to people.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include giving leads to people.') };
   if (ids.length === 0) return { ok: false, error: 'Nothing selected.' };
   const me = scope.member;
 
@@ -885,7 +885,7 @@ export async function logContact(
 
     if (opts?.moveToStageId) {
       if (!outcome) return { ok: false, error: 'Pick what happened on the call first.' };
-      return await logContactAndMove(studioId, fence, id, outcome, note, dueAt, picked ?? null, opts.moveToStageId, now);
+      return await logContactAndMove(studioId, fence, id, outcome, note, dueAt, picked ?? null, opts.moveToStageId, now, refusalFor(scope, 'That client is not yours.'));
     }
 
     /**
@@ -926,7 +926,7 @@ export async function logContact(
             : {}),
       },
     });
-    if (count === 0) return { ok: false, error: 'That client is not yours.' };
+    if (count === 0) return { ok: false, error: refusalFor(scope, 'That client is not yours.') };
 
     await record({
       studioId,
@@ -975,12 +975,14 @@ async function logContactAndMove(
   picked: { reactions: CallReactionId[]; minutes: number | null } | null,
   moveToStageId: string,
   now: Date,
+  /** What a refused caller is told (a director: roles.ts `refusalFor`). */
+  notYours: string,
 ): Promise<Result> {
   const lead = await prisma.studioClient.findFirst({
     where: { AND: [fence, { id, studioId, deletedAt: null }] },
     select: { stageId: true, bookedAt: true, stage: { select: { name: true, kind: true } } },
   });
-  if (!lead) return { ok: false, error: 'That client is not yours.' };
+  if (!lead) return { ok: false, error: notYours };
 
   const stages = await myStages();
   const allowed = allowedCallMoves(stages, lead.stageId, outcome).find((m) => m.id === moveToStageId);
@@ -1101,7 +1103,7 @@ export async function binClients(ids: string[]): Promise<Result> {
   /* Sales roles (owner, 22 Oct 2026): `lead.delete`, and only leads they can see. Was `myStudioId()`. */
   const scope = await scopeFor('lead.delete');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include deleting leads.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include deleting leads.') };
   if (ids.length === 0) return { ok: false, error: 'Nothing selected.' };
   const fence = scope.leads;
 
@@ -1157,7 +1159,7 @@ export async function binClients(ids: string[]): Promise<Result> {
 export async function restoreClients(ids: string[]): Promise<Result> {
   const scope = await scopeFor('lead.delete');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include the bin.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include the bin.') };
   if (ids.length === 0) return { ok: false, error: 'Nothing selected.' };
   const fence = scope.leads;
 
@@ -1205,7 +1207,7 @@ export async function restoreClients(ids: string[]): Promise<Result> {
 export async function eraseClients(ids: string[]): Promise<Result> {
   const scope = await scopeFor('lead.delete');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include the bin.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include the bin.') };
   if (ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 
   try {
@@ -1338,7 +1340,7 @@ export async function importClients(
      studio pool; anyone else fills their own team pool, to hand out. */
   const scope = await scopeFor('lead.import');
   const studioId = scope?.studioId ?? null;
-  if (!scope || !studioId) return { ok: false, error: 'Your role does not include importing leads.' };
+  if (!scope || !studioId) return { ok: false, error: await refusalForMe('Your role does not include importing leads.') };
   if (rows.length === 0) return { ok: false, error: 'Nothing to import.' };
   const importPool = hasSalesRole(scope.member) && reachOf(scope.member.sales, 'leads.pool') !== 'all' ? scope.member.id : null;
   if (rows.length > 5000) {

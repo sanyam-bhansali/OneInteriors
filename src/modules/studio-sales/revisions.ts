@@ -37,7 +37,7 @@ import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
 import { checkSalesNotes, sendRefusal, voiceExtOf } from './revision-rules';
 import { photoGate } from '@/modules/items/server';
 import { categoryRefusal } from '@/modules/studio-quote/category-rules';
-import { quoteReadOnly } from '@/modules/studio/roles';
+import { quoteReadOnly, refusalFor } from '@/modules/studio/roles';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -334,7 +334,7 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   /* Read only (a sales rep, a director) sends nothing (audit, 24 Nov 2026). */
-  if (quoteReadOnly(scope.member)) return { ok: false, error: 'You can read this quotation; sending it is for whoever builds quotations.' };
+  if (quoteReadOnly(scope.member)) return { ok: false, error: refusalFor(scope, 'You can read this quotation; sending it is for whoever builds quotations.') };
   const studioId = scope.studioId;
   const q = await prisma.studioQuote.findFirst({
     where: { ...scope.quotesWritable, id: quoteId, studioId },
@@ -411,7 +411,7 @@ export async function salesVoiceTicket(quoteId: string, type: unknown, bytes: un
     select: { clientId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
   });
   if (!q?.clientId) return { ok: false, error: 'That quotation is not yours.' };
-  if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null })) return { ok: false, error: 'Your role in the studio does not include that.' };
+  if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null })) return { ok: false, error: refusalFor(scope, 'Your role in the studio does not include that.') };
   return leadUploadTicket(scope.studioId, q.clientId, ext);
 }
 
@@ -444,7 +444,7 @@ export async function markSalesFinal(
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
   if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null })) {
-    return { ok: false, error: 'Your role in the studio does not include that. Ask your studio owner.' };
+    return { ok: false, error: refusalFor(scope, 'Your role in the studio does not include that. Ask your studio owner.') };
   }
   const revision = q.revisions[0] ?? null;
   const booked = (await prisma.homeProject.findFirst({ where: { signedQuoteId: q.id, cancelledAt: null }, select: { id: true } })) !== null;

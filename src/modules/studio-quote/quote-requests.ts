@@ -27,7 +27,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember } from '@/modules/studio/access';
 import { actingMember, fenceFor, leadForQuote, leadInScope, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
-import { asSeenBy, can } from '@/modules/studio/roles';
+import { asSeenBy, can, refusalFor as refusalForMember } from '@/modules/studio/roles';
 import { record } from '@/modules/studio-practice/events';
 import { signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { applyConfiguration, createQuote } from './quotes';
@@ -302,7 +302,7 @@ export async function requestQuotation(clientId: string, note: unknown): Promise
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const lead = await leadInScope(scope, String(clientId ?? ''));
   if (!lead) return { ok: false, error: 'That lead is not one of yours.' };
-  if (!mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: 'Your role in the studio does not include that. Ask your studio owner.' };
+  if (!mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: refusalForMember(scope, 'Your role in the studio does not include that. Ask your studio owner.') };
   const facts = await prisma.studioClient.findFirst({ where: { id: lead.id, studioId: scope.studioId }, select: { introductionId: true, source: true } });
   if (facts && (facts.introductionId !== null || facts.source === 'ONE_INTERIORS')) {
     return { ok: false, error: 'One Interiors introduced this client: use "Make the final quote" on this page, so they can read and sign it in the app.' };
@@ -342,7 +342,7 @@ export async function startRequest(requestId: string): Promise<{ ok: true; quote
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const req = await loadRequest(String(requestId ?? ''), scope.studioId);
-  if (!req || req.assignedToId !== scope.member.id) return { ok: false, error: NOT_YOURS };
+  if (!req || req.assignedToId !== scope.member.id) return { ok: false, error: refusalForMember(scope, NOT_YOURS) };
   const refusal = refusalFor(req.status, 'start');
   if (refusal) return { ok: false, error: refusal };
 
@@ -362,7 +362,7 @@ export async function startRequest(requestId: string): Promise<{ ok: true; quote
 /** A draft for the request's lead, filled from the lead and its newest read floor plan (leads.ts `newQuoteForLead`, for a builder). */
 async function draftFor(scope: LeadScope, clientId: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const found = await leadForQuote(scope, clientId);
-  if (!found || !mayOnLead(scope, 'quote.write', found)) return { ok: false, error: 'That lead is not one of yours.' };
+  if (!found || !mayOnLead(scope, 'quote.write', found)) return { ok: false, error: refusalForMember(scope, 'That lead is not one of yours.') };
   const studioId = scope.studioId;
   const lead = await prisma.studioClient.findFirst({
     where: { id: found.id, studioId, deletedAt: null },
@@ -412,7 +412,7 @@ export async function finishRequest(requestId: string): Promise<RequestResult> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const req = await loadRequest(String(requestId ?? ''), scope.studioId);
-  if (!req || (req.assignedToId !== scope.member.id && !headsIt(scope, req.client))) return { ok: false, error: NOT_YOURS };
+  if (!req || (req.assignedToId !== scope.member.id && !headsIt(scope, req.client))) return { ok: false, error: refusalForMember(scope, NOT_YOURS) };
   const refusal = refusalFor(req.status, 'done');
   if (refusal) return { ok: false, error: refusal };
   const { count } = await prisma.studioQuoteRequest.updateMany({ where: { id: req.id, status: ACTIVE }, data: { status: 'DONE', doneAt: new Date() } });
@@ -428,7 +428,7 @@ export async function reassignRequest(requestId: string, memberId: unknown): Pro
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const studioId = scope.studioId;
   const req = await loadRequest(String(requestId ?? ''), studioId);
-  if (!req || !headsIt(scope, req.client)) return { ok: false, error: 'Only a head over this lead can hand its quotation to someone else.' };
+  if (!req || !headsIt(scope, req.client)) return { ok: false, error: refusalForMember(scope, 'Only a head over this lead can hand its quotation to someone else.') };
   const [team, studio] = await Promise.all([builderTeam(studioId), prisma.studio.findUnique({ where: { id: studioId }, select: { quoteBuilderIds: true } })]);
   const check = checkReassign({ status: req.status, currentId: req.assignedToId, targetId: memberId }, buildersNow(team, readBuilderIds(studio?.quoteBuilderIds)));
   if (!check.ok) return check;
@@ -448,7 +448,7 @@ export async function cancelRequest(requestId: string): Promise<RequestResult> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const req = await loadRequest(String(requestId ?? ''), scope.studioId);
-  if (!req || (!headsIt(scope, req.client) && req.requestedById !== scope.member.id)) return { ok: false, error: NOT_YOURS };
+  if (!req || (!headsIt(scope, req.client) && req.requestedById !== scope.member.id)) return { ok: false, error: refusalForMember(scope, NOT_YOURS) };
   const refusal = refusalFor(req.status, 'cancel');
   if (refusal) return { ok: false, error: refusal };
   const by = await actingMember();

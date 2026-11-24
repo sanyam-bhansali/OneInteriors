@@ -21,7 +21,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { leadForQuote, leadInScope, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
-import { quoteReadOnly } from '@/modules/studio/roles';
+import { quoteReadOnly, refusalFor } from '@/modules/studio/roles';
 import { record } from '@/modules/studio-practice/events';
 import { readLeadFile, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { canReadPlans } from '@/modules/floorplan/read';
@@ -129,7 +129,7 @@ export async function buildFromPlan(clientId: string, ref: { fileId?: string; st
   if (!found) return { ok: false, error: NOT_YOURS };
   const mayRead = mayOnLead(scope, 'lead.edit', found);
   const mayQuote = mayOnLead(scope, 'quote.write', found);
-  if (!mayRead && !mayQuote) return { ok: false, error: NOT_ROLE };
+  if (!mayRead && !mayQuote) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
 
   const fileId = typeof ref.fileId === 'string' && ref.fileId.length <= 64 ? ref.fileId : null;
   const path = typeof ref.storagePath === 'string' && ref.storagePath.length <= 300 ? ref.storagePath : null;
@@ -256,9 +256,9 @@ export async function readRoomsForQuote(quoteId: string): Promise<{ ok: true; me
   /* Quotation requests: the builder a request was handed to reads its plan too. */
   const lead = await leadForQuote(scope, quote.clientId);
   if (!lead) return { ok: false, error: NOT_YOURS };
-  if (!mayOnLead(scope, 'quote.write', lead)) return { ok: false, error: NOT_ROLE };
+  if (!mayOnLead(scope, 'quote.write', lead)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
   // It rewrites the draft's kitchen run and bathrooms: not for a sales rep (owner, 22 Nov 2026).
-  if (quoteReadOnly(scope.member)) return { ok: false, error: NOT_ROLE };
+  if (quoteReadOnly(scope.member)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
   if (!canReadPlans()) return { ok: false, error: planReadMessage('not-configured') };
 
   const file = await prisma.studioClientFile.findFirst({
@@ -384,7 +384,7 @@ export async function readLeadPlan(clientId: string, ref: { fileId?: string; sto
   const studioId = scope.studioId;
   const lead = await leadForQuote(scope, clientId);
   if (!lead) return { ok: false, error: NOT_YOURS };
-  if (!mayOnLead(scope, 'quote.write', lead) && !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: NOT_ROLE };
+  if (!mayOnLead(scope, 'quote.write', lead) && !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
   const fileId = typeof ref.fileId === 'string' && ref.fileId.length <= 64 ? ref.fileId : null;
   const path = typeof ref.storagePath === 'string' && ref.storagePath.length <= 300 ? ref.storagePath : null;
   if (!fileId && !path) return { ok: false, error: 'Which file?' };
@@ -434,7 +434,7 @@ export async function saveFirstQuote(input: FirstQuoteInput): Promise<{ ok: true
   const studioId = scope.studioId;
   const found = await leadForQuote(scope, String(input?.clientId ?? ''));
   if (!found) return { ok: false, error: NOT_YOURS };
-  if (!mayOnLead(scope, 'quote.write', found)) return { ok: false, error: NOT_ROLE };
+  if (!mayOnLead(scope, 'quote.write', found)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
   const lead = await prisma.studioClient.findFirst({
     where: { AND: [scope.quoteLeads], id: found.id, studioId, deletedAt: null },
     select: { id: true, name: true, phone: true, email: true, society: true, carpetSqft: true, introductionId: true, source: true },

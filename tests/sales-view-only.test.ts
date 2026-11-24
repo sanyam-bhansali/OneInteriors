@@ -47,7 +47,7 @@ describe('wiring', () => {
     expect(plan).toContain('applyConfiguration({ quoteId: created.id, home, fromPlan: true })');
     expect(quotes).toContain("status: 'DRAFT', issuedOn: null, lines: { none: {} } }");
     // "Read rooms" rewrites a draft: not theirs.
-    expect(plan).toContain('if (quoteReadOnly(scope.member)) return { ok: false, error: NOT_ROLE };');
+    expect(plan).toContain('if (quoteReadOnly(scope.member)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };');
   });
 
   it('their screens: the builder locked with a note, View PDF only, no New quotation or Use as template', () => {

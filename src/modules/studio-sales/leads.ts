@@ -20,7 +20,7 @@ import { record } from '@/modules/studio-practice/events';
 import { normalisePhone } from '@/modules/studio-practice/csv';
 import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 import { actingMember, leadInScope, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
-import { can, hasSalesRole } from '@/modules/studio/roles';
+import { can, hasSalesRole, refusalFor } from '@/modules/studio/roles';
 import { assignableTo, reachOf } from '@/modules/studio/sales-access';
 import { applyConfiguration, createQuote } from '@/modules/studio-quote/quotes';
 import { openQuoteRequest } from '@/modules/studio-quote/quote-request-store';
@@ -56,7 +56,7 @@ async function leadFor(clientId: string, action: 'lead.read' | 'lead.edit' | 'qu
   if (!scope) return { error: 'Sign in as your studio first.' };
   const lead = await leadInScope(scope, String(clientId ?? ''));
   if (!lead) return { error: NOT_YOURS };
-  if (!mayOnLead(scope, action, lead)) return { error: NOT_ROLE };
+  if (!mayOnLead(scope, action, lead)) return { error: refusalFor(scope, NOT_ROLE) };
   return { scope, lead };
 }
 
@@ -457,7 +457,7 @@ export async function removeLeadFile(fileId: string): Promise<LeadResult> {
     select: { id: true, name: true, storagePath: true, clientId: true, client: { select: { assignedToId: true } } },
   });
   if (!file) return { ok: false, error: 'That file is not on one of your leads.' };
-  if (!mayOnLead(scope, 'lead.edit', file.client)) return { ok: false, error: NOT_ROLE };
+  if (!mayOnLead(scope, 'lead.edit', file.client)) return { ok: false, error: refusalFor(scope, NOT_ROLE) };
   await removeLeadFiles([file.storagePath]);
   await prisma.studioClientFile.deleteMany({ where: { id: file.id, studioId } });
   await record({ studioId, clientId: file.clientId, kind: 'FILE', summary: `File removed: ${file.name}` });
