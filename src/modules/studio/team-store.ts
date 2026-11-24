@@ -55,7 +55,7 @@ export type TeamResult = { ok: true; message: string; password?: string } | { ok
 
 const NOT_ALLOWED = 'Only the studio owner can change the team.';
 const PRO_ROLES = 'On Pro you can add salespeople. Designers, project managers, supervisors and accounts come with the Max plan.';
-const SOLO_SEAT = 'Pro Solo is for one person. Ask One Interiors to move your studio to Pro to add your team.';
+const SOLO_SEAT = 'Free is for one person. Ask One Interiors to move your studio to Pro to add your team.';
 
 /** The signed-in member when they may manage the team; null otherwise. */
 async function teamLead(): Promise<StudioMemberRef | null> {

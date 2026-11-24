@@ -146,14 +146,14 @@ export async function setHiddenAsTestAction(
   return result;
 }
 
-/** The studio software plan: Pro Solo, Pro or Max (record.ts setSoftwarePlan). */
+/** The studio CRM plan: Free, Pro or Max (record.ts setSoftwarePlan). */
 export async function setSoftwarePlanAction(
   _prev: RecordResult | null,
   formData: FormData,
 ): Promise<RecordResult> {
   const slug = String(formData.get('slug') ?? '');
   const plan = String(formData.get('plan') ?? '');
-  const result = await setSoftwarePlan(String(formData.get('studioId') ?? ''), plan === 'MAX' || plan === 'SOLO' ? plan : 'PRO');
+  const result = await setSoftwarePlan(String(formData.get('studioId') ?? ''), plan === 'MAX' || plan === 'FREE' ? plan : 'PRO');
   if (result.ok && slug) revalidatePath(`/ops/${slug}`);
   return result;
 }

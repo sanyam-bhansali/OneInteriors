@@ -12,6 +12,9 @@ import { extrasOnQuote } from '@/modules/project/change-orders';
 import { ExtrasAfterSignOff } from '../../../projects/[id]/ExtrasAfterSignOff';
 import { approvedElectrical, projectOfQuote } from '@/modules/project/electrical-bill';
 import { ElectricalBillDoc } from '../../doc/ElectricalBillDoc';
+import Link from 'next/link';
+import { quotingStudioId } from '@/modules/studio/lead-scope';
+import { claimPrint } from '@/modules/studio/plan-usage';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -55,6 +58,22 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const quote = await getQuote(id);
   if (!quote) notFound();
+
+  /* Free prints a set number of new quotations a month (owner, 24 Nov 2026;
+     studio/plan-usage.ts). A quotation printed before always prints again. */
+  const studioId = await quotingStudioId();
+  const room = studioId ? await claimPrint(quote.id, studioId) : { ok: true as const };
+  if (!room.ok) {
+    return (
+      <main className="mx-auto max-w-xl p-8" data-testid="print-limit">
+        <h1 className="m-0 mb-3 text-[20px] font-semibold">This month&apos;s quotations are printed</h1>
+        <p className="m-0 mb-4 text-[14.5px] leading-relaxed">{room.error}</p>
+        <Link href={`/studio/quotations/${quote.id}`} className="btn sec sm">
+          Back to the quotation
+        </Link>
+      </main>
+    );
+  }
 
   const [ctx, extras, projectId] = await Promise.all([quoteDocContext(quote), extrasOnQuote(quote.id).catch(() => []), projectOfQuote(quote.id).catch(() => null)]);
   /* The approved electrical bill joins the quotation in one PDF (owner, 22 Nov 2026). */

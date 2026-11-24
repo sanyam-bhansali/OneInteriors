@@ -55,6 +55,7 @@ import { allowedCallMoves } from './call-step-rules';
 import { queueConversions } from '@/modules/studio-sales/conversions';
 import { wonMoveRefusal } from '@/modules/studio-sales/convert-rules';
 import { phoneSearchDigits } from '@/modules/studio/phone-search';
+import { leadRoom } from '@/modules/studio/plan-usage';
 
 export interface ClientRow {
   id: string;
@@ -495,6 +496,10 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
       }
     }
   }
+
+  /* Free's open-lead limit (owner, 24 Nov 2026; studio/plan-usage.ts). */
+  const room = await leadRoom(studioId);
+  if (!room.ok) return room;
 
   // Where a new client lands is the studio's choice, not ours. `myStages()`
   // seeds the six defaults on first read, so this is never null for a studio
@@ -1371,6 +1376,10 @@ export async function importClients(
     if (fresh.length === 0) {
       return { ok: true, written: 0, alreadyHere: rows.length };
     }
+
+    /* Free's open-lead limit (owner, 24 Nov 2026): the whole file or none of it, never a silent half. */
+    const room = await leadRoom(studioId, fresh.length);
+    if (!room.ok) return room;
 
     const fields = await myFields();
     const ownSource = leadSourceId

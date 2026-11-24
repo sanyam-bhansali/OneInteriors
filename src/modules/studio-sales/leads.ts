@@ -44,6 +44,7 @@ import {
 } from './lead-rules';
 import { revisionLabel } from './revision-rules';
 import { bookingForLead, type LeadBooking } from './booking';
+import { storageRoom } from '@/modules/studio/plan-usage';
 
 export type LeadResult = { ok: true } | { ok: false; error: string };
 
@@ -381,6 +382,9 @@ export async function leadFileTicket(clientId: string, contentType: unknown, byt
   if ('error' in found) return { ok: false, error: found.error };
   const check = checkLeadFile(contentType, bytes);
   if (!check.ok) return check;
+  /* Free's file storage (owner, 24 Nov 2026; studio/plan-usage.ts): checked before the upload, so nothing is sent for nothing. */
+  const room = await storageRoom(found.scope.studioId, Number(bytes));
+  if (!room.ok) return room;
   return leadUploadTicket(found.scope.studioId, found.lead.id, check.ext);
 }
 

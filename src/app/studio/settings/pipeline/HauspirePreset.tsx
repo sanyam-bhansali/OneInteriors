@@ -18,7 +18,7 @@ export function HauspirePreset({ stages }: { stages: ExistingStage[] }) {
     <div className="card mb-5 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="m-0 text-[14.5px] font-semibold">Use the Hauspire pipeline</p>
+          <p className="m-0 text-[14.5px] font-semibold">Use the detailed pipeline</p>
           <p className="m-0 mt-1 text-[13px] leading-relaxed muted">{HAUSPIRE_PIPELINE.map((s) => s.name).join(' → ')}</p>
         </div>
         {!asking ? (
@@ -36,7 +36,7 @@ export function HauspirePreset({ stages }: { stages: ExistingStage[] }) {
             onClick={() =>
               start(async () => {
                 const r = await applyHauspireAction();
-                setSaid('error' in r ? { ok: false, text: r.error } : { ok: true, text: 'Done. Your pipeline now follows Hauspire’s.' });
+                setSaid('error' in r ? { ok: false, text: r.error } : { ok: true, text: 'Done. Your pipeline now follows the detailed one.' });
                 setAsking(false);
               })
             }

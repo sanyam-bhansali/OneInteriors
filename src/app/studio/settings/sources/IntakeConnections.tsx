@@ -149,7 +149,7 @@ export function IntakeConnections({ screen, people = [], metaNotice = null }: { 
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder={kind === 'META_PAGE' ? 'Hauspire Facebook Page' : kind === 'PORTAL' ? '99acres' : kind === 'WEBSITE' ? 'Website' : 'Google kitchen campaign'}
+            placeholder={kind === 'META_PAGE' ? 'Your Facebook Page' : kind === 'PORTAL' ? '99acres' : kind === 'WEBSITE' ? 'Website' : 'Google kitchen campaign'}
             aria-label="A name for it"
             className="fld w-auto min-w-[12rem] flex-1"
           />

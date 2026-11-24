@@ -26,7 +26,7 @@ export default async function PaymentStagesPage() {
             <p className="m-0 mb-4 max-w-[64ch] text-[14px] leading-relaxed muted">
               How your clients pay you, stage by stage. When a salesperson marks a quotation&apos;s sales final, these are filled in (they can change
               them for that one client), and the booking copies them onto the project.
-              {template.isDefault ? ' These are Hauspire’s six until you save your own.' : ''}
+              {template.isDefault ? ' These are the standard six until you save your own.' : ''}
             </p>
             <StagesForm initial={template.stages} />
           </>

@@ -312,7 +312,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
 
                 {/* The per-studio pilot switch (owner, 14 Oct 2026). */}
                 <div className="mt-4">
-                  <SoftwarePlanControl studioId={studio.id} slug={studio.slug} plan={softwarePlan} />
+                  <SoftwarePlanControl studioId={studio.id} slug={studio.slug} plan={softwarePlan.plan} legacySolo={softwarePlan.legacySolo} />
                 </div>
 
                 {/* Developer access: the studio as one of its people, read only (owner, 22 Oct 2026). */}

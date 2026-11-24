@@ -308,7 +308,7 @@ export function planSetup(a: QuizAnswers, now: StudioNow): SetupPlan {
     const intake = sorted.find((s) => s.isIntake)?.id;
     const same = plan.creates.length === 0 && plan.renames.length === 0 && plan.intake === intake && plan.order.every((id, i) => sorted[i]?.id === id);
     if (!same) {
-      changes.push({ id: 'pipeline', kind: 'pipeline', title: 'Use Hauspire’s detailed pipeline', detail: presetSummary(plan), overwrites: plan.renames.length > 0 });
+      changes.push({ id: 'pipeline', kind: 'pipeline', title: 'Use the detailed pipeline', detail: presetSummary(plan), overwrites: plan.renames.length > 0 });
     }
   } else if (a.pipeline === 'SIMPLE') {
     kept.push('Pipeline: your columns stay as they are.');
@@ -325,7 +325,7 @@ export function planSetup(a: QuizAnswers, now: StudioNow): SetupPlan {
         id: 'payments',
         kind: 'payments',
         stages: target.map((s) => ({ ...s })),
-        title: a.production === 'FACTORY' ? 'Payment stages: Hauspire’s six' : 'Payment stages: a simpler five',
+        title: a.production === 'FACTORY' ? 'Payment stages: the standard six' : 'Payment stages: a simpler five',
         detail: `${target.map((s) => (s.kind === 'FIXED' ? `${s.label} ₹${((s.amountPaise ?? 0) / 100).toLocaleString('en-IN')}` : `${s.label} ${s.pct}%`)).join(' · ')}${own ? '. Replaces the stages you set yourself.' : ''}`,
         overwrites: own,
       });
@@ -346,7 +346,7 @@ export function planSetup(a: QuizAnswers, now: StudioNow): SetupPlan {
           id: 'design',
           kind: 'design',
           steps: a.designInHouse ? null : target.map((s) => ({ ...s })),
-          title: a.designInHouse ? `Design steps: Hauspire’s ${HAUSPIRE_DESIGN.length}` : `Design steps: a shorter ${SHORT_DESIGN.length}`,
+          title: a.designInHouse ? `Design steps: the full ${HAUSPIRE_DESIGN.length}` : `Design steps: a shorter ${SHORT_DESIGN.length}`,
           detail: `New projects start with them; running projects keep their own.${own ? ' Replaces the steps you set yourself.' : ''}`,
           overwrites: own,
         });

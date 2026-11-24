@@ -3961,6 +3961,11 @@ model StudioQuote {
   importedFrom String?
   importedAt   DateTime?
 
+  /// The first time this quotation's print page (the PDF) was opened (owner,
+  /// 24 Nov 2026): Free counts quotations first printed in a calendar month;
+  /// reprints are free. Set once, never moved (modules/studio/plan-usage.ts).
+  firstPrintedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3969,6 +3974,7 @@ model StudioQuote {
   @@unique([studioId, number])
   @@unique([studioId, importedFrom])
   @@index([studioId, status, updatedAt])
+  @@index([studioId, firstPrintedAt])
   /// The leads board loads up to 400 clients and includes their
   /// quotes, so Postgres runs `WHERE clientId IN (400 ids)` on every
   /// render. Without this it is 400 sequential scans of the studio's
@@ -6244,8 +6250,12 @@ model HomeCrewPayment {
 /// The studio software plans (owner, 19 Oct 2026). Pro: Leads, Quotations,
 /// the product master, settings, Today and Calendar. Max: the full Studio OS.
 enum StudioSoftwarePlan {
-  /// Pro for a one-person company (owner, 21 Oct 2026): one login.
+  /// The old Pro Solo (owner, 21 Oct 2026): one login. Reads as Free with its
+  /// limits waived until the founding-studio script moves these to FREE
+  /// (modules/studio/software-plan.ts).
   SOLO
+  /// Free (owner, 24 Nov 2026): one person, leads and quotations, with limits.
+  FREE
   PRO
   MAX
 }

@@ -31,6 +31,7 @@ export function LogoAndMark({
   hasBranding,
   uploadEnabled,
   tier,
+  plan = null,
   hideRequested,
 }: {
   /** Signed, five minutes. Null when there is no logo or storage is off. */
@@ -39,9 +40,11 @@ export function LogoAndMark({
   hasBranding: boolean;
   uploadEnabled: boolean;
   tier: string | null;
+  /** The studio CRM plan: Pro and Max may take the line off (owner, 24 Nov 2026). */
+  plan?: string | null;
   hideRequested: boolean;
 }) {
-  const mark = markToggleState({ tier, hideRequested });
+  const mark = markToggleState({ tier, plan, hideRequested });
 
   return (
     <div className="flex max-w-[52rem] flex-col gap-5">

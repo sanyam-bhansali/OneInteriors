@@ -25,7 +25,7 @@ export default async function DesignStepsPage() {
               any one project later. &ldquo;Days&rdquo; is how long after the step before it, and &ldquo;Effort&rdquo; the hours of work, for a 2 BHK:
               a 1 BHK is 20% less, a 3 BHK 20% more, a 4 BHK 40% more. A step with a payment, and every step after it, opens only once that payment is
               recorded. Pre-execution steps belong to the execution team; the designer supports.
-              {template.custom ? '' : ' These are Hauspire’s steps until you save your own.'}
+              {template.custom ? '' : ' These are the standard steps until you save your own.'}
             </p>
             <p className="m-0 mb-4 text-[14px]">
               <Link href="/studio/settings/design/switch" className="btn sec sm">

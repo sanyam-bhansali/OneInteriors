@@ -37,6 +37,7 @@ import { Prisma } from '@prisma/client';
  */
 import { myStudioId } from '@/modules/studio/tenancy';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
+import { planOf, type SoftwarePlan } from '@/modules/studio/software-plan';
 import { currentMember } from '@/modules/studio/access';
 import { isDirector } from '@/modules/studio/roles';
 
@@ -831,6 +832,17 @@ export async function myTier(): Promise<string | null> {
   /* A cancelled subscription is not a tier. Reading `tier` alone would leave
      a studio white-labelled for as long as the row survived their leaving. */
   return sub.status === 'CANCELLED' ? null : sub.tier;
+}
+
+/**
+ * The studio CRM plan of the studio this person quotes for (owner, 24 Nov
+ * 2026), for the mark: Pro and Max may take it off (`mayRemoveMark`).
+ */
+export async function myPlan(): Promise<SoftwarePlan | null> {
+  const studioId = await quotingStudioId();
+  if (!studioId) return null;
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true } });
+  return row ? planOf(row) : null;
 }
 
 // ── The studio, for the cover and About pages of a quotation ─────

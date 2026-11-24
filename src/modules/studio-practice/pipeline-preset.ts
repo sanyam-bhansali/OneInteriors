@@ -130,7 +130,7 @@ export function presetSummary(plan: PresetPlan): string {
   if (plan.renames.length) bits.push(`renames ${plan.renames.map((r) => `${r.from} to ${r.to}`).join(', ')}`);
   for (const k of plan.kindChanges) bits.push(k.to === 'LOST' ? `makes ${k.name} a lost column (its leads count as lost)` : `makes ${k.name} ${k.to === 'OPEN' ? 'an open' : `a ${k.to.toLowerCase()}`} column`);
   if (plan.callStepMarks.length) bits.push(`marks ${plan.callStepMarks.join(', ')} as calling steps`);
-  if (!bits.length) return 'Your pipeline already matches; this only puts the columns in Hauspire’s order.';
+  if (!bits.length) return 'Your pipeline already matches; this only puts the columns in the detailed pipeline’s order.';
   const s = bits.join(', and ');
   return `${s[0]!.toUpperCase()}${s.slice(1)}. Nothing is deleted; your other columns stay, after these.`;
 }
