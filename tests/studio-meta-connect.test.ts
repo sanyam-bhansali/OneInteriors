@@ -56,6 +56,17 @@ describe('the login', () => {
     expect(u.searchParams.get('scope')).toContain('ads_read');
     expect(u.toString()).not.toContain('secret');
   });
+  it('uses the Login for Business configuration instead of scope when one is set', () => {
+    const u = new URL(loginUrl({ appId: '123456789', redirectUri: 'https://studio.example/api/studio/meta/callback', state: 'st8', configId: '2497939097366329' }));
+    expect(u.searchParams.get('config_id')).toBe('2497939097366329');
+    expect(u.searchParams.get('response_type')).toBe('code');
+    expect(u.searchParams.get('scope')).toBeNull();
+    expect(u.searchParams.get('state')).toBe('st8');
+  });
+  it('reads the configuration id only when it is a number', () => {
+    expect(metaApp({ META_APP_ID: '123456789', META_APP_SECRET: 's', META_LOGIN_CONFIG_ID: '2497939097366329' })).toEqual({ appId: '123456789', appSecret: 's', configId: '2497939097366329' });
+    expect(metaApp({ META_APP_ID: '123456789', META_APP_SECRET: 's', META_LOGIN_CONFIG_ID: 'abc' })).toEqual({ appId: '123456789', appSecret: 's' });
+  });
   it('needs both the app id and its secret', () => {
     expect(metaApp({ META_APP_ID: '123456789' })).toBeNull();
     expect(metaApp({ META_APP_ID: 'abc', META_APP_SECRET: 's' })).toBeNull();
