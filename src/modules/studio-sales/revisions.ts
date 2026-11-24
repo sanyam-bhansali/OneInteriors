@@ -361,8 +361,8 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
 export interface RevisionPair {
   number: string;
   clientName: string;
-  a: { n: number; lines: RevisionLine[]; totals: RevisionTotals };
-  b: { n: number; lines: RevisionLine[]; totals: RevisionTotals };
+  a: { n: number; lines: RevisionLine[]; totals: RevisionTotals; discountBps: number };
+  b: { n: number; lines: RevisionLine[]; totals: RevisionTotals; discountBps: number };
 }
 
 /** Two revisions of one quotation, for the comparison page. */
@@ -375,7 +375,7 @@ export async function revisionPair(quoteId: string, a: number, b: number): Promi
     select: {
       number: true,
       clientName: true,
-      revisions: { where: { studioId, n: { in: [a, b] } }, select: { n: true, lines: true, totals: true } },
+      revisions: { where: { studioId, n: { in: [a, b] } }, select: { n: true, lines: true, totals: true, terms: true } },
     },
   });
   const ra = q?.revisions.find((r) => r.n === a);
@@ -384,8 +384,8 @@ export async function revisionPair(quoteId: string, a: number, b: number): Promi
   return {
     number: q.number,
     clientName: q.clientName,
-    a: { n: ra.n, lines: readRevisionLines(ra.lines), totals: readRevisionTotals(ra.totals) },
-    b: { n: rb.n, lines: readRevisionLines(rb.lines), totals: readRevisionTotals(rb.totals) },
+    a: { n: ra.n, lines: readRevisionLines(ra.lines), totals: readRevisionTotals(ra.totals), discountBps: readRevisionTerms(ra.terms).discountBps },
+    b: { n: rb.n, lines: readRevisionLines(rb.lines), totals: readRevisionTotals(rb.totals), discountBps: readRevisionTerms(rb.terms).discountBps },
   };
 }
 
