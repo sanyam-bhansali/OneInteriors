@@ -971,6 +971,10 @@ model StudioMember {
   /// Design head (DESIGN-PROCESS-PLAN.md §2.6): a designer who sees every
   /// designer's projects and steps. Only on a DESIGNER; set in Settings, Team.
   designHead Boolean @default(false)
+  /// Director (owner, 24 Nov 2026: Anshu Ashis, Chandraveer Kumar): an owner
+  /// whose home puts projects first, with leads and quotations under More and
+  /// read only. Only on an OWNER; set by a full owner in Settings, Team.
+  director   Boolean @default(false)
 
   /// What this person may do (modules/studio/roles.ts `can`). Defaults to
   /// OWNER because the only path that creates a member without saying —

@@ -9,6 +9,7 @@ import {
   reinstateAction,
   resendAction,
   setDesignHeadAction,
+  setDirectorAction,
   setPasswordAction,
   setSitesAction,
   signOutEverywhereAction,
@@ -16,7 +17,9 @@ import {
 } from './actions';
 
 type Site = { id: string; label: string };
-type RoleCard = { role: StudioRoleName; name: string; line: string; can: string[] };
+/** `director`: the Director card (owner, 24 Nov 2026), an owner with projects first and leads and quotations read only. */
+type RoleCard = { role: StudioRoleName; name: string; line: string; can: string[]; director?: boolean };
+const cardKey = (r: { role: StudioRoleName; director?: boolean }) => (r.director ? 'DIRECTOR' : r.role);
 
 /** Project managers and supervisors see only the sites picked for them (roles.ts `needsAssignment`). */
 const PICKS_SITES: ReadonlySet<StudioRoleName> = new Set(['PM', 'SUPERVISOR']);
@@ -118,7 +121,10 @@ export function AddSomeone({
 }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<StudioRoleName>(roles.some((r) => r.role === 'SUPERVISOR') ? 'SUPERVISOR' : (roles[0]?.role ?? 'SALES'));
+  const [picked_, setPicked_] = useState<string>(roles.some((r) => r.role === 'SUPERVISOR') ? 'SUPERVISOR' : roles[0] ? cardKey(roles[0]) : 'SALES');
+  const card = roles.find((r) => cardKey(r) === picked_);
+  const role: StudioRoleName = card?.role ?? 'SALES';
+  const director = card?.director === true;
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [salesRoleId, setSalesRoleId] = useState(salesRoles.find((r) => r.system === 'REP')?.id ?? salesRoles[0]?.id ?? '');
   const [reportsToId, setReportsToId] = useState('');
@@ -142,7 +148,7 @@ export function AddSomeone({
         onSubmit={(e) => {
           e.preventDefault();
           run(
-            () => inviteAction({ name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [], ...(role === 'SALES' ? { salesRoleId, reportsToId } : {}) }),
+            () => inviteAction({ name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [], ...(role === 'SALES' ? { salesRoleId, reportsToId } : {}), ...(director ? { director: true } : {}) }),
             (r) => {
               if (r.ok) {
                 setName('');
@@ -170,15 +176,15 @@ export function AddSomeone({
           </span>
           <div role="radiogroup" aria-labelledby="i-role" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {roles.map((r) => {
-              const on = r.role === role;
+              const on = cardKey(r) === picked_;
               return (
                 <button
-                  key={r.role}
+                  key={cardKey(r)}
                   type="button"
                   role="radio"
                   aria-checked={on}
                   onClick={() => {
-                    setRole(r.role);
+                    setPicked_(cardKey(r));
                     setResult(null);
                   }}
                   className="st-role"
@@ -246,10 +252,13 @@ export function PersonActions({
   person,
   sites,
   passwordMode = false,
+  mayMakeDirector = false,
 }: {
   passwordMode?: boolean;
-  person: { id: string; name: string; role: StudioRoleName; status: StudioMemberStatusName; siteIds: string[]; designHead?: boolean };
+  person: { id: string; name: string; role: StudioRoleName; status: StudioMemberStatusName; siteIds: string[]; designHead?: boolean; director?: boolean };
   sites: Site[];
+  /** The signed-in person is a full owner: only they make someone a director (owner, 24 Nov 2026). */
+  mayMakeDirector?: boolean;
 }) {
   const { pending, result, run } = useResult();
   const [editing, setEditing] = useState(false);
@@ -327,6 +336,12 @@ export function PersonActions({
         <label className="hstack sm" style={{ gap: 6 }}>
           <input type="checkbox" checked={person.designHead === true} disabled={pending} onChange={(e) => run(() => setDesignHeadAction(person.id, e.target.checked))} />
           Design head: sees every project and every designer&apos;s work
+        </label>
+      ) : null}
+      {person.role === 'OWNER' && mayMakeDirector && person.status !== 'SUSPENDED' ? (
+        <label className="hstack sm" style={{ gap: 6 }}>
+          <input type="checkbox" checked={person.director === true} disabled={pending} onChange={(e) => run(() => setDirectorAction(person.id, e.target.checked))} data-testid="director-toggle" />
+          Director: projects first; leads and quotations read only
         </label>
       ) : null}
       {editing ? (

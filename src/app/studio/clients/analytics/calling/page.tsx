@@ -5,6 +5,7 @@ import { callStatsFor } from '@/modules/studio-sales/call-stats-data';
 import { CALL_RANGE_LABELS, CALL_RANGE_PRESETS, callRange, waitLabel, type CallStats, type PersonCalls } from '@/modules/studio-sales/call-stats';
 import { shortDay } from '@/modules/studio-sales/ist-range';
 import { AnalyticsTabs } from '../AnalyticsTabs';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Calling numbers',
@@ -30,6 +31,8 @@ export const dynamic = 'force-dynamic';
  * this page say the same thing in plain English.
  */
 export default async function CallingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients/analytics/calling');
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : (sp[k] as string | undefined));
   const range = callRange({ range: one('range'), from: one('from'), to: one('to') }, new Date());

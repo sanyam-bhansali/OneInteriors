@@ -107,8 +107,9 @@ export function leadScopeFor(member: StudioMemberRef): LeadScope | null {
   }
   const baseQuotes = quotesVisibleTo(member);
   const writeReach = hasSalesRole(member) ? reachOf(member.sales, 'quotes.write') : null;
-  const baseWritable: Prisma.StudioQuoteWhereInput =
-    !hasSalesRole(member) || (writeReach === 'all' && reach === 'all')
+  const baseWritable: Prisma.StudioQuoteWhereInput = !can(member, 'quote.write', { assigned: true })
+    ? /* A director (owner, 24 Nov 2026) reads quotations and writes none. */ { studioId: member.studioId, id: { in: [] } }
+    : !hasSalesRole(member) || (writeReach === 'all' && reach === 'all')
       ? baseQuotes
       : { AND: [baseQuotes, { studioId: member.studioId, client: { AND: [leadsWhereFor(member, 'quote.write')], deletedAt: null } }] };
   /* Quotation requests: a builder who does not see every lead also quotes

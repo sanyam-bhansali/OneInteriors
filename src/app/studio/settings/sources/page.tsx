@@ -7,6 +7,7 @@ import { myConversionScreen } from '@/modules/studio-sales/conversions';
 import { IntakeConnections } from './IntakeConnections';
 import { LeadRouting } from './LeadRouting';
 import { MetaFeedback } from './MetaFeedback';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Lead sources', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,8 @@ export const maxDuration = 60;
  * customers (off by default, the owner's switch).
  */
 export default async function LeadSourcesPage({ searchParams }: { searchParams: Promise<{ meta?: string }> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/settings/sources');
   const { meta } = await searchParams;
   const [sources, intake, routing, feedback] = await Promise.all([myLeadSources(), myIntakeScreen(), myLeadRouting(), myConversionScreen()]);
   const ours = Object.entries(SOURCE_LABELS)

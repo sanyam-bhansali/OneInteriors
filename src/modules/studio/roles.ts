@@ -431,6 +431,13 @@ export interface MemberRole {
    */
   designHead?: boolean;
   /**
+   * Director (owner, 24 Nov 2026: Anshu Ashis, accountant director, and
+   * Chandraveer Kumar): an owner whose home is projects first, with Leads and
+   * Quotations under More and read only (`DIRECTOR_REFUSED`). Everything else
+   * is the owner's. Only read on an OWNER.
+   */
+  director?: boolean;
+  /**
    * Sales roles (owner, 22 Oct 2026): a SALES member's sales role and place
    * in the reporting tree, built per request (access.ts `memberFor`). Null
    * or left out on a SALES member keeps the Phase 1 rule exactly. Ignored for
@@ -506,8 +513,38 @@ export const hasSalesRole = (member: MemberRole): member is MemberRole & { sales
  * marking the sales final and Convert keep their own permission.
  */
 export function quoteReadOnly(member: MemberRole): boolean {
+  if (isDirector(member)) return true;
   return member.role === 'SALES' && !can(member, 'quote.build');
 }
+
+/** A director (owner, 24 Nov 2026): an owner with leads and quotations read only. */
+export const isDirector = (member: MemberRole): boolean => member.role === 'OWNER' && member.director === true;
+
+/**
+ * What a director may not do (owner, 24 Nov 2026: "for leads as well as
+ * quotation, they only have read only access"): every lead and quotation
+ * write, the sales team and lead settings, and the leads list download.
+ * Reading leads, the pool and lead analytics stays. Recording a booking
+ * advance and refunding it are money (Anshu is the accountant director), so
+ * they stay too.
+ */
+export const DIRECTOR_REFUSED: ReadonlySet<StudioAction> = new Set<StudioAction>([
+  'lead.edit',
+  'lead.call',
+  'lead.add',
+  'lead.assign',
+  'lead.merge',
+  'lead.delete',
+  'lead.import',
+  'lead.export',
+  'lead.claim',
+  'lead.bulk',
+  'lead.settings',
+  'team.sales',
+  'quote.write',
+  'quote.salesFinal',
+  'quote.build',
+]);
 
 /**
  * The roles that only make sense with the full software (owner, 14 Oct
@@ -575,7 +612,8 @@ export function can(member: MemberRole, action: StudioAction, ctx: CanContext = 
   if (member.viewOnly === true && !READ_ACTIONS.has(action)) return false;
   /* The pilot switch (studio/pilot.ts): checked before the owner's "everything". */
   if (member.fullSoftware === false && (FULL_SOFTWARE_ROLES.includes(member.role) || FULL_SOFTWARE_ACTIONS.has(action))) return false;
-  if (member.role === 'OWNER') return true;
+  /* A director: the owner's everything, but leads and quotations read only. */
+  if (member.role === 'OWNER') return !(member.director === true && DIRECTOR_REFUSED.has(action));
   /* Sales roles (owner, 22 Oct 2026): the role and its reach decide, not GRANTS. */
   if (hasSalesRole(member)) return canBySalesRole(member.sales, action, ctx);
   const head = member.role === 'DESIGNER' && member.designHead === true;
@@ -651,6 +689,8 @@ export function poolVisibleTo(member: MemberRole & { id: string; studioId: strin
  * lead assigned to them (a quotation with no lead is not theirs to see).
  */
 export function quotesVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioQuoteWhereInput {
+  /* A director reads every quotation of the studio and writes none (quotes.ts `quoteScope`). */
+  if (isDirector(member) && member.status === 'ACTIVE') return { studioId: member.studioId };
   /* A read: a staff view sees the quotations the member sees (`asSeenBy`); writing still asks `can()`. */
   if (!can(asSeenBy(member), 'quote.write', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
   /* Sales roles: the quotations of the leads they may see (writing still asks `quote.write` on the lead). */

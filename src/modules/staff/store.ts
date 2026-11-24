@@ -28,7 +28,7 @@ import {
 export type StaffResult = { ok: true; message: string } | { ok: false; error: string };
 
 /** Owner and accounts keep employee records. */
-export const mayKeepStaff = (m: StudioMemberRef | null): m is StudioMemberRef => m !== null && !m.viewOnly && (m.role === 'OWNER' || m.role === 'ACCOUNTS');
+export const mayKeepStaff = (m: StudioMemberRef | null): m is StudioMemberRef => m !== null && m.status === 'ACTIVE' && !m.viewOnly && (m.role === 'OWNER' || m.role === 'ACCOUNTS');
 const NO = { ok: false as const, error: 'Only the owner or accounts keeps employee records.' };
 
 async function keeper(): Promise<StudioMemberRef | null> {

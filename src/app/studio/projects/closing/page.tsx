@@ -5,6 +5,7 @@ import { expectedClosing } from '@/modules/studio/expected-closing-store';
 import { isInTime } from '@/modules/studio/expected-closing';
 import '../projects.css';
 import '../../design/lifecycle.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Expected closing', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,8 @@ export const dynamic = 'force-dynamic';
 const dayWords = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 export default async function ExpectedClosingPage({ searchParams }: { searchParams: Promise<{ by?: string }> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/projects/closing');
   const [{ by: rawBy }, member] = await Promise.all([searchParams, currentMember()]);
   const list = await expectedClosing(rawBy?.slice(0, 10));
   const back = member?.role === 'DESIGNER' ? { href: '/studio/design', label: 'Back to design' } : { href: '/studio/projects', label: 'Back to projects' };

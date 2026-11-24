@@ -511,7 +511,7 @@ async function orderFor(woId: string, action: 'workorder.build' | 'workorder.mon
   return { ok: true as const, member, wo, access: check.access };
 }
 
-async function lineFor(lineId: string, action: 'workorder.build' | 'workorder.money') {
+async function lineFor(lineId: string, action: 'workorder.build' | 'crew.pay') {
   const member = await currentMember();
   if (!member) return { ok: false as const, error: SIGN_IN };
   const line = await prisma.homeWorkOrderLine.findFirst({
@@ -533,7 +533,7 @@ async function lineFor(lineId: string, action: 'workorder.build' | 'workorder.mo
  */
 export async function setLineQty(lineId: string, input: { measured?: unknown; estimate?: unknown }): Promise<CrewResult> {
   const member = await currentMember();
-  const action = member && can(member, 'workorder.money') ? 'workorder.money' : 'workorder.build';
+  const action = member && can(member, 'crew.pay') ? 'crew.pay' : 'workorder.build';
   const r = await lineFor(lineId, action);
   if (!r.ok) return r;
   const data: Prisma.HomeWorkOrderLineUpdateInput = {};
@@ -561,7 +561,7 @@ export async function setLineQty(lineId: string, input: { measured?: unknown; es
 /** Installation only, or full carpentry. Re-prices the line from the crew's card as it is now (an agreed amount stays). */
 export async function setLineCarpentry(lineId: string, mode: unknown): Promise<CrewResult> {
   const member = await currentMember();
-  const r = await lineFor(lineId, member && can(member, 'workorder.money') ? 'workorder.money' : 'workorder.build');
+  const r = await lineFor(lineId, member && can(member, 'crew.pay') ? 'crew.pay' : 'workorder.build');
   if (!r.ok) return r;
   if (r.line.trade !== CARPENTRY || r.line.isExtra) return { ok: false, error: 'Only a carpentry line from the quotation has this choice.' };
   const carpentry: CarpentryModeName = mode === 'FULL' ? 'FULL' : 'INSTALL';
@@ -580,7 +580,8 @@ export async function setLineCarpentry(lineId: string, mode: unknown): Promise<C
 
 /** A line's rate (for this project only; the card is untouched) or agreed amount. Owner and accounts only: the PM never sets money. */
 export async function setLinePrice(lineId: string, input: { rateRupees?: unknown; agreedRupees?: unknown }): Promise<CrewResult> {
-  const r = await lineFor(lineId, 'workorder.money');
+  /* Money writes are owner and accounts (crew.pay): a designer sees crew money and never sets it (audit, 24 Nov 2026). */
+  const r = await lineFor(lineId, 'crew.pay');
   if (!r.ok) return r;
   const data: Prisma.HomeWorkOrderLineUpdateInput = {};
   if (input.rateRupees !== undefined) {
@@ -612,8 +613,8 @@ export async function setLinePrice(lineId: string, input: { rateRupees?: unknown
  */
 export async function addExtra(woId: string, input: { what: unknown; room?: unknown; unit: unknown; qty?: unknown; rateRupees?: unknown; agreedRupees?: unknown }): Promise<CrewResult> {
   const member = await currentMember();
-  const money = member ? can(member, 'workorder.money') : false;
-  const r = await orderFor(woId, money ? 'workorder.money' : 'workorder.build');
+  const money = member ? can(member, 'crew.pay') : false;
+  const r = await orderFor(woId, money ? 'crew.pay' : 'workorder.build');
   if (!r.ok) return r;
   if (r.wo.archivedAt || r.wo.status === 'SETTLED') return { ok: false, error: 'This work order is closed. Reopen it first.' };
   const what = text(input.what, 160);
@@ -660,7 +661,7 @@ export async function addExtra(woId: string, input: { what: unknown; room?: unkn
 /** Take a line off a work order (kept on the record; the bill adds up again). */
 export async function removeLine(lineId: string): Promise<CrewResult> {
   const member = await currentMember();
-  const r = await lineFor(lineId, member && can(member, 'workorder.money') ? 'workorder.money' : 'workorder.build');
+  const r = await lineFor(lineId, member && can(member, 'crew.pay') ? 'crew.pay' : 'workorder.build');
   if (!r.ok) return r;
   try {
     await prisma.$transaction(async (tx) => {
@@ -681,7 +682,7 @@ export async function setOrderStatus(woId: string, to: unknown): Promise<CrewRes
   if (!target) return { ok: false, error: 'Which status?' };
   if (r.wo.archivedAt) return { ok: false, error: 'This work order is archived. Restore it first.' };
   const m = moneyOf(r.wo);
-  const ok = checkStatus(r.wo.status, target, { build: r.access.may('workorder.build'), money: r.access.may('workorder.money') }, { settled: m.settled });
+  const ok = checkStatus(r.wo.status, target, { build: r.access.may('workorder.build'), money: r.access.may('crew.pay') }, { settled: m.settled });
   if (!ok.ok) return ok;
   const name = (await prisma.user.findUnique({ where: { id: r.member.userId }, select: { name: true } }))?.name ?? null;
   try {
@@ -757,7 +758,7 @@ export async function swapCrew(woId: string, crewId: unknown): Promise<CrewResul
 /** Archive (or restore) a work order. Removing it outright is only for one with nothing paid. */
 export async function archiveOrder(woId: string, archived: boolean): Promise<CrewResult> {
   const r = await orderFor(woId, 'workorder.build');
-  const rm = r.ok ? r : await orderFor(woId, 'workorder.money');
+  const rm = r.ok ? r : await orderFor(woId, 'crew.pay');
   if (!rm.ok) return rm;
   try {
     await prisma.$transaction(async (tx) => {

@@ -10,6 +10,7 @@ import { RangePicker } from './RangePicker';
 import { AnalyticsTabs } from '../clients/analytics/AnalyticsTabs';
 import { currentMember } from '@/modules/studio/access';
 import { mayOpen } from '@/modules/studio/surfaces';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Analytics', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,8 @@ const list = (f: LeadFilters) => leadsHref(f, { view: 'list' });
  * the same page for their own leads, with the pool they can claim from.
  */
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/dashboard');
   const sp = await searchParams;
   const range = parseRange(sp.range) ?? '7d';
   const [d, member] = await Promise.all([myDashboard(range), currentMember()]);

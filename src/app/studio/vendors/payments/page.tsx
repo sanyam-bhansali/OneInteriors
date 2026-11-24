@@ -5,6 +5,7 @@ import { crewPaymentsLedger } from '@/modules/studio-crews/store';
 import { dayWords } from '../format';
 import '../../office-ui.css';
 import '../vendors.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Crew payments', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,8 @@ const MODE: Record<string, string> = { UPI: 'UPI', BANK: 'Bank', CASH: 'Cash', C
 
 /** Every rupee paid to a crew, newest first, recorded by name; corrections sit beside what they reverse. Owner and accounts. */
 export default async function CrewPaymentsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/vendors/payments');
   const data = await crewPaymentsLedger();
   if (!data) {
     return (

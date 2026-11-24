@@ -37,6 +37,7 @@ import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
 import { checkSalesNotes, sendRefusal, voiceExtOf } from './revision-rules';
 import { photoGate } from '@/modules/items/server';
 import { categoryRefusal } from '@/modules/studio-quote/category-rules';
+import { quoteReadOnly } from '@/modules/studio/roles';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -332,9 +333,11 @@ export async function sendRefusalFor(quoteId: string, studioId: string): Promise
 export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number; created: boolean } | { ok: false; error: string }> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
+  /* Read only (a sales rep, a director) sends nothing (audit, 24 Nov 2026). */
+  if (quoteReadOnly(scope.member)) return { ok: false, error: 'You can read this quotation; sending it is for whoever builds quotations.' };
   const studioId = scope.studioId;
   const q = await prisma.studioQuote.findFirst({
-    where: { ...scope.quotes, id: quoteId, studioId },
+    where: { ...scope.quotesWritable, id: quoteId, studioId },
     select: { id: true, status: true, clientId: true, category: true, scopeForProjectId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };

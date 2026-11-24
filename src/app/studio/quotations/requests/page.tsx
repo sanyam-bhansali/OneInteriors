@@ -5,6 +5,7 @@ import { asSeenBy, can } from '@/modules/studio/roles';
 import { myQuoteRequests, requestsOverview, type RequestView } from '@/modules/studio-quote/quote-requests';
 import { FinishRequest, OpenRequest, ReassignRequest } from './RequestControls';
 import '../quotes.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'To build',
@@ -23,6 +24,8 @@ export const dynamic = 'force-dynamic';
  * or cancel.
  */
 export default async function ToBuildPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/quotations/requests');
   const member = await currentMember();
   /* asSeenBy: under View as (staff, read only) the page shows what this person sees; writes stay refused. */
   const builds = member ? can(asSeenBy(member), 'quote.build') : false;

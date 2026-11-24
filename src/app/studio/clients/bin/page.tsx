@@ -3,6 +3,7 @@ import '../clients.css';
 import { myBin } from '@/modules/studio-practice/clients';
 import { BIN_DAYS } from '@/modules/studio-practice/vocabulary';
 import { BinList } from './Bin';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Deleted clients',
@@ -20,6 +21,8 @@ export const dynamic = 'force-dynamic';
  * reading them anyway, so the safety would be theatre.
  */
 export default async function BinPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients/bin');
   const rows = await myBin();
 
   return (

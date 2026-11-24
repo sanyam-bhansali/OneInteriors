@@ -7,6 +7,7 @@ import { canReadPlans } from '@/modules/floorplan/read';
 import { RatesGateCard } from '../../RatesGateCard';
 import { FirstQuote } from './FirstQuote';
 import '../quotes.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Quotation builder',
@@ -27,6 +28,8 @@ export const dynamic = 'force-dynamic';
  * prices every line again on the server.
  */
 export default async function FirstQuotePage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/quotations/first');
   const [quoting, gate] = await Promise.all([mayQuote(), myRatesGate()]);
   if (!quoting) {
     return (

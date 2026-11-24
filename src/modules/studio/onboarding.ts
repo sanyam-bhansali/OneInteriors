@@ -26,6 +26,8 @@ import { hasDatabase } from '@/lib/env';
 import { Prisma } from '@prisma/client';
 import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { OFFICE_MEMBER } from './surfaces';
+import { currentMember } from './access';
+import { can } from './roles';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { quotationsSent } from './approval';
@@ -887,6 +889,9 @@ export async function savePositioning(input: {
 export async function savePaymentPhases(text: string): Promise<SaveResult> {
   const context = await currentStudio();
   if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+  /* The payment stages are the owner's (`payments.template`); a project manager reaches this through the office too (audit, 24 Nov 2026). */
+  const me = await currentMember();
+  if (!me || !can(me, 'payments.template')) return { ok: false, errors: { form: 'Only the studio owner sets the payment stages.' } };
 
   const trimmed = text.trim();
   let phases: PaymentPhase[] | null = null;

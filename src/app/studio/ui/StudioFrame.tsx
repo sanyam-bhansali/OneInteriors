@@ -188,16 +188,24 @@ function AppsMenu({
             Close
           </button>
         </div>
-        <div className="lgrid2">
-          {apps.map((a) => (
-            <Link key={a.key} href={a.href} className="lapp" onClick={onClose} aria-current={a.key === current ? 'page' : undefined}>
-              <span style={{ background: a.bg, color: a.fg }}>
-                <AppIcon name={a.icon} size={22} />
-              </span>
-              {a.name}
-            </Link>
-          ))}
-        </div>
+        {[apps.filter((a) => !a.more), apps.filter((a) => a.more)].map((group, i) =>
+          group.length === 0 ? null : (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* A director's Leads and Quotations (owner, 24 Nov 2026). */}
+              {i === 1 ? <b style={{ fontSize: 13 }}>More</b> : null}
+              <div className="lgrid2">
+                {group.map((a) => (
+                  <Link key={a.key} href={a.href} className="lapp" onClick={onClose} aria-current={a.key === current ? 'page' : undefined}>
+                    <span style={{ background: a.bg, color: a.fg }}>
+                      <AppIcon name={a.icon} size={22} />
+                    </span>
+                    {a.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ),
+        )}
         <div className="hstack" style={{ justifyContent: 'space-between', borderTop: '1px solid var(--fill2)', paddingTop: 12 }}>
           <Link href={STUDIO_HOME} className="btn ghost sm" onClick={onClose}>
             <LineIcon name="home" size={16} />

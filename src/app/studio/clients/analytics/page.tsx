@@ -7,6 +7,7 @@ import { paiseToLakhs } from '@/lib/money';
 import { AnalyticsTabs } from './AnalyticsTabs';
 import { campaignAnalytics } from '@/modules/studio-sales/campaign-analytics';
 import type { CampaignLine } from '@/modules/studio-sales/campaign-rules';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Lead analytics',
@@ -48,6 +49,8 @@ export const dynamic = 'force-dynamic';
  * in the same table as everything else with the same arithmetic applied.
  */
 export default async function LeadAnalyticsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients/analytics');
   const [data, campaigns] = await Promise.all([leadAnalytics(), campaignAnalytics()]);
 
   if (!data) {

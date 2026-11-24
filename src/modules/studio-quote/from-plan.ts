@@ -149,8 +149,10 @@ export async function buildFromPlan(clientId: string, ref: { fileId?: string; st
 
   const oneInteriors = lead.introductionId !== null || lead.source === 'ONE_INTERIORS';
   const quotes = await prisma.studioQuote.count({ where: { studioId, clientId: lead.id } });
+  /* A read-only rep gets the one automatic draft and no more (audit, 24 Nov 2026): "manual" is the automatic rule for them. */
+  const onlyAuto = mode === 'auto' || quoteReadOnly(scope.member);
   const readOnlyWhy =
-    mode === 'read' ? 'asked' : oneInteriors ? 'one-interiors' : !mayQuote ? 'no-role' : mode === 'auto' && quotes > 0 ? 'has-quote' : null;
+    mode === 'read' ? 'asked' : oneInteriors ? 'one-interiors' : !mayQuote ? 'no-role' : onlyAuto && quotes > 0 ? 'has-quote' : null;
 
   if (!(await claimJob(studioId, lead.id, file.id))) {
     return { ok: true, status: 'READING', message: planReadMessage('busy'), quoteId: null, notes: [] };

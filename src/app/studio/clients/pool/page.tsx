@@ -16,6 +16,7 @@ import { taskPeople } from '@/modules/studio-sales/tasks';
 import { Toolbar } from '../LeadsControls';
 import { PoolTable } from './PoolTable';
 import { PoolSearch } from './PoolSearch';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Pool — leads nobody has taken',
@@ -37,6 +38,8 @@ export const dynamic = 'force-dynamic';
  * is offered only that head's team. Leads can also be moved into a pool.
  */
 export default async function PoolPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients/pool');
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : (sp[k] as string | undefined));
   const scope = await myLeadScope();

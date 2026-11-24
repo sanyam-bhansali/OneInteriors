@@ -15,6 +15,7 @@ import { byDesigner, designerChoices, pickDesigner } from '@/modules/studio/desi
 import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { maySeeClosing } from '@/modules/studio/expected-closing';
 import './projects.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Projects',
@@ -61,6 +62,8 @@ function lanesOf(rows: WorkspaceRow[]): { name: string; rows: WorkspaceRow[] }[]
 }
 
 export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/projects');
   const now = new Date();
   const [data, score, member, fullBoard, sp] = await Promise.all([
     studioProjects(now),

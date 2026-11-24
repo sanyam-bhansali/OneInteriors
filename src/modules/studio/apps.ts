@@ -11,7 +11,7 @@
  * reads (money stays hidden from designers and project managers there).
  */
 
-import { asSeenBy, can, type MemberRole, type StudioRoleName } from './roles';
+import { asSeenBy, can, isDirector, type MemberRole, type StudioRoleName } from './roles';
 import { CREWS_HOME, DESIGN_HOME, DOCUMENTS_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SERVICE_VISITS_PATH, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
 
 export { STUDIO_HOME };
@@ -58,7 +58,12 @@ export interface StudioApp {
   tabs: AppTab[];
   /** Path prefixes that belong to this app (the header shows its name and tabs). */
   owns: string[];
+  /** Shown under More on the home and the apps menu, not with the main tiles (a director's Leads and Quotations). */
+  more?: boolean;
 }
+
+/** A director's More (owner, 24 Nov 2026): "only the quotation and leads tab would be under more". */
+const DIRECTOR_MORE: ReadonlySet<AppKey> = new Set<AppKey>(['clients', 'quotes']);
 
 const T = (label: string, href: string): AppTab => ({ label, href });
 
@@ -211,6 +216,12 @@ export function appsFor(viewer: MemberRole): StudioApp[] {
     if (!mayOpen(member, href)) continue;
     const tabs = app.tabs.filter((t) => mayOpen(member, t.href) && tabFor(member, t.href));
     out.push({ ...app, href, tabs, name: app.key === 'team' && href !== TEAM_PATH ? 'Settings' : app.name });
+  }
+  /* A director (owner, 24 Nov 2026): projects first; Leads and Quotations last, under More. */
+  if (isDirector(member)) {
+    const order: readonly AppKey[] = ['projects', 'money', 'documents', 'site', 'vendors', 'chats', 'calendar', 'today', 'intros', 'rates', 'team'];
+    const rank = (k: AppKey) => (DIRECTOR_MORE.has(k) ? 100 + APPS.findIndex((a) => a.key === k) : order.indexOf(k) === -1 ? 50 : order.indexOf(k));
+    return out.map((a) => (DIRECTOR_MORE.has(a.key) ? { ...a, more: true } : a)).sort((a, b) => rank(a.key) - rank(b.key));
   }
   return out;
 }

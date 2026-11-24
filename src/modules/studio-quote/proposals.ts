@@ -16,6 +16,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { quotingStudioId, actingMember } from '@/modules/studio/lead-scope';
+import { currentMember } from '@/modules/studio/access';
+import { isDirector, quoteReadOnly } from '@/modules/studio/roles';
 import { addProduct, myStudioId } from './store';
 import { categoryOfRoom, cleanProposal, mayReview, sameProductName } from './proposal-rules';
 import type { QuoteUnitName, WorkCodeName } from './pricing';
@@ -38,6 +40,9 @@ export type ProposalResult = { ok: true; message: string } | { ok: false; error:
 export async function proposeProduct(raw: unknown, quoteId?: string | null): Promise<ProposalResult> {
   const studioId = await quotingStudioId();
   if (!studioId) return { ok: false, error: 'Your role in the studio does not include that.' };
+  /* Read only (a sales rep, a director) proposes nothing (audit, 24 Nov 2026). Designers revise the design final, so they still may. */
+  const me = await currentMember();
+  if (me && quoteReadOnly(me)) return { ok: false, error: 'Your role in the studio does not include that.' };
   const clean = cleanProposal(raw);
   if (!clean.ok) return clean;
   const p = clean.value;
@@ -48,10 +53,10 @@ export async function proposeProduct(raw: unknown, quoteId?: string | null): Pro
       prisma.studioProductProposal.findMany({ where: { studioId, state: 'PENDING' }, select: { name: true } }),
     ]);
     if (products.some((x) => sameProductName(x.name, p.name))) {
-      return { ok: false, error: `“${p.name}” is already in the product master — pick it from the list.` };
+      return { ok: false, error: `â€œ${p.name}â€ is already in the product master â€” pick it from the list.` };
     }
     if (pending.some((x) => sameProductName(x.name, p.name))) {
-      return { ok: true, message: `“${p.name}” is already waiting for approval. It is on this quotation.` };
+      return { ok: true, message: `â€œ${p.name}â€ is already waiting for approval. It is on this quotation.` };
     }
     const who = await actingMember();
     await prisma.studioProductProposal.create({
@@ -68,7 +73,7 @@ export async function proposeProduct(raw: unknown, quoteId?: string | null): Pro
         proposedBy: who?.name ?? null,
       },
     });
-    return { ok: true, message: `Proposed “${p.name}” for approval and added it to this quote.` };
+    return { ok: true, message: `Proposed â€œ${p.name}â€ for approval and added it to this quote.` };
   } catch (error) {
     console.error('[studio-quote] proposeProduct failed', error);
     return { ok: false, error: 'That did not save.' };
@@ -105,6 +110,7 @@ export async function pendingProposals(): Promise<ProposalRow[]> {
 /** Approve: the proposal becomes a product (through `addProduct`), then is marked approved. */
 export async function approveProposal(id: string): Promise<ProposalResult> {
   const studioId = await myStudioId();
+  if (studioId && (await currentMember().then((m) => m !== null && isDirector(m)))) return { ok: false, error: 'Directors see the product master read only.' };
   if (!studioId) return { ok: false, error: 'Only the owner or a project manager can approve a product.' };
   const row = await prisma.studioProductProposal.findFirst({ where: { id: String(id ?? ''), studioId } });
   if (!row) return { ok: false, error: 'That proposal is not there any more.' };
@@ -127,11 +133,12 @@ export async function approveProposal(id: string): Promise<ProposalResult> {
     where: { id: row.id, studioId, state: 'PENDING' },
     data: { state: 'APPROVED', reviewedAt: new Date(), reviewedById: who?.id ?? null },
   });
-  return { ok: true, message: added.ok ? `“${row.name}” is in the product master now.` : `“${row.name}” was already in the product master.` };
+  return { ok: true, message: added.ok ? `â€œ${row.name}â€ is in the product master now.` : `â€œ${row.name}â€ was already in the product master.` };
 }
 
 export async function rejectProposal(id: string): Promise<ProposalResult> {
   const studioId = await myStudioId();
+  if (studioId && (await currentMember().then((m) => m !== null && isDirector(m)))) return { ok: false, error: 'Directors see the product master read only.' };
   if (!studioId) return { ok: false, error: 'Only the owner or a project manager can reject a product.' };
   const who = await actingMember();
   const { count } = await prisma.studioProductProposal.updateMany({

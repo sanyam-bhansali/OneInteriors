@@ -3,6 +3,7 @@ import { priceThese } from '@/modules/studio-crews/store';
 import { PriceRows } from './PriceRows';
 import '../../office-ui.css';
 import '../vendors.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Price these', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,8 @@ export const dynamic = 'force-dynamic';
  * accounts; the PM enters quantities on the project's Crews tab.
  */
 export default async function PriceThesePage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/vendors/price');
   const data = await priceThese();
   if (!data) {
     return (

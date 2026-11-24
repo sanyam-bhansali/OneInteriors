@@ -11,6 +11,7 @@ import { myServiceSettings } from '@/modules/aftercare/store';
 import Link from 'next/link';
 import { currentMember } from '@/modules/studio/access';
 import { SETUP_PATH } from '@/modules/studio/surfaces';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -36,6 +37,8 @@ export const dynamic = 'force-dynamic';
  * they have not read.
  */
 export default async function SettingsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/settings');
   const branding = await myBranding();
 
   /* In parallel: neither depends on the other, and the signed URL is a round

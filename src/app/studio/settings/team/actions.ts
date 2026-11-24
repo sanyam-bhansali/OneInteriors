@@ -9,6 +9,7 @@ import {
   reinstateMember,
   resendInvite,
   setDesignHead,
+  setDirector,
   setMemberSites,
   setTemporaryPassword,
   signOutEverywhere,
@@ -40,7 +41,7 @@ async function done(r: Promise<TeamResult>): Promise<TeamResult> {
   }
 }
 
-export async function inviteAction(input: { name: string; phone: string; role: string; sites: string[]; salesRoleId?: string; reportsToId?: string }): Promise<TeamResult> {
+export async function inviteAction(input: { name: string; phone: string; role: string; sites: string[]; salesRoleId?: string; reportsToId?: string; director?: boolean }): Promise<TeamResult> {
   return done(inviteMember(input, await baseUrl()));
 }
 
@@ -96,4 +97,9 @@ export async function setPasswordAction(memberId: string): Promise<TeamResult> {
 
 export async function setDesignHeadAction(memberId: string, on: boolean): Promise<TeamResult> {
   return done(setDesignHead(String(memberId), on === true));
+}
+
+/** Director (owner, 24 Nov 2026): projects first, leads and quotations read only. */
+export async function setDirectorAction(memberId: string, on: boolean): Promise<TeamResult> {
+  return done(setDirector(String(memberId), on === true));
 }

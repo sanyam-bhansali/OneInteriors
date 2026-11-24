@@ -18,7 +18,7 @@ import 'server-only';
 
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { can, hasSalesRole } from '@/modules/studio/roles';
+import { can, hasSalesRole, isDirector } from '@/modules/studio/roles';
 import { mayAssignTo } from '@/modules/studio/sales-access';
 import { myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import { bulkAssign, bulkSplit } from '@/modules/studio-sales/bulk';
@@ -53,6 +53,9 @@ export interface SocietyAccess {
 }
 
 /** The signed-in member's society access, or null (not Max, or no leads). */
+/** Staff viewing as someone, or a director (owner, 24 Nov 2026: leads read only): reads societies, changes nothing. */
+const societyReadOnly = (a: SocietyAccess): boolean => a.scope.member.viewOnly === true || isDirector(a.scope.member);
+
 export async function mySocietyAccess(): Promise<SocietyAccess | null> {
   const scope = await myLeadScope();
   if (!scope) return null;
@@ -68,7 +71,7 @@ export async function mySocietyAccess(): Promise<SocietyAccess | null> {
 }
 
 const mayChange = (a: SocietyAccess, s: { assignedToId: string | null }) =>
-  !a.scope.member.viewOnly && (a.mayManage || s.assignedToId === a.scope.member.id);
+  !societyReadOnly(a) && (a.mayManage || s.assignedToId === a.scope.member.id);
 
 export interface SocietyRow {
   id: string;
@@ -347,7 +350,7 @@ export async function createSociety(
   access: SocietyAccess,
   input: { name: unknown; locality?: unknown; builder?: unknown; wings?: unknown; possession?: Date | null },
 ): Promise<Result<{ id: string; linked: number }>> {
-  if (access.scope.member.viewOnly || !access.mayAdd) return { ok: false, error: 'You can’t add societies.' };
+  if (societyReadOnly(access) || !access.mayAdd) return { ok: false, error: 'You can’t add societies.' };
   const name = clean(input.name, 120);
   if (!name) return { ok: false, error: 'Give the society a name.' };
   const key = societyKey(name);
@@ -407,7 +410,7 @@ export async function updateSociety(
 export async function setSocietyOwner(access: SocietyAccess, id: string, memberId: string | null): Promise<Result> {
   const found = await loadForChange(access, id);
   if (!found) return { ok: false, error: NOT_YOURS };
-  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change who owns a society.' };
+  if (societyReadOnly(access) || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change who owns a society.' };
   if (memberId) {
     const ok = await prisma.studioMember.findFirst({ where: { id: memberId, studioId: access.scope.studioId, status: 'ACTIVE' }, select: { id: true } });
     if (!ok || !mayHandTo(access, memberId)) return { ok: false, error: 'Pick someone in your team.' };
@@ -440,7 +443,7 @@ export async function setSocietyHeat(access: SocietyAccess, id: string, heat: He
 }
 
 export async function addSocietyNote(access: SocietyAccess, id: string, body: unknown): Promise<Result> {
-  if (access.scope.member.viewOnly) return { ok: false, error: 'You are viewing as someone else.' };
+  if (societyReadOnly(access)) return { ok: false, error: 'You are viewing as someone else.' };
   const found = await loadForChange(access, id);
   if (!found) return { ok: false, error: NOT_YOURS };
   const text = clean(body, 4000);
@@ -457,7 +460,7 @@ export async function saveWing(
   societyId: string,
   input: { wingId?: string | null; name: unknown; flats?: unknown; possession: Date | null },
 ): Promise<Result> {
-  if (access.scope.member.viewOnly) return { ok: false, error: 'You are viewing as someone else.' };
+  if (societyReadOnly(access)) return { ok: false, error: 'You are viewing as someone else.' };
   const found = await loadForChange(access, societyId);
   if (!found) return { ok: false, error: NOT_YOURS };
   const name = clean(input.name, 40);
@@ -484,7 +487,7 @@ export async function saveWing(
  * to automatic.
  */
 export async function setSocietyPossession(access: SocietyAccess, societyId: string, possession: Date | null): Promise<Result> {
-  if (access.scope.member.viewOnly) return { ok: false, error: 'You are viewing as someone else.' };
+  if (societyReadOnly(access)) return { ok: false, error: 'You are viewing as someone else.' };
   const found = await loadForChange(access, societyId);
   if (!found) return { ok: false, error: NOT_YOURS };
   const wings = await prisma.studioSocietyWing.count({ where: { societyId } });
@@ -496,7 +499,7 @@ export async function setSocietyPossession(access: SocietyAccess, societyId: str
 
 /** Put a lead (one this member may edit) in a wing of this society, or no wing. */
 export async function setLeadWing(access: SocietyAccess, societyId: string, clientId: string, wingId: string | null): Promise<Result> {
-  if (access.scope.member.viewOnly || !can(access.scope.member, 'lead.edit', { assigned: true })) return { ok: false, error: 'You can’t change this lead.' };
+  if (societyReadOnly(access) || !can(access.scope.member, 'lead.edit', { assigned: true })) return { ok: false, error: 'You can’t change this lead.' };
   const found = await loadForChange(access, societyId);
   if (!found) return { ok: false, error: NOT_YOURS };
   if (wingId) {
@@ -545,7 +548,7 @@ export async function assignSocietyLeads(
   societyId: string,
   input: { mode: SocietyAssignMode; memberIds: string[]; count?: number | null; only: 'unassigned' | 'all' },
 ): Promise<Result<{ message: string }>> {
-  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can give leads out.' };
+  if (societyReadOnly(access) || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can give leads out.' };
   const found = await loadForChange(access, societyId);
   if (!found) return { ok: false, error: NOT_YOURS };
   const people = [...new Set(input.memberIds.filter((m) => typeof m === 'string' && m))];
@@ -604,7 +607,7 @@ export async function doneCounts(studioId: string, societyId: string): Promise<{
  * records it. Admins and sales heads only, as giving leads out is.
  */
 export async function markSocietyDone(access: SocietyAccess, id: string): Promise<Result<{ message: string }>> {
-  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can mark a society done.' };
+  if (societyReadOnly(access) || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can mark a society done.' };
   const found = await loadForChange(access, id);
   if (!found) return { ok: false, error: NOT_YOURS };
   const studioId = access.scope.studioId;
@@ -625,7 +628,7 @@ export async function markSocietyDone(access: SocietyAccess, id: string): Promis
 
 /** Undo a done. Leads already sent back stay in the pool. */
 export async function markSocietyNotDone(access: SocietyAccess, id: string): Promise<Result> {
-  if (access.scope.member.viewOnly || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change this.' };
+  if (societyReadOnly(access) || !access.mayManage) return { ok: false, error: 'Only an admin or a sales head can change this.' };
   const found = await loadForChange(access, id);
   if (!found) return { ok: false, error: NOT_YOURS };
   const me = access.scope.member.id;
@@ -655,7 +658,7 @@ export interface SocietyImportResult {
  */
 export async function importSocietySheet(access: SocietyAccess, payload: SocietyImportPayload): Promise<Result<SocietyImportResult>> {
   const me = access.scope.member;
-  if (me.viewOnly || !access.mayImport) return { ok: false, error: 'Your role does not include importing leads.' };
+  if (societyReadOnly(access) || !access.mayImport) return { ok: false, error: 'Your role does not include importing leads.' };
   const studioId = access.scope.studioId;
   const groups = Array.isArray(payload?.societies) ? payload.societies.slice(0, 200) : [];
   const owners = groups.reduce((n, g) => n + (Array.isArray(g.owners) ? g.owners.length : 0), 0);

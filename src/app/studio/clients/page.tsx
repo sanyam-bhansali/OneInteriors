@@ -20,6 +20,7 @@ import { AxBoard } from './AxBoard';
 import { AxList } from './AxList';
 import { KpiCards, OwnerPicker, SourceTabs, Toolbar, ViewToggle } from './LeadsControls';
 import { StaleReview } from './StaleReview';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Leads',
@@ -44,6 +45,8 @@ export const dynamic = 'force-dynamic';
  * claim from — never a colleague's.
  */
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients');
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : (sp[k] as string | undefined));
   const scope = await myLeadScope();

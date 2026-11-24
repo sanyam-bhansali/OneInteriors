@@ -38,7 +38,7 @@ import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
-import { can, quoteReadOnly } from '@/modules/studio/roles';
+import { can, isDirector, quoteReadOnly } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision, sendRefusalFor } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
@@ -438,6 +438,8 @@ export interface NewQuoteInput {
  */
 export async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null; readOnly?: boolean } | null> {
   const lead = await myLeadScope();
+  /* A director (owner, 24 Nov 2026): every quotation of the studio, read only. */
+  if (lead && isDirector(lead.member)) return { studioId: lead.studioId, where: lead.quotes, write: NO_QUOTE, lead, readOnly: true };
   if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return designerQuoteScope();
   /* A sales rep (owner, 22 Nov 2026): reads their leads' quotations, writes none — `write` matches nothing, so every
      write below refuses. The floor plan's automatic draft goes through `fromPlan` (createQuote, applyConfiguration). */
@@ -451,6 +453,7 @@ export async function quoteScope(): Promise<{ studioId: string; where: Prisma.St
 /** A `where` no quotation matches. */
 const NO_QUOTE: Prisma.StudioQuoteWhereInput = { id: { in: [] } };
 export const READ_ONLY_QUOTE = 'Sales reps do not make or change quotations: attach the floor plan on the lead and the quotation is built from it.';
+export const DIRECTOR_READ_ONLY = 'Directors see quotations and leads read only. Ask the owner or the sales head to change this.';
 
 /**
  * A designer's quotations (the design meeting, 24 Oct 2026;
@@ -513,6 +516,7 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const studioId = qs?.studioId ?? null;
   if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
   if (!qs.lead) return { ok: false, error: 'New quotations are made by sales. Open the Design Final from the project.' };
+  if (isDirector(qs.lead.member)) return { ok: false, error: DIRECTOR_READ_ONLY };
   if (qs.readOnly && input.fromPlan !== true) return { ok: false, error: READ_ONLY_QUOTE };
 
   /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
@@ -746,9 +750,12 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
-  /* A Design Final reads its source (the sales final) and writes only the copy: a designer may read their projects' sales finals, not change them. */
+  /* Read only (a sales rep, a director): no copies of any kind (audit, 24 Nov 2026). */
+  if (qs?.readOnly) return { ok: false, error: qs.lead && isDirector(qs.lead.member) ? DIRECTOR_READ_ONLY : READ_ONLY_QUOTE };
+  /* A Design Final reads its source (the sales final) and writes only the copy: a designer may read their projects' sales finals, not change them.
+     Only a designer (no lead scope) copies from what they read; everyone else copies only what they may write. */
   const source = await prisma.studioQuote.findFirst({
-    where: { ...(copy.kind === 'design-final' ? qs?.where : qs?.write), id: quoteId, studioId },
+    where: { ...(copy.kind === 'design-final' && qs?.lead === null ? qs?.where : qs?.write), id: quoteId, studioId },
     include: { lines: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!source) return { ok: false, error: 'That quotation is not yours.' };
@@ -1017,12 +1024,12 @@ async function writableQuote(quoteId: string, fromPlan = false): Promise<{ ok: t
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
   /* A sales rep's floor-plan draft (owner, 22 Nov 2026): the empty draft just made for their lead, built once. */
-  const planDraft = fromPlan && qs?.readOnly === true;
+  const planDraft = fromPlan && qs?.readOnly === true && !(qs.lead && isDirector(qs.lead.member));
   const row = await prisma.studioQuote.findFirst({
     where: planDraft ? { ...qs?.where, id: quoteId, studioId, status: 'DRAFT', issuedOn: null, lines: { none: {} } } : { ...qs?.write, id: quoteId, studioId },
     select: { id: true, feeBps: true, status: true },
   });
-  if (!row) return { ok: false, error: qs?.readOnly ? READ_ONLY_QUOTE : 'That quotation is not yours.' };
+  if (!row) return { ok: false, error: qs?.lead && isDirector(qs.lead.member) ? DIRECTOR_READ_ONLY : qs?.readOnly ? READ_ONLY_QUOTE : 'That quotation is not yours.' };
   const live = await prisma.homeProject.findFirst({ where: { signedQuoteId: row.id, cancelledAt: null }, select: { id: true } });
   const refusal = quoteWriteRefusal({ liveProject: live !== null });
   if (refusal) return { ok: false, error: refusal };

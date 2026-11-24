@@ -190,6 +190,8 @@ export async function submitEnquiry(
 // ── The studio's own side ────────────────────────────────────────
 
 import { myStudioId } from '@/modules/studio-quote/store';
+import { currentMember } from '@/modules/studio/access';
+import { can } from '@/modules/studio/roles';
 
 /**
  * This studio's form, created on first read.
@@ -260,6 +262,9 @@ export async function myCaptureForm(): Promise<PublicForm | null> {
 export async function setFormActive(active: boolean): Promise<{ ok: boolean }> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false };
+  /* Lead settings (`lead.settings`): not a director, whose leads are read only (owner, 24 Nov 2026). */
+  const me = await currentMember();
+  if (!me || !can(me, 'lead.settings')) return { ok: false };
 
   try {
     await prisma.studioForm.updateMany({ where: { studioId }, data: { active } });

@@ -51,7 +51,8 @@ describe('salary and incentives', () => {
 describe('who sees it', () => {
   it('owner and accounts only, never view-only', () => {
     const store = readFileSync('src/modules/staff/store.ts', 'utf8');
-    expect(store).toContain("m !== null && !m.viewOnly && (m.role === 'OWNER' || m.role === 'ACCOUNTS')");
+    /* Active only too (audit, 24 Nov 2026): a suspended member's live session reads nothing. */
+    expect(store).toContain("m !== null && m.status === 'ACTIVE' && !m.viewOnly && (m.role === 'OWNER' || m.role === 'ACCOUNTS')");
     const migration = readFileSync('prisma/migrations/20261122100000_employee_records/migration.sql', 'utf8');
     for (const t of ['studio_staff_records', 'studio_staff_docs', 'studio_staff_salaries', 'studio_staff_incentives', 'studio_staff_devices']) {
       expect(migration).toContain(`REVOKE ALL ON "${t}" FROM anon, authenticated;`);

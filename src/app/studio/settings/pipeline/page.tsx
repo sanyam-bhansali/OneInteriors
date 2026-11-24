@@ -3,6 +3,7 @@ import { myStages } from '@/modules/studio-practice/stages';
 import { STAGE_KIND_LABELS, STAGE_KIND_NOTES } from '@/modules/studio-practice/vocabulary';
 import { PipelineEditor } from './PipelineEditor';
 import { HauspirePreset } from './HauspirePreset';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Pipeline',
@@ -34,6 +35,8 @@ export const dynamic = 'force-dynamic';
  * stated on this page rather than discovered later.
  */
 export default async function PipelinePage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/settings/pipeline');
   const stages = await myStages();
 
   return (

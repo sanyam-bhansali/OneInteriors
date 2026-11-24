@@ -5,6 +5,7 @@ import { projectWork } from '@/modules/portal/project-store';
 import { ProjectWork } from '@/components/project-work/ProjectWork';
 import { UpdateForm } from './UpdateForm';
 import { StageTicks } from './StageTicks';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Client projects', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,8 @@ export const dynamic = 'force-dynamic';
  * reaches the client's app and phone the moment it is saved.
  */
 export default async function StudioUpdatesPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/updates');
   const projects = await projectsForStudio();
   const work = await Promise.all(projects.map((p) => projectWork(p.id)));
   return (
