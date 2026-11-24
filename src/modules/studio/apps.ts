@@ -221,7 +221,11 @@ export function appsFor(viewer: MemberRole): StudioApp[] {
   if (isDirector(member)) {
     const order: readonly AppKey[] = ['projects', 'money', 'documents', 'site', 'vendors', 'chats', 'calendar', 'today', 'intros', 'rates', 'team'];
     const rank = (k: AppKey) => (DIRECTOR_MORE.has(k) ? 100 + APPS.findIndex((a) => a.key === k) : order.indexOf(k) === -1 ? 50 : order.indexOf(k));
-    return out.map((a) => (DIRECTOR_MORE.has(a.key) ? { ...a, more: true } : a)).sort((a, b) => rank(a.key) - rank(b.key));
+    /* No Team or Product master for a director (owner, 24 Nov 2026: "Remove team and product master option"). */
+    return out
+      .filter((a) => a.key !== 'team' && a.key !== 'rates')
+      .map((a) => (DIRECTOR_MORE.has(a.key) ? { ...a, more: true } : a))
+      .sort((a, b) => rank(a.key) - rank(b.key));
   }
   return out;
 }
