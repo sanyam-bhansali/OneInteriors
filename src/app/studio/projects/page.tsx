@@ -67,7 +67,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
   const now = new Date();
   const [data, score, member, fullBoard, sp] = await Promise.all([
     studioProjects(now),
-    studioUpdateScore(now), // score: Phase 2
+    studioUpdateScore(now).catch(() => null), // score: Phase 2
     currentMember(),
     lifecycleBoard().catch(() => null),
     searchParams ?? Promise.resolve<{ tab?: string; deleted?: string; designer?: string }>({}),

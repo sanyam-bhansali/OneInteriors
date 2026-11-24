@@ -18,6 +18,7 @@ import { expireDecisions } from '@/modules/project/decision-flow';
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 120;
 
 const DAY = 86_400_000;
 
@@ -46,10 +47,15 @@ export async function GET(req: Request) {
   for (const d of due) {
     if (!needsReminder(d, now)) continue;
     const userId = d.project.introduction.brief.userId;
-    // Marked first, so a slow push can never send the same reminder twice.
-    await prisma.homeDecision.update({ where: { id: d.id }, data: { remindedAt: now } });
-    if (userId) await notify(userId, { kind: 'decision-due', decisionId: d.id, title: d.title, daysLeft: daysLeft(d.dueOn, now) });
-    reminded += 1;
+    /* One decision that fails never stops the rest (owner, 24 Nov 2026: protect from crashing). */
+    try {
+      // Marked first, so a slow push can never send the same reminder twice.
+      await prisma.homeDecision.update({ where: { id: d.id }, data: { remindedAt: now } });
+      if (userId) await notify(userId, { kind: 'decision-due', decisionId: d.id, title: d.title, daysLeft: daysLeft(d.dueOn, now) });
+      reminded += 1;
+    } catch (error) {
+      console.error('[cron] decision reminder failed', d.id, error instanceof Error ? error.message : error);
+    }
   }
 
   // Payment stages with a due date set, not yet paid.
@@ -65,6 +71,7 @@ export async function GET(req: Request) {
     take: 1000,
   });
   for (const p of signed) {
+    try {
     const money = moneyView(p.contractPaise === null ? null : fromDb(p.contractPaise), p.paymentPhases, p.paidPhases);
     if (!money) continue;
     const marks = readMarks(p.paidPhases);
@@ -84,8 +91,14 @@ export async function GET(req: Request) {
       await notify(userId, { kind: 'payment-due', stage: stage.label, amountPaise: stage.amountPaise, studio: p.introduction.studio.tradeName, dueLabel });
       reminded += 1;
     }
+    } catch (error) {
+      console.error('[cron] payment reminder failed', p.id, error instanceof Error ? error.message : error);
+    }
   }
   // Phase 5: decisions past their date with no pick (once each; the studio is told any delay from here is the customer's).
-  const expired = await expireDecisions(now);
+  const expired = await expireDecisions(now).catch((error: unknown) => {
+    console.error('[cron] expireDecisions failed', error instanceof Error ? error.message : error);
+    return 0;
+  });
   return Response.json({ ok: true, reminded, expired });
 }

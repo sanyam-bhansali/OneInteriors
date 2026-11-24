@@ -115,7 +115,7 @@ async function storeImage(studioId: string, file: File, folder: '' | 'brand/' | 
   const path = `studio_${studioId}/${folder}${crypto.randomUUID()}.${extension}`;
 
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key}`,
@@ -205,7 +205,7 @@ async function signPath(path: string): Promise<string | null> {
   try {
     const response = await fetch(
       `${config.url}/storage/v1/object/sign/${BUCKET}/${encodeURI(path)}`,
-      {
+      { signal: AbortSignal.timeout(20000),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
@@ -232,7 +232,7 @@ export async function removeLogo(path: string | null): Promise<void> {
   if (!config || !key) return;
 
   try {
-    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });

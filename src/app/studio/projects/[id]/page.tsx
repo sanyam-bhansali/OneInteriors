@@ -110,28 +110,31 @@ export default async function ProjectWorkspacePage({
   const w = r.workspace;
   const money = w.contractPaise !== null;
   /* Priority stars: the owner, the PM and the designer on the project set them (DESIGN-PROCESS-PLAN.md §2.4). */
-  const starMember = await currentMember();
-  const canStar = starMember ? await mayDo(starMember, 'design.work', w.id) : false;
-  const me = await currentMember();
-  const broughtIn = me ? await broughtInOf(w.id, me.studioId).catch(() => null) : null;
-  const [viewer, decisions, life, closure, snagWin] = await Promise.all([
-    currentMember(),
+  /* Every panel at once (speed, owner 24 Nov 2026): they waited for each other in turn. Each panel that is not the
+     project itself degrades to empty on its own rather than taking the page down. */
+  const viewer = await currentMember();
+  const [canStar, broughtIn, decisions, life, closure, snagWin, extras, signoffs, electrical, hold, scope, carcass] = await Promise.all([
+    /* Priority stars: the owner, the PM and the designer on the project set them (DESIGN-PROCESS-PLAN.md §2.4). */
+    viewer ? mayDo(viewer, 'design.work', w.id).catch(() => false) : Promise.resolve(false),
+    viewer ? broughtInOf(w.id, viewer.studioId).catch(() => null) : Promise.resolve(null),
     studioDecisions(w.id, now),
-    projectPhaseFor(w.id, now),
-    closureFor(w.id, now),
+    projectPhaseFor(w.id, now).catch(() => null),
+    closureFor(w.id, now).catch(() => null),
     /* The snag window (owner, 15 Oct 2026; project/snag-window.ts): from the handover payment, the studio's days. */
     snagWindowFor(w.id).catch(() => null),
+    /* Change orders and sign-offs: null for those who do not see the project's money. */
+    extrasForStudio(w.id).catch(() => null),
+    signoffsForStudio(w.id).catch(() => null),
+    electricalForProject(w.id).catch(() => null),
+    /* A project on hold (owner, 12 Nov 2026): ask, approve, take off. */
+    holdView(w.id, now).catch(() => null),
+    /* Additional scope (owner, 12 Nov 2026; 13 Nov: a simple form, no quotation): after the design final. */
+    scopeView(w.id, now).catch(() => null),
+    /* On-site carcass (owner, 13 Nov 2026: "which projects can we take manual?"): carcass on site, shutters from the factory. */
+    carcassFor(w.id).catch(() => null),
   ]);
-  /* Change orders and sign-offs: null for those who do not see the project's money. */
-  const [extras, signoffs, electrical] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null), electricalForProject(w.id).catch(() => null)]);
   /* The project value counts approved electrical bills (owner, 22 Nov 2026). */
   const electricalPaise = (electrical?.bills ?? []).filter((b) => b.status === 'APPROVED' || b.status === 'PAID').reduce((a, b) => a + b.totalPaise, 0);
-  /* A project on hold (owner, 12 Nov 2026): ask, approve, take off. */
-  const hold = await holdView(w.id, now).catch(() => null);
-  /* Additional scope (owner, 12 Nov 2026; 13 Nov: a simple form, no quotation): after the design final. */
-  const scope = await scopeView(w.id, now).catch(() => null);
-  /* On-site carcass (owner, 13 Nov 2026: "which projects can we take manual?"): carcass on site, shutters from the factory. */
-  const carcass = await carcassFor(w.id).catch(() => null);
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });

@@ -72,7 +72,7 @@ async function storeIn(folder: string, file: File, allowed: Map<string, string>,
 
   const path = `${folder}/${crypto.randomUUID()}.${extension}`;
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type.split(';')[0]!.trim(), 'x-upsert': 'false' },
       body: await file.arrayBuffer(),
@@ -103,7 +103,7 @@ async function signedStorageUrls(paths: string[]): Promise<string[]> {
   const key = secretKey();
   if (!config || !key || paths.length === 0) return paths.map(() => '');
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths }),
@@ -141,7 +141,7 @@ export async function projectDocTicket(projectId: string, ext: string): Promise<
   const key = secretKey();
   if (!config || !key) return { ok: false, error: 'Documents are not switched on for this deployment yet.' };
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: '{}',
@@ -166,7 +166,7 @@ export async function projectDocExists(path: string): Promise<boolean> {
   const key = secretKey();
   if (!config || !key) return false;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/info/${BUCKET}/${encodeURI(path)}`, { headers: { Authorization: `Bearer ${key}`, apikey: key } });
+    const res = await fetch(`${config.url}/storage/v1/object/info/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000), headers: { Authorization: `Bearer ${key}`, apikey: key } });
     return res.ok;
   } catch {
     return false;

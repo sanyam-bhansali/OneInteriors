@@ -57,7 +57,7 @@ export async function sendMagicLink(to: string, link: string): Promise<SendResul
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,
@@ -164,7 +164,7 @@ export async function sendStudioWelcome(
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,
@@ -223,7 +223,7 @@ export async function sendTeamInvite(to: string, link: string, invite: { contact
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: cfg.from, to, subject: `You're on ${invite.studioName}'s team`, text }),
@@ -465,7 +465,7 @@ async function send(
   attachments?: { filename: string; content: string }[],
 ): Promise<SendResult> {
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(RESEND_ENDPOINT, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,

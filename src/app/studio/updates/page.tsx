@@ -20,7 +20,8 @@ export default async function StudioUpdatesPage() {
   /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
   await requireDoor('/studio/updates');
   const projects = await projectsForStudio();
-  const work = await Promise.all(projects.map((p) => projectWork(p.id)));
+  /* One project that fails to read shows without its work, never the whole page down (owner, 24 Nov 2026). */
+  const work = await Promise.all(projects.map((p) => projectWork(p.id).catch(() => null)));
   return (
     <div className="content oi-proj">
       <div className="phead">

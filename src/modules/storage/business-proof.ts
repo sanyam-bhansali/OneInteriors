@@ -127,7 +127,7 @@ export async function storeBusinessProof(studioId: string, file: File): Promise<
   const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
 
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key}`,
@@ -178,7 +178,7 @@ export async function signedUrlForProof(path: string): Promise<string | null> {
   try {
     const response = await fetch(
       `${config.url}/storage/v1/object/sign/${BUCKET}/${encodeURI(path)}`,
-      {
+      { signal: AbortSignal.timeout(20000),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
@@ -213,7 +213,7 @@ export async function removeBusinessProof(path: string): Promise<void> {
   if (!config || !key) return;
 
   try {
-    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${key}`, apikey: key },
     });
