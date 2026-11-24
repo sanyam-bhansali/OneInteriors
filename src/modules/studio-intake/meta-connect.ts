@@ -100,18 +100,33 @@ export function unseal(sealed: string | null | undefined, key: Buffer | null): s
 // ── The login ──────────────────────────────────────────────────
 
 /** Meta's app, or null when One Interiors has not set it up. */
-export function metaApp(env: Record<string, string | undefined> = process.env as Record<string, string | undefined>): { appId: string; appSecret: string } | null {
+export function metaApp(env: Record<string, string | undefined> = process.env as Record<string, string | undefined>): { appId: string; appSecret: string; configId?: string } | null {
   const appId = env.META_APP_ID?.trim();
   const appSecret = env.META_APP_SECRET?.trim();
-  return appId && /^\d{5,32}$/.test(appId) && appSecret ? { appId, appSecret } : null;
+  if (!(appId && /^\d{5,32}$/.test(appId) && appSecret)) return null;
+  const configId = env.META_LOGIN_CONFIG_ID?.trim();
+  return configId && /^\d{5,32}$/.test(configId) ? { appId, appSecret, configId } : { appId, appSecret };
 }
 
-export function loginUrl({ appId, redirectUri, state }: { appId: string; redirectUri: string; state: string }): string {
+/**
+ * The Facebook login address. A Business-type Meta app (One Interiors' app
+ * is one, 24 Nov 2026) uses Facebook Login for Business: the permissions are
+ * set on a "configuration" in the Meta app (the same list as META_SCOPES)
+ * and the login names it with `config_id`, env `META_LOGIN_CONFIG_ID`;
+ * `scope` is not used then. Without a configuration id the classic
+ * `scope` login is used.
+ */
+export function loginUrl({ appId, redirectUri, state, configId }: { appId: string; redirectUri: string; state: string; configId?: string }): string {
   const u = new URL(DIALOG);
   u.searchParams.set('client_id', appId);
   u.searchParams.set('redirect_uri', redirectUri);
   u.searchParams.set('state', state);
   u.searchParams.set('response_type', 'code');
+  if (configId) {
+    u.searchParams.set('config_id', configId);
+    u.searchParams.set('override_default_response_type', 'true');
+    return u.toString();
+  }
   u.searchParams.set('scope', META_SCOPES.join(','));
   /* Asked again on a reconnect, so a permission refused last time can be given. */
   u.searchParams.set('auth_type', 'rerequest');
