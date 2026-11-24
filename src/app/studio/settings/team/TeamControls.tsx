@@ -148,7 +148,13 @@ export function AddSomeone({
         onSubmit={(e) => {
           e.preventDefault();
           run(
-            () => inviteAction({ name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [], ...(role === 'SALES' ? { salesRoleId, reportsToId } : {}), ...(director ? { director: true } : {}) }),
+            () =>
+              inviteAction(
+                /* A director joins with their email (owner, 24 Nov 2026). */
+                director
+                  ? { name, phone: '', email: phone, role, sites: [], director: true }
+                  : { name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [], ...(role === 'SALES' ? { salesRoleId, reportsToId } : {}) },
+              ),
             (r) => {
               if (r.ok) {
                 setName('');
@@ -164,10 +170,17 @@ export function AddSomeone({
             <span className="lbl">Name</span>
             <input className="fld" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" required />
           </label>
-          <label className="ox-f">
-            <span className="lbl">Mobile number</span>
-            <input className="fld mono" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="off" required />
-          </label>
+          {director ? (
+            <label className="ox-f">
+              <span className="lbl">Email</span>
+              <input className="fld" type="email" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="off" required data-testid="invite-email" />
+            </label>
+          ) : (
+            <label className="ox-f">
+              <span className="lbl">Mobile number</span>
+              <input className="fld mono" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="off" required />
+            </label>
+          )}
         </div>
 
         <div className="ox-f" style={{ gap: 8 }}>
@@ -234,10 +247,15 @@ export function AddSomeone({
         ) : null}
 
         <button type="submit" className="btn pri lg" disabled={pending}>
-          {pending ? (passwordMode ? 'Adding…' : 'Sending…') : passwordMode ? 'Add and make a one-time password' : 'Send invite on WhatsApp'}
+          {director ? (pending ? 'Sending…' : 'Add and email them a sign-in link') : pending ? (passwordMode ? 'Adding…' : 'Sending…') : passwordMode ? 'Add and make a one-time password' : 'Send invite on WhatsApp'}
         </button>
         <p className="muted sm" style={{ margin: 0, lineHeight: 1.45 }}>
-          {passwordMode ? 'You get a one-time password to give them; they sign in with this number and it.' : 'They get a link and sign in with this number.'} A seat is used only once they sign in
+          {director
+            ? 'A director signs in with their email: we email them a link now, and after that they pick Email on the sign-in page.'
+            : passwordMode
+              ? 'You get a one-time password to give them; they sign in with this number and it.'
+              : 'They get a link and sign in with this number.'}{' '}
+          A seat is used only once they sign in
           {seatsLeft > 0 ? ` (${seatsLeft} free ${seatsLeft === 1 ? 'seat' : 'seats'} left)` : ''}.
           {PICKS_SITES.has(role) ? ` ${picked.size} ${picked.size === 1 ? 'site' : 'sites'} selected.` : ''}
         </p>
@@ -274,7 +292,7 @@ export function PersonActions({
   return (
     <div style={{ display: 'flex', minWidth: 180, flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
       <div className="hstack" style={{ gap: 6 }}>
-        {person.status === 'INVITED' && !passwordMode ? (
+        {person.status === 'INVITED' && (!passwordMode || person.director) ? (
           <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => resendAction(person.id))}>
             Resend
           </button>

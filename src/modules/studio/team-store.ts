@@ -36,6 +36,8 @@ import { studioSignInMode, temporaryPassword } from '@/modules/auth/studio-passw
 import { send } from '@/modules/messaging/sender';
 import { bucketFor, consume } from '@/modules/rate-limit/store';
 import { STUDIO_SIGN_IN } from '@/lib/host';
+import { isValidEmail, normaliseEmail, requestMagicLink } from '@/modules/auth/magic-link';
+import { cleanName, isValidName } from '@/modules/auth/otp-code';
 import { FULL_SOFTWARE_ROLES, isDirector } from './roles';
 import { assertCan, currentMember, StudioAccessError, type StudioMemberRef } from './access';
 import { rolesOf, salesTeamLead, type SalesRoleRow } from './sales-team-store';
@@ -191,7 +193,7 @@ async function teammate(lead: StudioMemberRef, memberId: string) {
   return prisma.studioMember.findFirst({
     /* A director (owner, 24 Nov 2026) manages the team but never another owner: no password, suspension or sign-out of them. */
     where: { id: memberId, studioId: lead.studioId, ...(isDirector(lead) ? { NOT: { role: 'OWNER', id: { not: lead.id } } } : {}) },
-    select: { id: true, userId: true, role: true, status: true, lastSeenAt: true, director: true, user: { select: { name: true, phone: true } } },
+    select: { id: true, userId: true, role: true, status: true, lastSeenAt: true, director: true, user: { select: { name: true, phone: true, email: true } } },
   });
 }
 
@@ -243,13 +245,16 @@ function sentLine(delivered: boolean, via: string): string {
  * The seat is used only once they sign in.
  */
 export async function inviteMember(
-  raw: { name?: unknown; phone?: unknown; role?: unknown; sites?: unknown; salesRoleId?: unknown; reportsToId?: unknown; director?: unknown },
+  raw: { name?: unknown; phone?: unknown; email?: unknown; role?: unknown; sites?: unknown; salesRoleId?: unknown; reportsToId?: unknown; director?: unknown },
   baseUrl: string,
 ): Promise<TeamResult> {
   const access = await teamAccess();
   if (!access) return { ok: false, error: NOT_ALLOWED };
   const { lead } = access;
   if (lead.solo === true) return { ok: false, error: SOLO_SEAT };
+
+  /* A director joins with their email (owner, 24 Nov 2026): no mobile number needed. */
+  if (raw.director === true && typeof raw.email === 'string' && raw.email.trim() !== '') return inviteDirectorByEmail(lead, raw, baseUrl);
 
   const check = checkInvite(raw);
   if (!check.ok) return check;
@@ -367,6 +372,61 @@ export async function inviteMember(
 }
 
 /**
+ * A director added by email (owner, 24 Nov 2026: "Director should join with
+ * email"). Their login is the email: we send them a welcome with a sign-in
+ * link (seven days), and afterwards they sign in at studio.oneinteriors.in
+ * with Email, which mails a fresh link. Following the link proves the
+ * mailbox, so their membership turns ACTIVE then (magic-link.ts). Only a full
+ * owner; the same one-person-one-account rules as a mobile number.
+ */
+async function inviteDirectorByEmail(lead: StudioMemberRef, raw: { name?: unknown; email?: unknown }, baseUrl: string): Promise<TeamResult> {
+  if (lead.role !== 'OWNER' || isDirector(lead)) return { ok: false, error: 'Only the owner adds an owner or a director.' };
+  const name = typeof raw.name === 'string' ? raw.name : '';
+  if (!isValidName(name)) return { ok: false, error: 'Add their name.' };
+  const email = normaliseEmail(String(raw.email ?? '').slice(0, 200));
+  if (!isValidEmail(email)) return { ok: false, error: 'That does not look like an email address.' };
+  const clean = cleanName(name);
+
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true, deletedAt: true, studioMember: { select: { studioId: true } } } });
+  if (existing) {
+    if (existing.deletedAt) return { ok: false, error: 'That email belonged to an account that was closed. Contact One Interiors to reuse it.' };
+    if (existing.role === 'CUSTOMER') return { ok: false, error: 'That email already has a One Interiors customer account. One person has one account. Ask them for another email, or contact One Interiors.' };
+    if (existing.role === 'OPS' || existing.role === 'ADMIN') return { ok: false, error: 'That email belongs to the One Interiors team.' };
+    if (existing.studioMember) {
+      return { ok: false, error: existing.studioMember.studioId === lead.studioId ? 'That email is already on your team.' : 'That email is already on another studio’s team. One person can be on one studio’s team.' };
+    }
+  }
+
+  const now = new Date();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const userId = existing?.id ?? (await tx.user.create({ data: { email, name: clean, role: 'STUDIO' }, select: { id: true } })).id;
+      const member = await tx.studioMember.create({
+        data: { studioId: lead.studioId, userId, role: 'OWNER', status: 'INVITED', isOwner: true, director: true, invitedById: lead.id, invitedAt: now },
+        select: { id: true },
+      });
+      await tx.auditLog.create({ data: { actorId: lead.userId, action: 'studio.member.invite', entityType: 'StudioMember', entityId: member.id, after: { role: 'OWNER', director: true, by: 'email' } } });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { ok: false, error: 'That email was just added. Refresh the page.' };
+    throw error;
+  }
+
+  const sent = await sendDirectorEmail(lead, email, clean, baseUrl);
+  const first = clean.split(' ')[0] || clean;
+  return sent
+    ? { ok: true, message: `Added as a director. ${first} gets an email with a link to sign in; after that they sign in with Email at ${STUDIO_SIGN_IN}.` }
+    : { ok: true, message: `Added as a director, but the email could not be sent just now. Press Resend on their row, or ask ${first} to sign in with Email at ${STUDIO_SIGN_IN}.` };
+}
+
+/** The director's welcome: a seven-day sign-in link to the studio. */
+async function sendDirectorEmail(lead: StudioMemberRef, email: string, name: string, baseUrl: string): Promise<boolean> {
+  const studio = await prisma.studio.findUnique({ where: { id: lead.studioId }, select: { tradeName: true } });
+  const r = await requestMagicLink(email, { baseUrl, next: '/studio/home', purpose: 'team-invite', invite: { contactName: name, studioName: studio?.tradeName ?? 'your studio' } }).catch(() => null);
+  return r !== null && r.ok;
+}
+
+/**
  * Make someone a one-time password (owner, 27 Oct 2026: password sign-in
  * until WhatsApp codes are live). For a first sign-in, a forgotten password,
  * or a lock after five wrong tries. They are signed out everywhere and
@@ -400,9 +460,14 @@ export async function resendInvite(memberId: string, baseUrl: string): Promise<T
   const m = await teammate(lead, memberId);
   if (!m) return { ok: false, error: 'That person is not on your team.' };
   if (!access.full && m.role !== 'SALES') return { ok: false, error: 'That person is not on your team.' };
-  if (m.status !== 'INVITED' || !m.user.phone) return { ok: false, error: 'They have already signed in.' };
+  if (m.status !== 'INVITED' || (!m.user.phone && !m.user.email)) return { ok: false, error: 'They have already signed in.' };
   const verdict = await consume(bucketFor('team-invite', m.id), { max: 3, windowMs: 60 * 60_000 });
   if (!verdict.allowed) return { ok: false, error: 'Sent three times this hour already. Try again later.' };
+  /* A director added by email (owner, 24 Nov 2026): the welcome email again. */
+  if (!m.user.phone && m.user.email) {
+    return (await sendDirectorEmail(lead, m.user.email, m.user.name ?? '', baseUrl)) ? { ok: true, message: 'Sent the sign-in email again.' } : { ok: false, error: 'The email could not be sent just now. Try again in a minute.' };
+  }
+  if (!m.user.phone) return { ok: false, error: 'They have already signed in.' };
   const sent = await sendInvite(lead, m.user.phone, m.user.name ?? '', baseUrl);
   return sent.delivered ? { ok: true, message: sentLine(true, sent.via) } : { ok: false, error: sentLine(false, sent.via) };
 }

@@ -24,7 +24,7 @@ import { prisma } from '@/lib/prisma';
 import { safeNext } from '@/lib/site';
 import { AuthChannel } from '@prisma/client';
 import { createSession, hashIp, hashToken, newToken } from './session';
-import { sendMagicLink, sendStudioWelcome } from './email';
+import { sendMagicLink, sendStudioWelcome, sendTeamInvite } from './email';
 
 const TOKEN_TTL_MINUTES = 15;
 
@@ -93,7 +93,7 @@ export async function requestMagicLink(
      * What this link is for. `invite` swaps the plain sign-in email for the
      * welcome, and gives the token seven days instead of fifteen minutes.
      */
-    purpose?: 'sign-in' | 'invite';
+    purpose?: 'sign-in' | 'invite' | 'team-invite';
     /** For the welcome: who it is addressed to and which studio. */
     invite?: { contactName: string | null; studioName: string };
   },
@@ -107,7 +107,7 @@ export async function requestMagicLink(
   });
   if (recent >= MAX_REQUESTS) return { ok: false, reason: 'rate_limited' };
 
-  const invited = meta.purpose === 'invite';
+  const invited = meta.purpose === 'invite' || meta.purpose === 'team-invite';
   const token = newToken();
   const expiresAt = new Date(
     Date.now() + (invited ? INVITE_TTL_MINUTES : TOKEN_TTL_MINUTES) * 60_000,
@@ -156,7 +156,9 @@ export async function requestMagicLink(
   const deliverable = user ? !user.deletedAt : true;
 
   if (deliverable) {
-    const sent = invited
+    const sent = meta.purpose === 'team-invite'
+      ? await sendTeamInvite(email, link, { contactName: meta.invite?.contactName ?? null, studioName: meta.invite?.studioName ?? 'your studio' })
+      : invited
       ? await sendStudioWelcome(email, link, {
           contactName: meta.invite?.contactName ?? null,
           studioName: meta.invite?.studioName ?? 'your studio',
@@ -234,6 +236,12 @@ export async function consumeMagicLink(
         where: { id: user.id },
         data: { failedSignIns: 0, lockedOutAt: null },
       });
+    }
+
+    /* A studio member added by email (a director, owner 24 Nov 2026): following the link proves the mailbox, so
+       their first sign-in turns them ACTIVE, as a first phone sign-in does (otp.ts). Never a suspended one. */
+    if (user.role === 'STUDIO') {
+      await tx.studioMember.updateMany({ where: { userId: user.id, status: 'INVITED' }, data: { status: 'ACTIVE', lastSeenAt: new Date() } });
     }
 
     return { ok: true as const, userId: user.id };
