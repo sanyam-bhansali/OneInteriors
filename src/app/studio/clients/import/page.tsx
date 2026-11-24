@@ -5,6 +5,7 @@ import { Import } from './Import';
 import { CaptureLink } from './CaptureLink';
 import { myFields } from '@/modules/studio-practice/fields';
 import { myLeadSources } from '@/modules/studio-sales/settings';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Import clients',
@@ -27,6 +28,8 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function ImportPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/clients/import');
   /* Created on first read, like the stage seeder — no migration step, and no
      moment where a studio has an account but not the thing the screen is
      about. */

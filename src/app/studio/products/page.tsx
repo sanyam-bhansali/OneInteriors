@@ -10,6 +10,7 @@ import { allItems } from '@/modules/items/server';
 import { matchByName } from '@/modules/items/rules';
 import type { ItemPick } from './ProductTable';
 import './products.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Product master',
@@ -37,6 +38,8 @@ export const dynamic = 'force-dynamic';
  * codes and the sizes that recur. The numbers are theirs.
  */
 export default async function ProductsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/products');
   const [products, gate, proposals, items] = await Promise.all([myProducts(), myRatesGate(), pendingProposals(), allItems()]);
   /* Which One Interiors item each product is, for its photo on every quotation line (owner, 10 Nov 2026). */
   const itemOptions = items.map((i) => ({ id: i.id, name: i.name, hasPhoto: i.photos.length > 0 }));

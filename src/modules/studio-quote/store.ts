@@ -37,8 +37,22 @@ import { Prisma } from '@prisma/client';
  */
 import { myStudioId } from '@/modules/studio/tenancy';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
+import { currentMember } from '@/modules/studio/access';
+import { isDirector } from '@/modules/studio/roles';
 
 export { myStudioId };
+
+/**
+ * The studio, for a change to the product master or the terms: an owner or a
+ * project manager (`myStudioId`), but not a director, whose quotations are
+ * read only (owner, 24 Nov 2026).
+ */
+async function quoteConfigStudioId(): Promise<string | null> {
+  const studioId = await myStudioId();
+  if (!studioId) return null;
+  const me = await currentMember();
+  return me && isDirector(me) ? null : studioId;
+}
 
 // ── Product master ─────────────────────────────────────────────
 
@@ -199,7 +213,7 @@ export type SaveResult = { ok: true } | { ok: false; error: string };
 
 /** Set one product's rate. The only field a studio changes often. */
 export async function setProductRate(productId: string, ratePaise: Paise): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   if (!Number.isInteger(ratePaise) || ratePaise < 0) {
@@ -235,7 +249,7 @@ export async function setProductStandard(
   productId: string,
   inStandardBuild: boolean,
 ): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   try {
@@ -255,7 +269,7 @@ export async function setProductStandard(
  * photo on every quotation line comes from. Null goes back to matching by name.
  */
 export async function setProductItem(productId: string, itemId: string | null): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   try {
     if (itemId && !(await prisma.itemPage.findUnique({ where: { id: itemId }, select: { id: true } }))) {
@@ -270,7 +284,7 @@ export async function setProductItem(productId: string, itemId: string | null): 
 }
 
 export async function setProductActive(productId: string, isActive: boolean): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   try {
@@ -308,7 +322,7 @@ const CODES: WorkCodeName[] = ['MODULAR', 'ONSITE'];
  * Changing it never touches a quotation already made — lines are copies.
  */
 export async function updateProduct(productId: string, input: ProductEdit): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const name = input.name.trim().slice(0, 120);
@@ -357,7 +371,7 @@ export interface NewProductInput {
 }
 
 export async function addProduct(input: NewProductInput): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const name = input.name.trim();
@@ -763,7 +777,7 @@ export const TERMS_MAX = 20_000;
  * manager (`myStudioId`), as every other branding field.
  */
 export async function saveTerms(text: string): Promise<SaveResult> {
-  const studioId = await myStudioId();
+  const studioId = await quoteConfigStudioId();
   if (!studioId) return { ok: false, error: 'Only the studio owner or a project manager changes the terms.' };
   const terms = String(text ?? '').replace(/\r/g, '').trim();
   if (terms.length > TERMS_MAX) return { ok: false, error: `At most ${TERMS_MAX.toLocaleString('en-IN')} characters.` };

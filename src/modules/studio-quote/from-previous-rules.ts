@@ -230,7 +230,9 @@ export function fillRefusal(target: { status: string; issuedOn: Date | null; lin
  * (a designer) keeps their own scope. Only for picking a template: who may
  * open a quotation is unchanged.
  */
-export function templateSourceWhere(qs: { studioId: string; where: Prisma.StudioQuoteWhereInput; lead: unknown }): Prisma.StudioQuoteWhereInput {
+export function templateSourceWhere(qs: { studioId: string; where: Prisma.StudioQuoteWhereInput; lead: unknown; readOnly?: boolean }): Prisma.StudioQuoteWhereInput {
+  /* Read only (a sales rep, a director) starts no quotation, so picks no template (audit, 24 Nov 2026): what they already read. */
+  if (qs.readOnly) return qs.where;
   return qs.lead ? { studioId: qs.studioId } : qs.where;
 }
 

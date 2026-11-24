@@ -45,7 +45,7 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import { asSeenBy, can, FULL_SOFTWARE_ROLES, type MemberRole, type StudioRoleName } from './roles';
+import { asSeenBy, can, FULL_SOFTWARE_ROLES, isDirector, type MemberRole, type StudioRoleName } from './roles';
 import { PHONE_PAGE } from './phone-rules';
 
 /** The roles that work in the office. */
@@ -218,6 +218,25 @@ function under(path: string, prefix: string): boolean {
 export const LEAD_SETTINGS_PATHS: readonly string[] = ['/studio/settings/pipeline', '/studio/settings/fields', '/studio/settings/sources'];
 
 /**
+ * The screens a director does not open (owner, 24 Nov 2026): the ones that
+ * only make or change leads and quotations. The leads board, a lead, My
+ * Quotations, a quotation and its print stay, read only.
+ */
+const DIRECTOR_CLOSED: readonly string[] = [
+  '/studio/quotations/first',
+  '/studio/quotations/builder',
+  '/studio/quotations/requests',
+  '/studio/quotations/terms',
+  '/studio/quotations/new',
+  '/studio/quotations/import',
+  '/studio/clients/import',
+  `${SOCIETIES_PATH}/import`,
+  '/studio/clients/bin',
+  POOL_PATH,
+  ...LEAD_SETTINGS_PATHS,
+];
+
+/**
  * The extra screens a salesperson's sales role may open (owner, 22 Oct
  * 2026), and which right opens each. A Phase 1 salesperson has none of
  * these rights, so for them nothing changes.
@@ -259,6 +278,8 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
     if (needsFullSoftware(member.role)) return path === STUDIO_HOME;
     if (isFullSoftwarePath(path)) return false;
   }
+  /* A director (owner, 24 Nov 2026): leads and quotations read only, so none of the screens that only write them. */
+  if (isDirector(member) && DIRECTOR_CLOSED.some((p) => under(path, p))) return false;
   if (under(path, CHATS_HOME)) return member.role !== 'SALES' && member.role !== 'ACCOUNTS';
   /* The setup quiz sets the studio's settings up: the owner's alone. */
   if (under(path, SETUP_PATH)) return member.role === 'OWNER';

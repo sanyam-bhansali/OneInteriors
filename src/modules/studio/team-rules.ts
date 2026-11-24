@@ -105,6 +105,15 @@ export function roleCan(role: StudioRoleName): string[] {
   return STUDIO_ACTIONS.filter((a) => can({ role, status: 'ACTIVE' }, a, { assigned: true })).map((a) => ACTION_LABELS[a]);
 }
 
+/** Director (owner, 24 Nov 2026: Anshu Ashis, Chandraveer Kumar): an owner with projects first and leads and quotations read only. */
+export const DIRECTOR_NAME = 'Director';
+export const DIRECTOR_LINE = 'Everything the owner has, with projects first on their home. Leads and Quotations sit under More and are read only: they see every lead and quotation and change none.';
+
+/** What a director may do, read off `can` like every other card. */
+export function directorCan(): string[] {
+  return STUDIO_ACTIONS.filter((a) => can({ role: 'OWNER', status: 'ACTIVE', director: true }, a, { assigned: true })).map((a) => ACTION_LABELS[a]);
+}
+
 /** Roles that see only the sites picked for them, so the invite asks which. */
 export const pickSites = (role: StudioRoleName): boolean => PICKS_SITES.includes(role);
 

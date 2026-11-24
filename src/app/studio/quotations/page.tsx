@@ -14,6 +14,7 @@ import { LineIcon } from '../ui/icons';
 import { KpiRow } from '../ui/KpiRow';
 import { quoteKpis } from '@/modules/studio/app-kpis';
 import './quotes.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Quotations',
@@ -50,6 +51,8 @@ const TABS: { key: 'ALL' | QuoteStatusName; name: string }[] = [
  * filtered list is a link a studio can keep.
  */
 export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; new?: string; from?: string }> }) {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/quotations');
   const sp = await searchParams;
   /* "Use as template" (owner, 22 Nov 2026): the quotation to copy, read as the picker would (only one this person may copy). */
   const fromId = String(sp.from ?? '').trim().slice(0, 64);

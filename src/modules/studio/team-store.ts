@@ -36,7 +36,7 @@ import { studioSignInMode, temporaryPassword } from '@/modules/auth/studio-passw
 import { send } from '@/modules/messaging/sender';
 import { bucketFor, consume } from '@/modules/rate-limit/store';
 import { STUDIO_SIGN_IN } from '@/lib/host';
-import { FULL_SOFTWARE_ROLES } from './roles';
+import { FULL_SOFTWARE_ROLES, isDirector } from './roles';
 import { assertCan, currentMember, StudioAccessError, type StudioMemberRef } from './access';
 import { rolesOf, salesTeamLead, type SalesRoleRow } from './sales-team-store';
 import { FREE_SEATS, type StudioMemberStatusName, type StudioRoleName } from './roles';
@@ -100,6 +100,8 @@ export interface TeamPerson {
   reportsToId: string | null;
   /** A designer marked design head (DESIGN-PROCESS-PLAN.md §2.6). */
   designHead: boolean;
+  /** An owner who is a director (owner, 24 Nov 2026): projects first, leads and quotations read only. */
+  director: boolean;
 }
 
 export interface TeamView {
@@ -137,6 +139,7 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
         salesRoleId: true,
         reportsToId: true,
         designHead: true,
+        director: true,
         salesRole: { select: { name: true } },
         user: { select: { name: true, phone: true, email: true, locale: true } },
         projects: { select: { homeProjectId: true } },
@@ -174,6 +177,7 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
       salesRoleName: m.role === 'SALES' ? (m.salesRole?.name ?? null) : null,
       reportsToId: m.role === 'SALES' ? m.reportsToId : null,
       designHead: m.role === 'DESIGNER' && m.designHead,
+      director: m.role === 'OWNER' && m.director,
     }))
     .sort((a, b) => order[a.role] - order[b.role]);
 
@@ -185,9 +189,27 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
 /** A member of the lead's own studio, or null — an id from a form proves nothing. */
 async function teammate(lead: StudioMemberRef, memberId: string) {
   return prisma.studioMember.findFirst({
-    where: { id: memberId, studioId: lead.studioId },
-    select: { id: true, userId: true, role: true, status: true, lastSeenAt: true, user: { select: { name: true, phone: true } } },
+    /* A director (owner, 24 Nov 2026) manages the team but never another owner: no password, suspension or sign-out of them. */
+    where: { id: memberId, studioId: lead.studioId, ...(isDirector(lead) ? { NOT: { role: 'OWNER', id: { not: lead.id } } } : {}) },
+    select: { id: true, userId: true, role: true, status: true, lastSeenAt: true, director: true, user: { select: { name: true, phone: true } } },
   });
+}
+
+/**
+ * Make an owner a director, or a director a full owner again (owner, 24 Nov
+ * 2026: Anshu Ashis and Chandraveer Kumar). Only a full owner, never on
+ * themselves, and a studio keeps at least one active full owner.
+ */
+export async function setDirector(memberId: string, on: boolean): Promise<TeamResult> {
+  const lead = await teamLead();
+  if (!lead || lead.role !== 'OWNER' || isDirector(lead)) return { ok: false, error: 'Only the owner makes someone a director.' };
+  const m = await teammate(lead, memberId);
+  if (!m) return { ok: false, error: 'That person is not on your team.' };
+  if (m.id === lead.id) return { ok: false, error: 'You cannot change your own access.' };
+  if (m.role !== 'OWNER') return { ok: false, error: 'Add them as a director, or make them an owner first.' };
+  await prisma.studioMember.update({ where: { id: m.id }, data: { director: on } });
+  await audit(lead, 'studio.member.director', m.id, { director: m.director }, { director: on });
+  return { ok: true, message: on ? `${m.user.name || 'They'}: projects first, leads and quotations read only.` : `${m.user.name || 'They'} ${m.user.name ? 'is' : 'are'} a full owner again.` };
 }
 
 /** The ids that are this studio's customer projects; refuses the lot if any is not. */
@@ -221,7 +243,7 @@ function sentLine(delivered: boolean, via: string): string {
  * The seat is used only once they sign in.
  */
 export async function inviteMember(
-  raw: { name?: unknown; phone?: unknown; role?: unknown; sites?: unknown; salesRoleId?: unknown; reportsToId?: unknown },
+  raw: { name?: unknown; phone?: unknown; role?: unknown; sites?: unknown; salesRoleId?: unknown; reportsToId?: unknown; director?: unknown },
   baseUrl: string,
 ): Promise<TeamResult> {
   const access = await teamAccess();
@@ -232,6 +254,9 @@ export async function inviteMember(
   const check = checkInvite(raw);
   if (!check.ok) return check;
   const { name, phone, role, sites } = check.invite;
+  /* An owner or a director (owner, 24 Nov 2026) is added only by a full owner. */
+  const director = role === 'OWNER' && raw.director === true;
+  if (role === 'OWNER' && (lead.role !== 'OWNER' || isDirector(lead))) return { ok: false, error: 'Only the owner adds an owner or a director.' };
   if (lead.fullSoftware === false && FULL_SOFTWARE_ROLES.includes(role)) return { ok: false, error: PRO_ROLES };
   /* Sales roles (owner, 22 Oct 2026): managing the sales team adds salespeople only. */
   if (!access.full && role !== 'SALES') return { ok: false, error: 'You can add salespeople. Ask the studio owner to add anyone else.' };
@@ -300,6 +325,7 @@ export async function inviteMember(
           status: 'INVITED',
           // Kept in step until the contract migration drops it (PHASE-1-FOUNDATION).
           isOwner: role === 'OWNER',
+          director,
           invitedById: lead.id,
           invitedAt: now,
           salesRoleId,

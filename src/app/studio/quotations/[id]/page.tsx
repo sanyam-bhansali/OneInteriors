@@ -12,6 +12,7 @@ import { currentMember } from '@/modules/studio/access';
 import { projectForQuote } from '@/modules/project/own-project';
 import { quoteSalesView } from '@/modules/studio-sales/revisions';
 import { can, quoteReadOnly } from '@/modules/studio/roles';
+import { mayOpen } from '@/modules/studio/surfaces';
 import { Revisions } from './Revisions';
 /* The client's digital sign-off (15 Oct 2026): "Signed by … on …" per revision. */
 import { signaturesOfQuote } from '@/modules/project/signoffs';
@@ -80,7 +81,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
     .catch(() => new Map<number, string>());
   /* Owner and PM may add a typed line to the product list; a salesperson asks. */
-  const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
+  const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM') && !quoteReadOnly(member);
   const mayBook = member !== null && can(member, 'booking.record');
 
   const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
@@ -106,10 +107,13 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <div className="phead hphead">
         <div style={{ minWidth: 0 }}>
           <span className="hstack" style={{ gap: 14 }}>
-            <Link href="/studio/quotations" className="sm muted qback">
-              <LineIcon name="back" size={15} />
-              Quotations
-            </Link>
+            {/* Only for whoever opens the list: a designer goes back to the project (owner, 24 Nov 2026). */}
+            {member === null || mayOpen(member, '/studio/quotations') ? (
+              <Link href="/studio/quotations" className="sm muted qback">
+                <LineIcon name="back" size={15} />
+                Quotations
+              </Link>
+            ) : null}
             {backProjectId ? (
               <Link href={`/studio/projects/${backProjectId}`} className="sm acc-t qback" data-testid="back-to-project">
                 <LineIcon name="back" size={15} />
@@ -167,7 +171,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       {viewOnly ? (
         <div className="qnote hnoteline" data-testid="sales-view-only">
           <p>
-            View only. Sales reps don&rsquo;t change quotations: attach the client&rsquo;s floor plan on the lead and the quotation is built from it. Ask your sales head or the quotation team for changes.
+            {member?.role === 'OWNER'
+              ? 'View only. Directors see every quotation and change none. Ask the owner or the sales head for changes.'
+              : 'View only. Sales reps don’t change quotations: attach the client’s floor plan on the lead and the quotation is built from it. Ask your sales head or the quotation team for changes.'}
           </p>
         </div>
       ) : null}

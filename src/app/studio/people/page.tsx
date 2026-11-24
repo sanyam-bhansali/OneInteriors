@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { staffList } from '@/modules/staff/store';
 import '../office-ui.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'People', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,8 @@ const inr = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-
 
 /** Employee records (owner, 21 Nov 2026): everyone on the team, with what is missing. Owner and accounts only. */
 export default async function PeoplePage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/people');
   const rows = await staffList();
   if (!rows) notFound();
   return (

@@ -6,6 +6,7 @@ import { STATUS_LABEL } from '@/modules/studio-crews/rules';
 import { dayWords } from '../format';
 import '../../office-ui.css';
 import '../vendors.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Pay these', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,8 @@ export const dynamic = 'force-dynamic';
  * has marked the work done (the signal to pay). Owner and accounts.
  */
 export default async function PayThesePage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/vendors/pay');
   const data = await payThese();
   if (!data) {
     return (

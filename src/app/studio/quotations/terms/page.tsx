@@ -4,6 +4,7 @@ import { myBranding, myStudioProfile, TERMS_MAX } from '@/modules/studio-quote/s
 import { TermsEditor } from './TermsEditor';
 import '../quotes.css';
 import './terms.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Terms',
@@ -23,6 +24,8 @@ export const dynamic = 'force-dynamic';
  * anyone else.
  */
 export default async function TermsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/quotations/terms');
   const member = await currentMember();
   const mayEdit = member !== null && member.status === 'ACTIVE' && (member.role === 'OWNER' || member.role === 'PM');
   const [branding, profile] = mayEdit ? await Promise.all([myBranding(), myStudioProfile()]) : [null, null];

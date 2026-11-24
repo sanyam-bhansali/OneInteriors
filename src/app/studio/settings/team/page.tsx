@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { teamView } from '@/modules/studio/team-store';
 import { currentMember } from '@/modules/studio/access';
-import { FULL_SOFTWARE_ROLES } from '@/modules/studio/roles';
-import { ROLE_LINES, ROLE_NAMES, ROLE_ORDER, STATUS_LINES, roleCan, seatLine } from '@/modules/studio/team-rules';
+import { FULL_SOFTWARE_ROLES, isDirector, type StudioRoleName } from '@/modules/studio/roles';
+import { DIRECTOR_LINE, DIRECTOR_NAME, ROLE_LINES, ROLE_NAMES, ROLE_ORDER, STATUS_LINES, directorCan, roleCan, seatLine } from '@/modules/studio/team-rules';
 import { AddSomeone, PersonActions } from './TeamControls';
 import { studioSignInMode } from '@/modules/auth/studio-password-rules';
 import { RolesTab, SalesPersonControls, TeamTree, type SalesPerson } from './SalesTeam';
@@ -43,7 +43,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   /* On Pro (owner, 21 Oct 2026) the owner adds salespeople; the other roles come with Max. Managing the sales team: salespeople only. */
   const pro = member?.fullSoftware === false;
-  const roles = ROLE_ORDER.filter((role) => (!pro || !FULL_SOFTWARE_ROLES.includes(role)) && (view.full || role === 'SALES')).map((role) => ({ role, name: ROLE_NAMES[role], line: ROLE_LINES[role], can: roleCan(role) }));
+  /* Owners and directors are added by a full owner only (owner, 24 Nov 2026). */
+  const fullOwner = member?.role === 'OWNER' && !isDirector(member);
+  const roles: { role: StudioRoleName; name: string; line: string; can: string[]; director?: boolean }[] = ROLE_ORDER.filter(
+    (role) => (!pro || !FULL_SOFTWARE_ROLES.includes(role)) && (view.full || role === 'SALES') && (role !== 'OWNER' || fullOwner),
+  ).map((role) => ({ role, name: ROLE_NAMES[role], line: ROLE_LINES[role], can: roleCan(role) }));
+  if (fullOwner && !pro) roles.push({ role: 'OWNER', director: true, name: DIRECTOR_NAME, line: DIRECTOR_LINE, can: directorCan() });
   const used = Math.min(view.seatsUsed, view.freeSeats);
   const salesPeople: SalesPerson[] = view.people.map((p) => ({ id: p.id, name: p.name, role: p.role, status: p.status, salesRoleId: p.salesRoleId, reportsToId: p.reportsToId, isYou: p.isYou }));
   const roleCards = view.roles.map((r) => ({ id: r.id, name: r.name, description: r.description, system: r.system, permissions: r.permissions, people: r.people }));
@@ -132,9 +137,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                         {p.phone ? p.phone.replace(/^\+91(\d{5})(\d{5})$/, '+91 $1 $2') : p.email}
                       </div>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{ROLE_NAMES[p.role]}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{p.director ? DIRECTOR_NAME : ROLE_NAMES[p.role]}</td>
                     <td>
-                      {p.role === 'OWNER'
+                      {p.director
+                        ? 'Everything; leads and quotations read only'
+                        : p.role === 'OWNER'
                         ? 'Everything'
                         : p.role === 'ACCOUNTS'
                           ? 'Payments on all projects'
@@ -170,7 +177,10 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     </td>
                     <td>
                       {p.isYou || !view.full ? null : (
-                        <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id), designHead: p.designHead }} sites={view.sites} passwordMode={passwordMode} />
+                        /* A director never acts on another owner (team-store.ts `teammate`), so no controls are drawn for one. */
+                        p.role === 'OWNER' && !fullOwner ? null : (
+                          <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id), designHead: p.designHead, director: p.director }} sites={view.sites} passwordMode={passwordMode} mayMakeDirector={fullOwner} />
+                        )
                       )}
                     </td>
                   </tr>

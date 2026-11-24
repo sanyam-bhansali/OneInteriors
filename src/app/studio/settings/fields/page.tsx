@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { myFields } from '@/modules/studio-practice/fields';
 import { FieldEditor } from './FieldEditor';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = {
   title: 'Fields',
@@ -32,6 +33,8 @@ export const dynamic = 'force-dynamic';
  * would still be in the row and invisible on the screen.
  */
 export default async function FieldsPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/settings/fields');
   const fields = await myFields();
 
   return (

@@ -47,6 +47,7 @@ const MEMBER_SELECT = {
   status: true,
   reportsToId: true,
   designHead: true,
+  director: true,
   salesRole: { select: { id: true, name: true, permissions: true } },
   studio: { select: { fullSoftware: true, softwarePlan: true } },
 } as const;
@@ -80,9 +81,9 @@ type MemberRow = Prisma.StudioMemberGetPayload<{ select: typeof MEMBER_SELECT }>
 
 async function refFor(row: MemberRow | null): Promise<StudioMemberRef | null> {
   if (!row) return null;
-  const { studio, salesRole, reportsToId, designHead, ...rest } = row;
-  /* Design head: only ever read on a designer. */
-  const member = rest.role === 'DESIGNER' && designHead ? { ...rest, designHead: true } : rest;
+  const { studio, salesRole, reportsToId, designHead, director, ...rest } = row;
+  /* Design head: only ever read on a designer. Director (owner, 24 Nov 2026): only ever read on an owner. */
+  const member = rest.role === 'DESIGNER' && designHead ? { ...rest, designHead: true } : rest.role === 'OWNER' && director ? { ...rest, director: true } : rest;
   /* Sales roles (owner, 22 Oct 2026): a SALES member with a sales role is
      governed by it (roles.ts `can`), reaching their subtree of the reporting
      tree. No role keeps the Phase 1 rule. Never read for any other role. A

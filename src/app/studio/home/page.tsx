@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/modules/auth/session';
 import { currentMember } from '@/modules/studio/access';
 import { appsFor, comingSoonApps, APPS, type AppKey, type StudioApp } from '@/modules/studio/apps';
+import { isDirector } from '@/modules/studio/roles';
 import { waitingForFullSoftware } from '@/modules/studio/pilot';
 import { quizPrompt } from '@/modules/studio/setup-quiz';
 import { crmIsOpen } from '@/modules/studio/standing';
@@ -59,7 +60,11 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
      the "Right now" strip. Only ever a subset of `appsFor`. */
   const allApps = member ? appsFor(member) : [...APPS];
   const prefs = member ? await myHomePrefs(member.id) : DEFAULT_HOME_PREFS;
-  const apps = homeTiles(allApps, prefs);
+  const tiles = homeTiles(allApps, prefs);
+  /* A director (owner, 24 Nov 2026): projects first; Leads and Quotations under More, read only. */
+  const director = member ? isDirector(member) : false;
+  const apps = tiles.filter((a) => !a.more);
+  const moreApps = tiles.filter((a) => a.more);
   const role = member?.role ?? 'OWNER';
   /* The lower sections read through the same scoped module functions as the
      screens they summarise: a salesperson's own leads (myToday), the sites
@@ -70,7 +75,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     member
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
-    member && ['OWNER', 'PM', 'SALES'].includes(member.role) ? myToday() : Promise.resolve(null),
+    /* A director's home is projects, not the day's calls (owner, 24 Nov 2026). */
+    member && ['OWNER', 'PM', 'SALES'].includes(member.role) && !isDirector(member) ? myToday() : Promise.resolve(null),
     getLang(),
     member && ['OWNER', 'PM', 'DESIGNER'].includes(member.role) ? mySitesToday().catch(() => null) : Promise.resolve(null),
     member?.role === 'PM' ? crewsOnMySites().catch(() => []) : Promise.resolve([]),
@@ -104,7 +110,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const greeting = firstName ? `${hello}, ${firstName}` : hello;
   const dateLine = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
-  const roleLine = member ? ROLE_LINE[member.role] : 'Owner and admin';
+  const roleLine = director ? 'Director' : member ? ROLE_LINE[member.role] : 'Owner and admin';
 
   const sections = today?.sections ?? [];
   const n = (id: SectionId) => sectionCount(sections, id);
@@ -196,6 +202,21 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
               </div>
             ))}
           </div>
+          {moreApps.length > 0 ? (
+            <section aria-label="More" data-testid="home-more" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <b style={{ fontSize: 14 }}>More</b>
+              <div className="ph-grid">
+                {moreApps.map((a) => (
+                  <Link key={a.key} href={a.href} className="ph-app">
+                    <span className="tico" style={{ background: a.bg, color: a.fg }}>
+                      <AppIcon name={a.icon} />
+                    </span>
+                    {a.name}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
           {prompt === 'card' ? <SetupCard /> : null}
           {strip.length > 0 ? (
             <section className="card ph-card" aria-label="Right now">
@@ -231,12 +252,15 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
 
         {work ? <MyWork work={work} /> : null}
 
+        {/* A director's dashboard is projects first (owner, 24 Nov 2026): every site, today, above the apps. */}
+        {director ? <EverySite cards={cards} /> : null}
+
         <section aria-labelledby="h-apps" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="hstack" style={{ justifyContent: 'space-between' }}>
             <h2 id="h-apps" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
               {member && member.role !== 'OWNER' ? 'Your apps' : 'Your studio'}
             </h2>
-            {sees.has('clients') ? (
+            {sees.has('clients') && !director ? (
               <Link href="/studio/clients?add=1" className="btn pri sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -270,6 +294,28 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
             ))}
           </div>
         </section>
+
+        {moreApps.length > 0 ? (
+          <section aria-labelledby="h-more" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} data-testid="home-more-desk">
+            <div className="hstack" style={{ justifyContent: 'space-between' }}>
+              <h2 id="h-more" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
+                More
+              </h2>
+              <span className="muted sm">Read only</span>
+            </div>
+            <div className="lgrid few">
+              {moreApps.map((a) => (
+                <Link key={a.key} href={a.href} className="tile">
+                  <span className="tico" style={{ background: a.bg, color: a.fg }}>
+                    <AppIcon name={a.icon} />
+                  </span>
+                  <b>{a.name}</b>
+                  <span className="tsub">{a.key === 'clients' ? 'Every lead, read only' : 'Every quotation, read only'}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {prompt === 'card' ? <SetupCard /> : null}
 

@@ -24,6 +24,7 @@ import { RoleFrame } from './RoleFrame';
 import { APPS, TO_BUILD_PATH, appsFor } from '@/modules/studio/apps';
 import { toBuildCount } from '@/modules/studio-quote/quote-request-store';
 import { StudioFrame } from './ui/StudioFrame';
+import { DoorGuard } from './ui/DoorGuard';
 import { THEME_SCRIPT } from './ui/theme-script';
 import './studio-ui.css';
 import './studio-extra.css';
@@ -175,6 +176,7 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
     if (member.role === 'SUPERVISOR' && member.fullSoftware !== false) {
       return (
         <Themed>
+          <DoorGuard member={doorFacts(member)} />
           <RoleFrame
             member={member}
             name={view ? view.memberName : user.name}
@@ -218,6 +220,7 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
   const office = !member || usesOfficeShell(member);
   return (
     <Themed>
+      {member ? <DoorGuard member={doorFacts(member)} /> : null}
       <StudioFrame
         apps={apps}
         studioName={context?.tradeName ?? 'Your studio'}
@@ -231,6 +234,25 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
       </StudioFrame>
     </Themed>
   );
+}
+
+/**
+ * What the in-app door (`DoorGuard`) needs to ask `doorFor` in the browser:
+ * the member's role facts, nothing else of theirs. Their sales role's
+ * permissions and team ids are their own, already shown on their screens.
+ */
+function doorFacts(m: MemberRole): MemberRole {
+  return {
+    role: m.role,
+    status: m.status,
+    ...(m.fullSoftware !== undefined ? { fullSoftware: m.fullSoftware } : {}),
+    ...(m.solo !== undefined ? { solo: m.solo } : {}),
+    ...(m.id !== undefined ? { id: m.id } : {}),
+    ...(m.designHead ? { designHead: true } : {}),
+    ...(m.director ? { director: true } : {}),
+    ...(m.viewOnly ? { viewOnly: true } : {}),
+    ...(m.sales ? { sales: m.sales } : {}),
+  };
 }
 
 /**

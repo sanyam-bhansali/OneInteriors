@@ -15,6 +15,7 @@ import '../office-ui.css';
 /* The call sheet's look (Log call on a line; calling steps, 21 Oct 2026). */
 import '../clients/clients.css';
 import './today.css';
+import { requireDoor } from '@/app/studio/door';
 
 export const metadata: Metadata = { title: 'Today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,8 @@ export const dynamic = 'force-dynamic';
  * with its progress ring, and the side cards (new for you, crews).
  */
 export default async function TodayPage() {
+  /* The door on every navigation, not only a full load (owner, 24 Nov 2026; app/studio/door.ts). */
+  await requireDoor('/studio/today');
   const member = await currentMember();
   /* An owner still finishing setup is sent to it: the leads are not open yet. */
   if (member && member.role !== 'SALES') {
