@@ -255,7 +255,14 @@ export default async function ComparePage({
               schedule={ctx.schedule}
               salesTotalPaise={ctx.salesTotalPaise}
               spec={ctx.spec}
-              compare={{ initialLabel: left, initialPaise: was.totalPaise, finalLabel: right, finalPaise: now.totalPaise }}
+              compare={{
+                initialLabel: left,
+                initialPaise: was.totalPaise,
+                initialPricePaise: was.workPaise + was.feePaise + was.gstPaise,
+                finalLabel: right,
+                finalPaise: now.totalPaise,
+                finalPricePaise: now.workPaise + now.feePaise + now.gstPaise,
+              }}
             />
           ) : null}
 

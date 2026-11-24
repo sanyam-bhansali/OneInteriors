@@ -333,7 +333,7 @@ export function DocSummary({
   salesTotalPaise?: number | null;
   spec: DocSpecRow[];
   /** The Final (Original vs Revised): the initial and final value under the totals (owner, 14 Nov 2026). */
-  compare?: { initialLabel: string; initialPaise: number; finalLabel: string; finalPaise: number } | null;
+  compare?: { initialLabel: string; initialPaise: number; finalLabel: string; finalPaise: number; initialPricePaise: number; finalPricePaise: number } | null;
 }) {
   const shares = roomShares(rooms);
   const palette = donutPalette(studio?.accentHex ?? null, shares.length);
@@ -393,20 +393,42 @@ export function DocSummary({
                 <td className="r">{r(totals.totalPaise)}</td>
               </tr>
             )}
-            {/* Initial and final value only (owner, 14 Nov 2026: "this total comparison at the end, not at the start"). */}
-            {compare ? (
-              <>
-                <Row k={`Initial value (${compare.initialLabel})`} v={r(compare.initialPaise)} />
-                <Row k={`Final value (${compare.finalLabel})`} v={r(compare.finalPaise)} bold />
-                <Row
-                  k="Difference"
-                  v={compare.finalPaise === compare.initialPaise ? '—' : `${compare.finalPaise > compare.initialPaise ? '+' : '−'} ${r(Math.abs(compare.finalPaise - compare.initialPaise))}`}
-                />
-              </>
-            ) : null}
           </tbody>
         </table>
       </div>
+
+      {/* Both quotations side by side at the end (owner, 14 Nov 2026: "at the end, not at the start"; 24 Nov 2026:
+          "it should show price and discounted price both for both the quotation and then show the difference"). */}
+      {compare ? (
+        <div className="qd-keep qd-section" data-testid="compare-prices">
+          <table className="qd-tbl">
+            <thead>
+              <tr className="qd-cols">
+                <th></th>
+                <th className="r">{compare.initialLabel}</th>
+                <th className="r">{compare.finalLabel}</th>
+                <th className="r">Difference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  ['Price', compare.initialPricePaise, compare.finalPricePaise],
+                  ['Discount', compare.initialPricePaise - compare.initialPaise, compare.finalPricePaise - compare.finalPaise],
+                  ['Discounted price', compare.initialPaise, compare.finalPaise],
+                ] as const
+              ).map(([k, a, b]) => (
+                <tr key={k} className={k === 'Discounted price' ? 'qd-sub' : undefined}>
+                  <td>{k}</td>
+                  <td className="r">{k === 'Discount' && a > 0 ? `− ${r(a)}` : r(a)}</td>
+                  <td className="r">{k === 'Discount' && b > 0 ? `− ${r(b)}` : r(b)}</td>
+                  <td className="r">{b === a ? '—' : `${(k === 'Discount' ? a > b : b > a) ? '+' : '−'} ${r(Math.abs(b - a))}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {stages.length > 0 ? (
         <div className="qd-section">
