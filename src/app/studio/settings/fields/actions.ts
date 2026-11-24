@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import {
   addField,
@@ -23,6 +25,7 @@ function refresh() {
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 
 export async function addFieldAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('addFieldAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await addField({
     label: str(form, 'label'),
     type: (str(form, 'type') || 'TEXT') as FieldTypeName,
@@ -31,25 +34,32 @@ export async function addFieldAction(_prev: State, form: FormData): Promise<Stat
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 export async function renameFieldAction(id: string, label: string): Promise<State> {
+  return guarded('renameFieldAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await renameField(id, label);
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 export async function setGroupingAction(id: string, groupBy: boolean): Promise<State> {
+  return guarded('setGroupingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setFieldGrouping(id, groupBy);
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 export async function removeFieldAction(id: string): Promise<State> {
+  return guarded('removeFieldAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await removeField(id);
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }

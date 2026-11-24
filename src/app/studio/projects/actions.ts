@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { addProject, setProjectStage, type ProjectStageName } from '@/modules/studio-practice/projects';
 import { deleteProject, restoreProject, type DeleteResult } from '@/modules/studio/project-delete';
@@ -19,6 +21,7 @@ function refresh() {
 }
 
 export async function addProjectAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('addProjectAction', { ok: false, error: SAVE_FAILED }, async () => {
   const contract = Number(str(form, 'contract'));
 
   const result = await addProject({
@@ -31,17 +34,21 @@ export async function addProjectAction(_prev: State, form: FormData): Promise<St
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 export async function setStageAction(id: string, stage: ProjectStageName): Promise<State> {
+  return guarded('setStageAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setProjectStage(id, stage);
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+});
 }
 
 /* Delete and restore a project (owner, 27 Oct 2026; studio/project-delete.ts). */
 export async function deleteProjectAction(projectId: string, typedName: string, reason: string): Promise<DeleteResult> {
+  return guarded('deleteProjectAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await deleteProject(projectId, typedName, reason);
   if (r.ok) {
     refresh();
@@ -49,9 +56,11 @@ export async function deleteProjectAction(projectId: string, typedName: string, 
     revalidatePath('/studio/design');
   }
   return r;
+});
 }
 
 export async function restoreProjectAction(projectId: string): Promise<DeleteResult> {
+  return guarded('restoreProjectAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await restoreProject(projectId);
   if (r.ok) {
     refresh();
@@ -59,4 +68,5 @@ export async function restoreProjectAction(projectId: string): Promise<DeleteRes
     revalidatePath('/studio/home');
   }
   return r;
+});
 }

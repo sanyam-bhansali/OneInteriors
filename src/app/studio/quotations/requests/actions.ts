@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
  * the actions behind To build, the heads' Requests, the lead page's
@@ -26,43 +28,55 @@ const id = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
 
 /** "Request quotation" on the lead page. */
 export async function requestQuotationAction(clientId: string, note: string): Promise<Done> {
+  return guarded('requestQuotationAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await requestQuotation(id(clientId), typeof note === 'string' ? note : '');
   if (r.ok) refresh(id(clientId));
   return r;
+});
 }
 
 /** "Open" on To build: the request is being built, and the builder opens on its draft. */
 export async function startRequestAction(requestId: string): Promise<Done> {
+  return guarded('startRequestAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await startRequest(id(requestId));
   if (!r.ok) return r;
   refresh();
   redirect(`/studio/quotations/${r.quoteId}`);
+});
 }
 
 export async function finishRequestAction(requestId: string, clientId?: string): Promise<Done> {
+  return guarded('finishRequestAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await finishRequest(id(requestId));
   if (r.ok) refresh(clientId ? id(clientId) : null);
   return r;
+});
 }
 
 export async function reassignRequestAction(requestId: string, memberId: string, clientId?: string): Promise<Done> {
+  return guarded('reassignRequestAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await reassignRequest(id(requestId), id(memberId));
   if (r.ok) refresh(clientId ? id(clientId) : null);
   return r;
+});
 }
 
 export async function cancelRequestAction(requestId: string, clientId?: string): Promise<Done> {
+  return guarded('cancelRequestAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await cancelRequest(id(requestId));
   if (r.ok) refresh(clientId ? id(clientId) : null);
   return r;
+});
 }
 
 /** Settings → Team → Quotations: "Who builds quotations". */
 export async function saveBuildersAction(ids: string[]): Promise<Done> {
+  return guarded('saveBuildersAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await saveBuilders(Array.isArray(ids) ? ids.map(id) : null);
   if (r.ok) {
     revalidatePath(TEAM_PATH);
     revalidatePath(REQUESTS);
   }
   return r;
+});
 }

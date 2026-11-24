@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * The server actions behind Studio OS Phase 1's screens: Today, the lead
  * page, revisions and the sales final, the booking, and the sales settings.
@@ -44,6 +46,7 @@ function refreshLead(clientId?: string | null) {
  * Whoever may assign; the module checks the reach.
  */
 export async function assignLeadsAction(ids: string[], memberId: string | null, toPool?: string | null): Promise<Done> {
+  return guarded('assignLeadsAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Pick at least one lead.' };
   const clean = ids.filter((i) => typeof i === 'string').slice(0, 500);
   const pool = typeof toPool === 'string' && toPool ? toPool.slice(0, 64) : null;
@@ -52,6 +55,7 @@ export async function assignLeadsAction(ids: string[], memberId: string | null, 
   refreshLead(clean.length === 1 ? clean[0] : null);
   revalidatePath('/studio/clients/pool');
   return { ok: true, message: memberId ? (clean.length === 1 ? 'Assigned. They have been told.' : `${clean.length} leads assigned. They have been told.`) : pool ? 'Moved to that pool.' : 'Back in the pool.' };
+});
 }
 
 // ── The lead ───────────────────────────────────────────────────
@@ -68,47 +72,59 @@ export async function editLeadAction(input: {
   source: string;
   force?: boolean;
 }): Promise<EditResult> {
+  return guarded('editLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await editLeadDetails({ ...input, force: input.force === true });
   if (r.ok) refreshLead(input.clientId);
   return r;
+});
 }
 
 export async function addNoteAction(clientId: string, note: string): Promise<Done> {
+  return guarded('addNoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await addLeadNote(String(clientId), note);
   if (!r.ok) return r;
   refreshLead(clientId);
   return { ok: true, message: 'Note added.' };
+});
 }
 
 export async function setMeetingAction(clientId: string, day: string, time: string, note: string): Promise<Done> {
+  return guarded('setMeetingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await setLeadMeeting(String(clientId), day, time, note);
   if (!r.ok) return r;
   refreshLead(clientId);
   return { ok: true, message: day ? 'Meeting saved. It shows on Today that day.' : 'Meeting cleared.' };
+});
 }
 
 export async function attachFileAction(input: { clientId: string; path: string; name: string; contentType: string; bytes: number; kind: string; quoteRequest?: boolean; note?: string }): Promise<Done> {
+  return guarded('attachFileAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await attachLeadFile({ ...input, quoteRequest: input.quoteRequest !== false });
   if (!r.ok) return r;
   refreshLead(input.clientId);
   if (input.kind === 'FLOOR_PLAN') revalidatePath('/studio/quotations/requests');
   return { ok: true, message: input.kind === 'FLOOR_PLAN' ? 'Floor plan attached.' : 'File attached.' };
+});
 }
 
 export async function removeFileAction(clientId: string, fileId: string): Promise<Done> {
+  return guarded('removeFileAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await removeLeadFile(String(fileId));
   if (!r.ok) return r;
   refreshLead(clientId);
   return { ok: true, message: 'File removed.' };
+});
 }
 
 /** "New quotation" on the lead: made, filled from the lead, and opened. */
 export async function newQuoteForLeadAction(clientId: string): Promise<Done> {
+  return guarded('newQuoteForLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await newQuoteForLead(String(clientId));
   if (!r.ok) return r;
   refreshLead(clientId);
   revalidatePath('/studio/quotations');
   redirect(`/studio/quotations/${r.id}`);
+});
 }
 
 /**
@@ -116,6 +132,7 @@ export async function newQuoteForLeadAction(clientId: string): Promise<Done> {
  * owner and PM, theirs for a salesperson), then a quotation for them.
  */
 export async function newLeadAndQuoteAction(input: { name: string; phone: string; society: string; config: string }): Promise<Done> {
+  return guarded('newLeadAndQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const added = await addClient({ name: String(input.name ?? ''), phone: String(input.phone ?? ''), society: String(input.society ?? ''), config: String(input.config ?? ''), source: 'OTHER' });
   if (!added.ok) {
     if ('duplicate' in added) return { ok: false, error: `${added.duplicate.name} already has that number. Search for them by name or phone above.` };
@@ -125,16 +142,19 @@ export async function newLeadAndQuoteAction(input: { name: string; phone: string
   if (!r.ok) return r;
   refreshLead(added.id);
   redirect(`/studio/quotations/${r.id}`);
+});
 }
 
 // ── Revisions and the sales final ──────────────────────────────
 
 export async function sendAgainAction(quoteId: string): Promise<Done> {
+  return guarded('sendAgainAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await sendAgain(String(quoteId));
   if (!r.ok) return r;
   revalidatePath(`/studio/quotations/${quoteId}`);
   revalidatePath('/studio/today');
   return { ok: true, message: r.created ? `Saved as R${r.n}: the copy the client has now.` : `Nothing changed since R${r.n}, so it stays R${r.n}.` };
+});
 }
 
 export async function markSalesFinalAction(
@@ -144,6 +164,7 @@ export async function markSalesFinalAction(
   clientId: string | null,
   extra: { notes?: string; voicePath?: string | null } = {},
 ): Promise<Done> {
+  return guarded('markSalesFinalAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await markSalesFinal(String(quoteId), Number(n), Array.isArray(stages) ? stages : [], {
     notes: typeof extra.notes === 'string' ? extra.notes.slice(0, 3200) : '',
     voicePath: typeof extra.voicePath === 'string' ? extra.voicePath.slice(0, 300) : null,
@@ -153,11 +174,14 @@ export async function markSalesFinalAction(
   refreshLead(clientId);
   revalidatePath('/studio/payments');
   return { ok: true, message: `R${n} is the sales final. Accounts can record the booking against it.` };
+});
 }
 
 /** A place for the sales final's voice note (kept as audio). */
 export async function salesVoiceTicketAction(quoteId: string, type: string, bytes: number): Promise<{ ok: true; path: string; url: string | null } | { ok: false; error: string }> {
+  return guarded('salesVoiceTicketAction', { ok: false, error: SAVE_FAILED }, async () => {
   return salesVoiceTicket(String(quoteId), type, bytes);
+});
 }
 
 // ── The booking ────────────────────────────────────────────────
@@ -172,6 +196,7 @@ export async function recordBookingAction(input: {
   customerPhone: string;
   customerEmail: string;
 }): Promise<Done> {
+  return guarded('recordBookingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await recordBooking(input);
   if (!r.ok) return r;
   refreshLead(r.clientId);
@@ -180,9 +205,11 @@ export async function recordBookingAction(input: {
   revalidatePath('/studio/projects');
   const how = r.invitedBy.length ? `invited to the app by ${r.invitedBy.join(' and ')}` : 'ready to be invited: share the link from the project';
   return { ok: true, message: `Booked. The project is open and the client is ${how}.` };
+});
 }
 
 export async function refundBookingAction(clientId: string, reason: string, lateConfirmed: boolean): Promise<RefundResult> {
+  return guarded('refundBookingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await refundBooking({ clientId: String(clientId), reason, lateConfirmed: lateConfirmed === true });
   if (r.ok) {
     refreshLead(clientId);
@@ -190,27 +217,34 @@ export async function refundBookingAction(clientId: string, reason: string, late
     revalidatePath('/studio/projects');
   }
   return r;
+});
 }
 
 // ── Settings ───────────────────────────────────────────────────
 
 export async function savePaymentStagesAction(stages: PaymentStage[]): Promise<Done> {
+  return guarded('savePaymentStagesAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await savePaymentTemplate(stages);
   if (!r.ok) return r;
   revalidatePath('/studio/settings/payments');
   return { ok: true, message: 'Saved. New sales finals start from these stages.' };
+});
 }
 
 export async function addLeadSourceAction(name: string): Promise<Done> {
+  return guarded('addLeadSourceAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await addLeadSource(name);
   if (!r.ok) return r;
   revalidatePath('/studio/settings/sources');
   return { ok: true, message: 'Added. It is in every source list now.' };
+});
 }
 
 export async function removeLeadSourceAction(id: string): Promise<Done> {
+  return guarded('removeLeadSourceAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await removeLeadSource(id);
   if (!r.ok) return r;
   revalidatePath('/studio/settings/sources');
   return { ok: true, message: 'Removed. Its leads now show as Other.' };
+});
 }

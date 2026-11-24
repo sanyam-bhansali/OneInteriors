@@ -26,6 +26,10 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    /* Crash protection (owner, 24 Nov 2026): Prisma's default gives a transaction 5 s and waits 2 s for a
+       connection. Moving plan dates, ticking a late design step and a site post update one row at a time inside
+       one transaction, and on a slow moment that ran out and threw. Generous, still well inside Vercel's limit. */
+    transactionOptions: { maxWait: 10_000, timeout: 20_000 },
     ...(sampleOnly ? { datasourceUrl: 'postgresql://sample-data-only.invalid:5432/none' } : pooled ? { datasourceUrl: pooled } : {}),
   });
 

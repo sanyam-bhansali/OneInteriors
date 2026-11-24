@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * Calendar tasks, as server actions (leads at scale, 12 Oct 2026). The
  * module checks who is asking (studio-sales/task-rules.ts) before anything
@@ -17,25 +19,33 @@ function refresh(leadId?: string | null) {
 }
 
 export async function createTaskAction(input: { title: string; day: string; time: string; leadId?: string | null; assignedToId?: string | null }): Promise<Done> {
+  return guarded('createTaskAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await createTask(input ?? {});
   if (r.ok) refresh(typeof input?.leadId === 'string' ? input.leadId : null);
   return r;
+});
 }
 
 export async function updateTaskAction(id: string, input: { title: string; day: string; time: string; assignedToId?: string | null }, leadId?: string | null): Promise<Done> {
+  return guarded('updateTaskAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await updateTask(id, input ?? {});
   if (r.ok) refresh(leadId);
   return r;
+});
 }
 
 export async function setTaskDoneAction(id: string, done: boolean, leadId?: string | null): Promise<Done> {
+  return guarded('setTaskDoneAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await setTaskDone(id, done === true);
   if (r.ok) refresh(leadId);
   return r;
+});
 }
 
 export async function deleteTaskAction(id: string, leadId?: string | null): Promise<Done> {
+  return guarded('deleteTaskAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await deleteTask(id);
   if (r.ok) refresh(leadId);
   return r;
+});
 }

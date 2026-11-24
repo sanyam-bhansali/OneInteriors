@@ -10,6 +10,7 @@ describe('connections per server', () => {
   it('raises a limit of one so queries asked for together run together', () => {
     const url = new URL(withPoolSize(POOLER, 5)!);
     expect(url.searchParams.get('connection_limit')).toBe('5');
+    expect(url.searchParams.get('pool_timeout')).toBe('20');
     expect(url.searchParams.get('pgbouncer')).toBe('true');
     expect(url.hostname).toBe('aws-0-ap-south-1.pooler.supabase.com');
   });
@@ -25,12 +26,12 @@ describe('connections per server', () => {
     expect(withPoolSize(undefined, 5)).toBeNull();
     expect(withPoolSize('not a url', 5)).toBeNull();
   });
-  it('is five unless DB_POOL_SIZE says otherwise (1 to 20)', () => {
+  it('is eight unless DB_POOL_SIZE says otherwise (1 to 20)', () => {
     expect(poolSize({})).toBe(DEFAULT_POOL_SIZE);
-    expect(DEFAULT_POOL_SIZE).toBe(5);
-    expect(poolSize({ DB_POOL_SIZE: '8' })).toBe(8);
-    expect(poolSize({ DB_POOL_SIZE: '0' })).toBe(5);
-    expect(poolSize({ DB_POOL_SIZE: '500' })).toBe(5);
+    expect(DEFAULT_POOL_SIZE).toBe(8);
+    expect(poolSize({ DB_POOL_SIZE: '12' })).toBe(12);
+    expect(poolSize({ DB_POOL_SIZE: '0' })).toBe(8);
+    expect(poolSize({ DB_POOL_SIZE: '500' })).toBe(8);
   });
 });
 

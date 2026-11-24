@@ -264,12 +264,13 @@ async function viewsOf(scope: LeadScope, rows: ViewRaw[], now: Date): Promise<Le
   const rules = kpiRules(clockAt(now));
   const [notes, noteCounts, lastEvents, stale] = await Promise.all([
     full.length
-      ? prisma.studioClientEvent.findMany({
-          where: { studioId: scope.studioId, clientId: { in: full }, kind: 'NOTE' },
-          orderBy: { createdAt: 'desc' },
-          distinct: ['clientId'],
-          select: { clientId: true, summary: true },
-        })
+      ? /* The newest note per card in the database (speed, owner 24 Nov 2026): Prisma's `distinct` read every note of
+           every card and dropped the rest in memory. DISTINCT ON keeps one row per client, newest first. */
+        prisma.$queryRaw<{ clientId: string; summary: string }[]>`
+          SELECT DISTINCT ON ("clientId") "clientId", "summary"
+          FROM "studio_client_events"
+          WHERE "studioId" = ${scope.studioId} AND "clientId" = ANY(${full}) AND "kind" = 'NOTE'
+          ORDER BY "clientId", "createdAt" DESC`
       : Promise.resolve([]),
     full.length
       ? prisma.studioClientEvent.groupBy({ by: ['clientId'], where: { studioId: scope.studioId, clientId: { in: full }, kind: 'NOTE' }, _count: { _all: true } })

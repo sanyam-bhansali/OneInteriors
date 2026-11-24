@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { RATE_CATEGORIES, CATEGORY } from '@/modules/quotation/categories';
@@ -173,6 +175,7 @@ export async function saveProfileAction(
  * anyway: what autosave has done is keep their work, not finish the step.
  */
 export async function saveProfileDraftAction(formData: FormData): Promise<void> {
+  return guarded('saveProfileDraftAction', undefined, async () => {
   await saveProfileDraft({
     about: String(formData.get('about') ?? ''),
     localities: formData.getAll('localities').map(String),
@@ -183,6 +186,7 @@ export async function saveProfileDraftAction(formData: FormData): Promise<void> 
     minLakhs: lakhs(formData.get('minLakhs')),
     maxLakhs: lakhs(formData.get('maxLakhs')),
   });
+});
 }
 
 export async function saveRegistrationAction(
@@ -330,7 +334,9 @@ export async function uploadQuotationsAction(
 
 /** Step one of a direct upload: a signed link per file, after the usual checks. */
 export async function planQuotationUploadsAction(files: { name: string; type: string; size: number }[]) {
+  return guarded('planQuotationUploadsAction', { ok: false, error: SAVE_FAILED }, async () => {
   return planQuotationUploads(Array.isArray(files) ? files.slice(0, 100) : []);
+});
 }
 
 /** Step two: record what the browser put in storage, and start reading it. */

@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
@@ -67,6 +69,7 @@ function refresh(quoteId?: string) {
  * place to learn it than a form they have just been bounced out of.
  */
 export async function createQuoteAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('createQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const carpet = Number(str(form, 'carpetSqft'));
   const config = str(form, 'config');
   /* Essential, Premium or Luxe first (owner, 13 Nov 2026: "If it is not there, you cannot make a quotation"),
@@ -138,6 +141,7 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
   // Straight into the builder. A confirmation screen between "new quotation"
   // and "the quotation" buys nobody anything.
   redirect(`/studio/quotations/${result.id}`);
+});
 }
 
 /**
@@ -160,18 +164,22 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
  * prints.
  */
 export async function generatePdfAction(quoteId: string, status: QuoteStatusName): Promise<State> {
+  return guarded('generatePdfAction', { ok: false, error: SAVE_FAILED }, async () => {
   if (status !== 'DRAFT' && status !== 'ISSUED') return { ok: true };
   const result = await setQuoteStatus(quoteId, 'ISSUED');
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+});
 }
 
 export async function setStatusAction(quoteId: string, status: QuoteStatusName): Promise<State> {
+  return guarded('setStatusAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setQuoteStatus(quoteId, status);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+});
 }
 
 /**
@@ -193,6 +201,7 @@ export async function saveLinesAction(
   lines: SaveLineInput[],
   terms?: QuoteTermsInput,
 ): Promise<{ ok: true; ids: (string | null)[] } | { ok: false; error: string }> {
+  return guarded('saveLinesAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await saveQuoteLines(quoteId, lines);
   if (!result.ok) return result;
   if (terms) {
@@ -201,6 +210,7 @@ export async function saveLinesAction(
   }
   refresh(quoteId);
   return { ok: true, ids: result.ids };
+});
 }
 
 export type BuildState =
@@ -210,14 +220,17 @@ export type BuildState =
 
 /** Build the standard quotation for this flat. Replaces whatever is there. */
 export async function applyConfigAction(quoteId: string, home: HomeConfig): Promise<BuildState> {
+  return guarded('applyConfigAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await applyConfiguration({ quoteId, home });
   if (!result.ok) return result;
   refresh(quoteId);
   return result;
+});
 }
 
 /** Use as template (new client) or make the Design Final; opens the new one. */
 export async function copyQuoteAction(quoteId: string, kind: 'template' | 'design-final', clientName = ''): Promise<State> {
+  return guarded('copyQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await copyQuote(
     quoteId,
     kind === 'template' ? { kind: 'template', clientName: String(clientName) } : { kind: 'design-final' },
@@ -225,39 +238,50 @@ export async function copyQuoteAction(quoteId: string, kind: 'template' | 'desig
   if (!result.ok) return result;
   refresh(result.id);
   redirect(`/studio/quotations/${result.id}`);
+});
 }
 
 /** "Start from a previous quotation": the ones this person may copy, matching the search (client, number, society, BHK). */
 export async function previousQuotesAction(search: string): Promise<PreviousQuote[]> {
+  return guarded('previousQuotesAction', [], async () => {
   return previousQuotes(String(search ?? '').slice(0, 80));
+});
 }
 
 /** One previous quotation's lines and terms, and what has changed in the product master since. */
 export async function previousQuoteAction(quoteId: string): Promise<PreviousQuoteCopy> {
+  return guarded('previousQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   return previousQuoteToCopy(String(quoteId ?? '').slice(0, 64));
+});
 }
 
 /** Delete a draft that was never sent. */
 export async function deleteQuoteAction(quoteId: string): Promise<State> {
+  return guarded('deleteQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await deleteQuote(quoteId);
   if (!result.ok) return result;
   revalidatePath('/studio/quotations');
   redirect('/studio/quotations');
+});
 }
 
 /** Correct who the quotation is for. */
 export async function saveClientAction(quoteId: string, input: QuoteClientInput): Promise<State> {
+  return guarded('saveClientAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await saveQuoteClient(quoteId, input);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+});
 }
 
 export async function clearLinesAction(quoteId: string): Promise<State> {
+  return guarded('clearLinesAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await clearQuoteLines(quoteId);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+});
 }
 
 /**
@@ -266,10 +290,12 @@ export async function clearLinesAction(quoteId: string): Promise<State> {
  * read and sign it in the app once it is issued.
  */
 export async function finalQuoteAction(clientId: string): Promise<State> {
+  return guarded('finalQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await finalQuoteForClient(clientId);
   if (!result.ok) return result;
   refresh(result.id);
   redirect(`/studio/quotations/${result.id}`);
+});
 }
 
 // ── Floor plan → first quotation (12 Oct 2026) ─────────────────
@@ -290,6 +316,7 @@ export async function buildFromPlanAction(
   ref: { fileId?: string; path?: string },
   mode: 'auto' | 'manual' | 'read',
 ): Promise<PlanBuildState> {
+  return guarded('buildFromPlanAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await buildFromPlan(
     String(clientId ?? ''),
     { fileId: typeof ref?.fileId === 'string' ? ref.fileId : undefined, storagePath: typeof ref?.path === 'string' ? ref.path : undefined },
@@ -300,18 +327,23 @@ export async function buildFromPlanAction(
   revalidatePath('/studio/today');
   if (r.quoteId) refresh(r.quoteId);
   return { ok: true, message: r.message, status: r.status, quoteId: r.quoteId, notes: r.notes };
+});
 }
 
 /** The last read-and-build run of each floor plan on this lead, for the lead page. */
 export async function planJobsAction(clientId: string): Promise<{ canRead: boolean; jobs: Record<string, PlanJobView> } | null> {
+  return guarded('planJobsAction', null, async () => {
   return planJobsFor(String(clientId ?? ''));
+});
 }
 
 /** "Read rooms" on a quotation: the lead's floor plan, read once and attached. */
 export async function readRoomsForQuoteAction(quoteId: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  return guarded('readRoomsForQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await readRoomsForQuote(String(quoteId ?? ''));
   if (r.ok) refresh(quoteId);
   return r;
+});
 }
 
 /**
@@ -328,6 +360,7 @@ export async function addLineToProductsAction(input: {
   room: string;
   details: string | null;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  return guarded('addLineToProductsAction', { ok: false, error: SAVE_FAILED }, async () => {
   const unit = (['AREA', 'SQFT', 'RFT', 'UNIT'] as const).find((u) => u === input?.unit) ?? 'UNIT';
   const code = input?.code === 'ONSITE' ? 'ONSITE' : 'MODULAR';
   const rate = Number(input?.rateRupees);
@@ -355,6 +388,7 @@ export async function addLineToProductsAction(input: {
   if (!r.ok) return r;
   revalidatePath('/studio/products');
   return { ok: true };
+});
 }
 
 /**
@@ -366,9 +400,11 @@ export async function proposeProductAction(
   input: { name: string; code: string; unit: string; ratePaise: number; details: string | null; room: string | null },
   quoteId?: string | null,
 ): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  return guarded('proposeProductAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await proposeProduct(input, typeof quoteId === 'string' ? quoteId : null);
   if (r.ok) revalidatePath('/studio/products');
   return r;
+});
 }
 
 // ── First quote (Hauspire's First Quote page, 13 Oct 2026) ──────────
@@ -384,6 +420,7 @@ export async function addPlanLeadAction(
   phone: string,
   config: string,
 ): Promise<{ ok: true; lead: { id: string; name: string; phone: string | null; society: string | null } } | { ok: false; error: string }> {
+  return guarded('addPlanLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const added = await addClient({ name: String(name ?? ''), phone: String(phone ?? ''), society: '', config: String(config ?? ''), source: 'OTHER' });
   if (!added.ok) {
     if ('duplicate' in added) return { ok: false, error: `${added.duplicate.name} already has that number. Search for them in Client name and pick them, then upload.` };
@@ -391,18 +428,23 @@ export async function addPlanLeadAction(
   }
   revalidatePath('/studio/clients');
   return { ok: true, lead: { id: added.id, name: String(name).trim().replace(/\s+/g, ' '), phone: String(phone).trim() || null, society: null } };
+});
 }
 
 export async function leadPlansAction(clientId: string): Promise<LeadPlan[]> {
+  return guarded('leadPlansAction', [], async () => {
   return leadPlans(String(clientId ?? ''));
+});
 }
 
 /** Read one of the lead's floor plans (once; a plan read before is not read again) and hand back what it shows. */
 export async function readLeadPlanAction(clientId: string, ref: { fileId?: string; path?: string }): Promise<LeadPlanRead> {
+  return guarded('readLeadPlanAction', { ok: false, error: SAVE_FAILED }, async () => {
   return readLeadPlan(String(clientId ?? ''), {
     fileId: typeof ref?.fileId === 'string' ? ref.fileId : undefined,
     storagePath: typeof ref?.path === 'string' ? ref.path : undefined,
   });
+});
 }
 
 /**
@@ -411,6 +453,7 @@ export async function readLeadPlanAction(clientId: string, ref: { fileId?: strin
  * and the builder opens on it.
  */
 export async function saveFirstQuoteAction(input: FirstQuoteInput & { newLead?: { name: string; phone: string; society: string } | null }): Promise<State> {
+  return guarded('saveFirstQuoteAction', { ok: false, error: SAVE_FAILED }, async () => {
   let clientId = typeof input?.clientId === 'string' ? input.clientId : '';
   if (!clientId && input?.newLead) {
     const added = await addClient({
@@ -432,10 +475,12 @@ export async function saveFirstQuoteAction(input: FirstQuoteInput & { newLead?: 
   refresh(r.id);
   revalidatePath(`/studio/clients/${clientId}`);
   redirect(`/studio/quotations/${r.id}`);
+});
 }
 
 /** Essential, Premium or Luxe on a quotation (DESIGN-PROCESS-PLAN.md §4.3); the project booked on it follows. */
 export async function setQuoteCategoryAction(quoteId: string, category: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  return guarded('setQuoteCategoryAction', { ok: false, error: SAVE_FAILED }, async () => {
   const id = String(quoteId ?? '').slice(0, 64);
   const r = await setQuoteCategory(id, category);
   if (r.ok) {
@@ -444,4 +489,5 @@ export async function setQuoteCategoryAction(quoteId: string, category: string |
     revalidatePath('/studio/projects');
   }
   return r;
+});
 }

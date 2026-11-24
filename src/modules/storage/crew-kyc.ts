@@ -43,7 +43,7 @@ export async function storeKycScan(studioId: string, crewId: string, doc: KycDoc
     return { ok: false, error: 'File storage is not switched on for this deployment yet.' };
   }
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type, 'x-upsert': 'false' },
       body: await file.arrayBuffer(),
@@ -63,7 +63,7 @@ export async function signedKycLinks(paths: readonly string[]): Promise<Map<stri
   const wanted = [...new Set(paths.filter((p) => p && !p.startsWith('dev-unstored/')))];
   if (!config || !key || wanted.length === 0) return out;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths: wanted }),
