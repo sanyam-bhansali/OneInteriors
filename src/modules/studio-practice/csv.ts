@@ -260,6 +260,8 @@ export interface ImportPlan {
   skippedNoName: number;
   /** Rows whose phone matched another row in the same file. */
   duplicatesInFile: number;
+  /** Rows with no usable mobile number: left out, every lead needs one (owner, 24 Nov 2026). */
+  skippedNoPhone: number;
   /** Total data rows read, excluding the header. */
   read: number;
   /**
@@ -285,6 +287,7 @@ export function planImport(rows: string[][], mapping: readonly (ColumnKey | stri
     rows: [],
     skippedNoName: 0,
     duplicatesInFile: 0,
+    skippedNoPhone: 0,
     mangledPhones: 0,
     read: body.length,
   };
@@ -312,6 +315,10 @@ export function planImport(rows: string[][], mapping: readonly (ColumnKey | stri
     if (looksDestroyed(rawPhone)) plan.mangledPhones += 1;
 
     const phone = normalisePhone(rawPhone);
+    if (!phone) {
+      plan.skippedNoPhone += 1;
+      continue;
+    }
 
     // Within the file only. Matching against what is already in the database
     // happens at write time, where the rows to compare against actually are.

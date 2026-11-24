@@ -230,6 +230,11 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead, 
   }
 
   const shaped = shapeLead(incoming);
+  /* No mobile number: not put on the board, and shown as skipped (owner, 24 Nov 2026), not as a failure to retry. */
+  if (!shaped.ok && shaped.noPhone) {
+    await settle(eventId, 'SKIPPED', { error: shaped.error, campaign });
+    return { outcome: 'skipped' };
+  }
   if (!shaped.ok) return fail(shaped.error);
   const { draft } = shaped;
 

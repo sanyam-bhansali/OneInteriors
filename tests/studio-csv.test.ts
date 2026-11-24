@@ -197,15 +197,14 @@ describe('the import plan', () => {
     expect(plan.rows.map((r) => r.name)).toEqual(['Asha Patil', 'Ravi Kumar']);
   });
 
-  it('keeps a row with no phone at all', () => {
-    // A walk-in with a name and a society and no number is still a lead. It
-    // just cannot be deduplicated.
+  it('leaves out a row with no mobile number, and counts it', () => {
+    // Every lead needs a mobile number (owner, 24 Nov 2026).
     const plan = planImport(
-      [['Name', 'Mobile'], ['Asha', ''], ['Ravi', '']],
+      [['Name', 'Mobile'], ['Asha', ''], ['Ravi', '12345'], ['Meera', '9876543210']],
       ['name', 'phone'],
     );
-    expect(plan.rows).toHaveLength(2);
-    expect(plan.rows.every((r) => r.phone === null)).toBe(true);
+    expect(plan.rows.map((r) => r.name)).toEqual(['Meera']);
+    expect(plan.skippedNoPhone).toBe(2);
   });
 
   it('ignores a column mapped to skip', () => {
@@ -260,10 +259,8 @@ describe('planImport counts the damage separately', () => {
     expect(plan.mangledPhones).toBe(1);
     /* Meera is not damage — she is a row somebody left blank. */
     expect(plan.read).toBe(3);
-    /* The row still imports. A studio would rather have the name and ring
-       round for the number than lose the lead entirely. */
-    expect(plan.rows).toHaveLength(3);
-    expect(plan.rows[0]?.phone).toBeNull();
-    expect(plan.rows[1]?.phone).toBe('9876543210');
+    /* Neither row without a mobile number is added (owner, 24 Nov 2026); both are counted. */
+    expect(plan.rows.map((r) => r.name)).toEqual(['Ravi']);
+    expect(plan.skippedNoPhone).toBe(2);
   });
 });

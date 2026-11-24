@@ -35,7 +35,7 @@ const isSource = (v: unknown): v is ClientSourceName => typeof v === 'string' &&
 
 export type ImportState =
   | { idle: true }
-  | { ok: true; written: number; alreadyHere: number; skippedNoName: number; duplicatesInFile: number }
+  | { ok: true; written: number; alreadyHere: number; skippedNoName: number; skippedNoPhone: number; duplicatesInFile: number }
   | { ok: false; error: string };
 
 /**
@@ -100,6 +100,7 @@ export async function importCsvAction(text: string, mapping: string[], source = 
     written: result.written,
     alreadyHere: result.alreadyHere,
     skippedNoName: plan.skippedNoName,
+    skippedNoPhone: plan.skippedNoPhone,
     duplicatesInFile: plan.duplicatesInFile,
   };
 });
