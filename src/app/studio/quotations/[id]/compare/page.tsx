@@ -186,7 +186,7 @@ export default async function ComparePage({
                 <tr className="qd-band">
                   <th colSpan={10}>{r.room}</th>
                 </tr>
-                {/* Original and discounted for each side, as in the builder (owner, 24 Nov 2026). */}
+                {/* Original and discounted for each side, as in the builder (owner, 24 Nov 2026); the discounted figures in green like the quotation PDF (owner, 24 Nov 2026: "the discounted price should be in green"). */}
                 <tr className="qd-cols">
                   <th rowSpan={2}>S.No.</th>
                   <th rowSpan={2}>Product</th>
@@ -247,18 +247,18 @@ export default async function ComparePage({
                       )}
                     </td>
                     <td className="r">{row.kind === 'ADDED' ? '—' : n(row.wasPaise)}</td>
-                    <td className="r">{row.kind === 'ADDED' ? '—' : n(discOf(row.wasPaise, row.codeWas ?? row.code, wasBps))}</td>
+                    <td className="r qd-disc">{row.kind === 'ADDED' ? '—' : n(discOf(row.wasPaise, row.codeWas ?? row.code, wasBps))}</td>
                     <td className="r">{row.kind === 'REMOVED' ? '—' : n(row.nowPaise)}</td>
-                    <td className="r">{row.kind === 'REMOVED' ? '—' : n(discOf(row.nowPaise, row.code, nowBps))}</td>
+                    <td className="r qd-disc">{row.kind === 'REMOVED' ? '—' : n(discOf(row.nowPaise, row.code, nowBps))}</td>
                     <DiffCell paise={(row.kind === 'REMOVED' ? 0 : discOf(row.nowPaise, row.code, nowBps)) - (row.kind === 'ADDED' ? 0 : discOf(row.wasPaise, row.codeWas ?? row.code, wasBps))} />
                   </tr>
                 ))}
                 <tr className="qd-sub">
                   <td colSpan={5}>{r.room} (Sub-total)</td>
                   <td className="r">{n(r.wasPaise)}</td>
-                  <td className="r">{n(roomDisc(r.rows, 'was', wasBps))}</td>
+                  <td className="r qd-disc">{n(roomDisc(r.rows, 'was', wasBps))}</td>
                   <td className="r">{n(r.nowPaise)}</td>
-                  <td className="r">{n(roomDisc(r.rows, 'now', nowBps))}</td>
+                  <td className="r qd-disc">{n(roomDisc(r.rows, 'now', nowBps))}</td>
                   <td className="r">{diff(roomDisc(r.rows, 'now', nowBps) - roomDisc(r.rows, 'was', wasBps))}</td>
                 </tr>
               </tbody>
