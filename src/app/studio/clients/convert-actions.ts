@@ -1,12 +1,16 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { convertLead, convertScreen, type ConvertResult, type ConvertScreen } from '@/modules/studio-sales/convert';
 
 /** Convert (owner, 13 Nov 2026): the dialog's data, and the convert itself. The module checks who may. */
 
 export async function convertScreenAction(clientId: string): Promise<ConvertScreen | null> {
+  return guarded('convertScreenAction', null, async () => {
   return convertScreen(clientId);
+});
 }
 
 export async function convertLeadAction(
@@ -17,6 +21,7 @@ export async function convertLeadAction(
   property: { building: string; address: string },
   stageId: string | null,
 ): Promise<ConvertResult> {
+  return guarded('convertLeadAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await convertLead({ clientId, quoteId, n, handover, building: property.building, address: property.address, stageId });
   if (r.ok) {
     revalidatePath(`/studio/quotations/${quoteId}`);
@@ -27,4 +32,5 @@ export async function convertLeadAction(
     revalidatePath('/studio/design');
   }
   return r;
+});
 }

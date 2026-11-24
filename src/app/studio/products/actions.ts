@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
 import {
@@ -45,6 +47,7 @@ function done(result: SaveResult): State {
  * truncating on something that is not a number.
  */
 export async function saveRateAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('saveRateAction', { ok: false, error: SAVE_FAILED }, async () => {
   const id = String(form.get('id') ?? '');
   const raw = String(form.get('rate') ?? '').trim();
 
@@ -57,23 +60,31 @@ export async function saveRateAction(_prev: State, form: FormData): Promise<Stat
   }
 
   return done(await setProductRate(id, rupeesToPaise(rupees)));
+});
 }
 
 /** Tie a product to a One Interiors item, or back to matching by name (''). */
 export async function setProductItemAction(id: string, itemId: string): Promise<State> {
+  return guarded('setProductItemAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await setProductItem(String(id), itemId ? String(itemId) : null));
+});
 }
 
 export async function toggleActiveAction(id: string, isActive: boolean): Promise<State> {
+  return guarded('toggleActiveAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await setProductActive(id, isActive));
+});
 }
 
 /** Edit a product: name, unit, rooms, sizes, rules. Re-checked in the store. */
 export async function updateProductAction(id: string, input: ProductEdit): Promise<State> {
+  return guarded('updateProductAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await updateProduct(String(id), input));
+});
 }
 
 export async function addProductAction(_prev: State, form: FormData): Promise<State> {
+  return guarded('addProductAction', { ok: false, error: SAVE_FAILED }, async () => {
   const rupees = Number(String(form.get('rate') ?? '0').trim() || '0');
   if (!Number.isFinite(rupees) || rupees < 0) {
     return { ok: false, error: 'A number for the rate, please.' };
@@ -89,6 +100,7 @@ export async function addProductAction(_prev: State, form: FormData): Promise<St
       details: String(form.get('details') ?? ''),
     }),
   );
+});
 }
 
 /**
@@ -99,7 +111,9 @@ export async function addProductAction(_prev: State, form: FormData): Promise<St
  * the product rather than in a list of its own.
  */
 export async function toggleStandardAction(id: string, standard: boolean): Promise<State> {
+  return guarded('toggleStandardAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(await setProductStandard(id, standard));
+});
 }
 
 /**
@@ -110,25 +124,31 @@ export async function toggleStandardAction(id: string, standard: boolean): Promi
  * lock.
  */
 export async function confirmRatesAction(_prev: State | null): Promise<State> {
+  return guarded('confirmRatesAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await confirmMyRates();
   if (result.ok) {
     revalidatePath('/studio', 'layout');
   }
   return result;
+});
 }
 
 /** A proposed product (from the quotation builder): approve adds it to the product master. Owner and PM only, checked in the store. */
 export async function approveProposalAction(id: string): Promise<ProposalResult> {
+  return guarded('approveProposalAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await approveProposal(String(id ?? ''));
   if (!r.ok) return r;
   revalidatePath('/studio/products');
   revalidatePath('/studio/quotations');
   return { ok: true, message: r.message };
+});
 }
 
 export async function rejectProposalAction(id: string): Promise<ProposalResult> {
+  return guarded('rejectProposalAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await rejectProposal(String(id ?? ''));
   if (!r.ok) return r;
   revalidatePath('/studio/products');
   return { ok: true, message: r.message };
+});
 }

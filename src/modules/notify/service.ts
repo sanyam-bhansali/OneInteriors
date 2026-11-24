@@ -130,7 +130,7 @@ async function push(tokens: string[], msg: Message): Promise<boolean> {
   if (access) headers.authorization = `Bearer ${access}`;
   for (let i = 0; i < tokens.length; i += BATCH) {
     const batch = tokens.slice(i, i + BATCH);
-    const res = await fetch(EXPO_PUSH, {
+    const res = await fetch(EXPO_PUSH, { signal: AbortSignal.timeout(10000),
       method: 'POST',
       headers,
       body: JSON.stringify(

@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { addCrewMember, setCrewActive, type CrewResult } from '@/modules/project/site-log-crew';
 
@@ -20,9 +22,13 @@ async function done(r: Promise<CrewResult>): Promise<CrewResult> {
 }
 
 export async function addCrewAction(input: { name: string; role: string; phone: string }): Promise<CrewResult> {
+  return guarded('addCrewAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(addCrewMember(String(input.name ?? ''), String(input.role ?? ''), String(input.phone ?? '')));
+});
 }
 
 export async function setCrewActiveAction(id: string, active: boolean): Promise<CrewResult> {
+  return guarded('setCrewActiveAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(setCrewActive(String(id).slice(0, 64), active === true));
+});
 }

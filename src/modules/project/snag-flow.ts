@@ -664,11 +664,16 @@ export async function autoCloseSnags(now = new Date(), limit = 500): Promise<{ c
     const s = snagStatus(eventsOrLegacy(snag.events, snag), now);
     if (!s.autoCloseDue || !s.fix) continue;
     const dueAt = new Date(s.fix.at.getTime() + 7 * 86_400_000);
-    const r = await step(snag.id, { kind: 'AUTO_CLOSED', actor: { type: 'SYSTEM' }, at: dueAt }, now);
-    if (!r.ok) continue;
-    closed += 1;
-    const customer = snag.project.introduction.brief.userId;
-    if (customer) await notify(customer, { kind: 'snag-auto-closed', snagId: snag.id, title: snag.title });
+    /* One snag that fails never stops the rest (owner, 24 Nov 2026: protect from crashing). */
+    try {
+      const r = await step(snag.id, { kind: 'AUTO_CLOSED', actor: { type: 'SYSTEM' }, at: dueAt }, now);
+      if (!r.ok) continue;
+      closed += 1;
+      const customer = snag.project.introduction.brief.userId;
+      if (customer) await notify(customer, { kind: 'snag-auto-closed', snagId: snag.id, title: snag.title });
+    } catch (error) {
+      console.error('[cron] snag auto-close failed', snag.id, error instanceof Error ? error.message : error);
+    }
   }
   return { closed };
 }

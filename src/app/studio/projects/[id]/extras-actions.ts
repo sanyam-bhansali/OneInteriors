@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * Extra work (change orders) and the client's digital sign-off (owner,
  * 15 Oct 2026). Every check is in the modules (project/change-orders.ts,
@@ -25,6 +27,7 @@ const refresh = (projectId: string) => {
 
 /** FormData: projectId, id (to edit a draft), title, reason, lines (JSON), photo (optional). */
 export async function saveExtraAction(form: FormData): Promise<ExtrasActionResult> {
+  return guarded('saveExtraAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   let lines: unknown = null;
   try {
@@ -40,28 +43,36 @@ export async function saveExtraAction(form: FormData): Promise<ExtrasActionResul
   );
   if (r.ok) refresh(projectId);
   return r;
+});
 }
 
 export async function sendExtraAction(projectId: string, extraId: string): Promise<ExtrasActionResult> {
+  return guarded('sendExtraAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await sendExtra(id(extraId));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 export async function cancelExtraAction(projectId: string, extraId: string): Promise<ExtrasActionResult> {
+  return guarded('cancelExtraAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await cancelExtra(id(extraId));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 export async function releaseExtraAction(projectId: string, extraId: string): Promise<ExtrasActionResult> {
+  return guarded('releaseExtraAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await releaseExtra(id(extraId));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 /** FormData: projectId, extraId, amount, receivedOn, mode, note, receipt (optional). */
 export async function recordExtraPaymentAction(form: FormData): Promise<ExtrasActionResult> {
+  return guarded('recordExtraPaymentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   const receipt = form.get('receipt');
   const r = await recordExtraPayment(
@@ -71,16 +82,21 @@ export async function recordExtraPaymentAction(form: FormData): Promise<ExtrasAc
   );
   if (r.ok) refresh(projectId);
   return r;
+});
 }
 
 export async function requestSignoffAction(projectId: string, kind: string): Promise<ExtrasActionResult> {
+  return guarded('requestSignoffAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await requestSignoff(id(projectId), kind);
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }
 
 export async function withdrawSignoffAction(projectId: string, signoffId: string): Promise<ExtrasActionResult> {
+  return guarded('withdrawSignoffAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await withdrawSignoff(id(signoffId));
   if (r.ok) refresh(id(projectId));
   return r;
+});
 }

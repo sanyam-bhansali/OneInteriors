@@ -70,6 +70,8 @@ export async function runSiteReminders(now = new Date()): Promise<ReminderRun> {
   const link = `${siteUrlFor('studio')}/studio/site`;
 
   for (const p of projects) {
+    /* One project that fails never stops the rest (owner, 24 Nov 2026: protect from crashing). */
+    try {
     if (!needsDailyPost({ startOn: p.startOn, now, stages: p.stages, doneStages: p.doneStages })) continue;
     const studio = p.introduction.studio;
     const calendar = calendarOf(studio);
@@ -122,6 +124,9 @@ export async function runSiteReminders(now = new Date()): Promise<ReminderRun> {
       } else {
         await notifyOps({ kind: 'site-missed', projectId: p.id, home, studio: studio.tradeName, days: missedInRow, toOps: true });
       }
+    }
+    } catch (error) {
+      console.error('[cron] site reminder failed', p.id, error instanceof Error ? error.message : error);
     }
   }
   return { projects: projects.length, sent };

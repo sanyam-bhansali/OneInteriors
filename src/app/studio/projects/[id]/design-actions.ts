@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
@@ -46,10 +48,13 @@ function done(projectId: string, r: DesignResult): DesignResult {
 }
 
 export async function assignDesignerAction(projectId: string, memberId: string): Promise<DesignResult> {
+  return guarded('assignDesignerAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await assignDesigner(id(projectId), memberId ? id(memberId) : null));
+});
 }
 
 export async function tickDesignStepAction(form: FormData): Promise<DesignResult> {
+  return guarded('tickDesignStepAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   return done(
     projectId,
@@ -65,50 +70,70 @@ export async function tickDesignStepAction(form: FormData): Promise<DesignResult
         : null,
     ),
   );
+});
 }
 
 export async function untickDesignStepAction(projectId: string, stepId: string, reason: string): Promise<DesignResult> {
+  return guarded('untickDesignStepAction', { ok: false, error: SAVE_FAILED }, async () => {
   const p = id(projectId);
   return done(p, await untickDesignStep(p, id(stepId), text(reason, 400)));
+});
 }
 
 export async function moveDesignStepAction(input: { projectId: string; stepId: string; to: string; reason: string; note: string }): Promise<DesignResult> {
+  return guarded('moveDesignStepAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(input.projectId);
   return done(projectId, await moveDesignStep(projectId, id(input.stepId), { to: text(input.to, 10), reason: text(input.reason, 40), note: text(input.note, 600) }));
+});
 }
 
 export async function editDesignStepAction(input: { projectId: string; stepId: string; responsible: string; needsDocument: boolean; gatePayment: string }): Promise<DesignResult> {
+  return guarded('editDesignStepAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(input.projectId);
   return done(projectId, await editDesignStep(projectId, id(input.stepId), { responsible: text(input.responsible, 20) || null, needsDocument: input.needsDocument === true, gatePayment: text(input.gatePayment, 3) }));
+});
 }
 
 export async function applyDesignStepsAction(projectId: string): Promise<DesignResult> {
+  return guarded('applyDesignStepsAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await applyDesignSteps(id(projectId)));
+});
 }
 
 export async function shareMoodBoardAction(projectId: string, note: string): Promise<DesignResult> {
+  return guarded('shareMoodBoardAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await shareMoodBoard(id(projectId), text(note, 400)));
+});
 }
 
 export async function addMoodBoardPiecesAction(projectId: string, roomKey: string, slugs: string[]): Promise<DesignResult> {
+  return guarded('addMoodBoardPiecesAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await addMoodBoardPieces(id(projectId), text(roomKey, 40), Array.isArray(slugs) ? slugs.slice(0, 24).map((s) => text(s, 80)) : []));
+});
 }
 
 export async function bookVisitAction(input: { projectId: string; day: string; time: string; purpose: string; note: string }): Promise<DesignResult> {
+  return guarded('bookVisitAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(input.projectId);
   return done(projectId, await bookVisit(projectId, { day: text(input.day, 10), time: text(input.time, 5), purpose: text(input.purpose, 100), note: text(input.note, 600) }));
+});
 }
 
 export async function setVisitStatusAction(projectId: string, visitId: string, status: string): Promise<DesignResult> {
+  return guarded('setVisitStatusAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await setVisitStatus(id(projectId), id(visitId), text(status, 12)));
+});
 }
 
 export async function saveMeasurementsAction(projectId: string, rows: { room: string; length: string; width: string; height: string; note: string }[]): Promise<DesignResult> {
+  return guarded('saveMeasurementsAction', { ok: false, error: SAVE_FAILED }, async () => {
   const clean = (Array.isArray(rows) ? rows : []).slice(0, 60).map((r) => ({ room: text(r.room, 80), length: text(r.length, 20), width: text(r.width, 20), height: text(r.height, 20), note: text(r.note, 220) }));
   return done(id(projectId), await saveMeasurements(id(projectId), clean));
+});
 }
 
 export async function uploadDrawingAction(form: FormData): Promise<DesignResult> {
+  return guarded('uploadDrawingAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   return done(
     projectId,
@@ -118,61 +143,81 @@ export async function uploadDrawingAction(form: FormData): Promise<DesignResult>
       fileOf(form.get('file')),
     ),
   );
+});
 }
 
 export async function shareDrawingAction(projectId: string, documentId: string): Promise<DesignResult> {
+  return guarded('shareDrawingAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await shareDrawing(id(projectId), id(documentId)));
+});
 }
 
 /** Sends the client their requirement form (owner, 1 Nov 2026; project/requirement-form.ts). */
 export async function sendRequirementFormAction(projectId: string): Promise<FormResult> {
+  return guarded('sendRequirementFormAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await sendRequirementForm(id(projectId));
   if (r.ok) revalidatePath(`/studio/projects/${id(projectId)}`);
   return r;
+});
 }
 
 /** "Mark as final" on a version, or take the mark off (owner, 1 Nov 2026). */
 export async function markFinalAction(projectId: string, documentId: string, final: boolean): Promise<DesignResult> {
+  return guarded('markFinalAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await markDocumentFinal(id(projectId), id(documentId), final === true);
   if (r.ok) revalidatePath(`/studio/projects/${id(projectId)}/documents`, 'layout');
   return done(id(projectId), r);
+});
 }
 
 /** Makes (or finds) the Design Final, then opens it in the quotation builder. */
 export async function makeDesignFinalAction(projectId: string): Promise<DesignResult> {
+  return guarded('makeDesignFinalAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await makeDesignFinal(id(projectId));
   if (r.ok && r.id) redirect(`/studio/quotations/${r.id}`);
   return r;
+});
 }
 
 export async function closeDesignAction(projectId: string): Promise<DesignResult> {
+  return guarded('closeDesignAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await closeDesign(id(projectId)));
+});
 }
 
 /* The design process (DESIGN-PROCESS-PLAN.md Decisions 7–8): tasks inside a step, a step's order, a step added below another. */
 
 export async function setStepTaskAction(projectId: string, taskId: string, isDone: boolean): Promise<DesignResult> {
+  return guarded('setStepTaskAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await setStepTask(id(projectId), id(taskId), isDone === true));
+});
 }
 
 export async function addStepTaskAction(projectId: string, stepId: string, label: string): Promise<DesignResult> {
+  return guarded('addStepTaskAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await addStepTask(id(projectId), id(stepId), text(label, 200)));
+});
 }
 
 export async function moveDesignStepOrderAction(projectId: string, stepId: string, dir: 'up' | 'down'): Promise<DesignResult> {
+  return guarded('moveDesignStepOrderAction', { ok: false, error: SAVE_FAILED }, async () => {
   return done(id(projectId), await moveDesignStepOrder(id(projectId), id(stepId), dir));
+});
 }
 
 export async function addDesignStepBelowAction(input: { projectId: string; afterId: string; label: string; responsible: string; days: string; hours: string }): Promise<DesignResult> {
+  return guarded('addDesignStepBelowAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(input.projectId);
   return done(
     projectId,
     await addDesignStepBelow(projectId, id(input.afterId), { label: text(input.label, 200), responsible: text(input.responsible, 20), days: text(input.days, 4), hours: text(input.hours, 6) }),
   );
+});
 }
 
 /** Records a project document the browser put straight into storage (DESIGN-PROCESS-PLAN.md §3.6); its version follows the type and room. */
 export async function uploadDocumentAction(input: { projectId: string; kind: string; room: string; share: boolean; final?: boolean; path: string; name: string; bytes: number }): Promise<DesignResult> {
+  return guarded('uploadDocumentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(input.projectId);
   const now = new Date();
   const r = await uploadDrawing(projectId, { kind: text(input.kind, 30), room: text(input.room, 80), share: input.share === true }, null, now, {
@@ -186,9 +231,11 @@ export async function uploadDocumentAction(input: { projectId: string; kind: str
     return done(projectId, marked.ok ? { ok: true, id: r.id, message: `${r.message} ${marked.message}` } : { ok: true, id: r.id, message: `${r.message} It is not marked final: ${marked.error}` });
   }
   return done(projectId, r);
+});
 }
 
 export async function setProjectPriorityAction(projectId: string, stars: number | null): Promise<DesignResult> {
+  return guarded('setProjectPriorityAction', { ok: false, error: SAVE_FAILED }, async () => {
   const pid = id(projectId);
   const r = await setProjectPriority(pid, stars);
   if (r.ok) {
@@ -196,10 +243,13 @@ export async function setProjectPriorityAction(projectId: string, stars: number 
     revalidatePath('/studio/design');
   }
   return done(pid, r);
+});
 }
 
 /** The final design date (owner or design head, 13 Nov 2026): the open steps spread to fit it. */
 export async function setDesignEndAction(projectId: string, to: string): Promise<DesignResult> {
+  return guarded('setDesignEndAction', { ok: false, error: SAVE_FAILED }, async () => {
   const p = id(projectId);
   return done(p, await setDesignEnd(p, text(to, 10)));
+});
 }

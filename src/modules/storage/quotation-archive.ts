@@ -122,7 +122,7 @@ export async function storeQuotationFile(studioId: string, file: File): Promise<
   const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
 
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key}`,
@@ -171,7 +171,7 @@ export async function signedUrlForFile(path: string): Promise<string | null> {
   try {
     const response = await fetch(
       `${config.url}/storage/v1/object/sign/${BUCKET}/${encodeURI(path)}`,
-      {
+      { signal: AbortSignal.timeout(20000),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
@@ -206,7 +206,7 @@ export async function deleteQuotationFiles(paths: string[]): Promise<void> {
   if (!config || !key || paths.length === 0) return;
 
   try {
-    await fetch(`${config.url}/storage/v1/object/${BUCKET}`, {
+    await fetch(`${config.url}/storage/v1/object/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${key}`,
@@ -281,7 +281,7 @@ export async function planQuotationUpload(
 
   const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
   try {
-    const response = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+    const response = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: '{}',

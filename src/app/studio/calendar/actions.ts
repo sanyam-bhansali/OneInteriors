@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import {
   setAppointmentStatus,
@@ -19,15 +21,18 @@ import {
  */
 
 export async function confirmAction(appointmentId: string): Promise<ActionResult> {
+  return guarded('confirmAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setAppointmentStatus(appointmentId, 'CONFIRMED');
   if (result.ok) {
     revalidatePath('/studio/calendar');
     revalidatePath('/studio/calendar/appointments');
   }
   return result;
+});
 }
 
 export async function completeAction(appointmentId: string): Promise<ActionResult> {
+  return guarded('completeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setAppointmentStatus(appointmentId, 'COMPLETED');
   if (result.ok) {
     revalidatePath('/studio/calendar');
@@ -35,9 +40,11 @@ export async function completeAction(appointmentId: string): Promise<ActionResul
     revalidatePath('/studio');
   }
   return result;
+});
 }
 
 export async function cancelAction(appointmentId: string): Promise<ActionResult> {
+  return guarded('cancelAction', { ok: false, error: SAVE_FAILED }, async () => {
   const result = await setAppointmentStatus(appointmentId, 'CANCELLED');
   if (result.ok) {
     revalidatePath('/studio/calendar');
@@ -45,6 +52,7 @@ export async function cancelAction(appointmentId: string): Promise<ActionResult>
     revalidatePath('/studio');
   }
   return result;
+});
 }
 
 export async function proposeAction(
@@ -53,6 +61,7 @@ export async function proposeAction(
   isoDateTime: string,
   location: string,
 ): Promise<ActionResult> {
+  return guarded('proposeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const startsAt = new Date(isoDateTime);
   const result = await proposeAppointment({ introductionId, kind, startsAt, location });
   if (result.ok) {
@@ -60,4 +69,5 @@ export async function proposeAction(
     revalidatePath('/studio/calendar/appointments');
   }
   return result.ok ? { ok: true } : result;
+});
 }

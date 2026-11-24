@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import {
   addSocietyNote,
@@ -30,6 +32,7 @@ function done(id?: string) {
 }
 
 export async function addSocietyAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('addSocietyAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const possession = str(f, 'possession') ? parsePossession(str(f, 'possession')) : null;
@@ -38,9 +41,11 @@ export async function addSocietyAction(_: SocietyFormState, f: FormData): Promis
   if (!r.ok) return { error: r.error };
   done(r.id);
   return { ok: true, id: r.id, message: r.linked ? `Added. ${r.linked} existing lead${r.linked === 1 ? '' : 's'} linked by name.` : 'Added.' };
+});
 }
 
 export async function editSocietyAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('editSocietyAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -48,9 +53,11 @@ export async function editSocietyAction(_: SocietyFormState, f: FormData): Promi
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: r.linked ? `Saved. ${r.linked} lead${r.linked === 1 ? '' : 's'} linked by the new name.` : 'Saved.' };
+});
 }
 
 export async function ownerAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('ownerAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -58,12 +65,14 @@ export async function ownerAction(_: SocietyFormState, f: FormData): Promise<Soc
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: 'Owner changed.' };
+});
 }
 
 const PRIORITIES = new Set(['P1', 'P2', 'P3']);
 const HEATS = new Set(['HOT', 'WARM', 'COLD']);
 
 export async function priorityAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('priorityAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -72,9 +81,11 @@ export async function priorityAction(_: SocietyFormState, f: FormData): Promise<
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: PRIORITIES.has(v) ? 'Priority set by hand.' : 'Priority back to automatic.' };
+});
 }
 
 export async function heatAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('heatAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -83,9 +94,11 @@ export async function heatAction(_: SocietyFormState, f: FormData): Promise<Soci
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: HEATS.has(v) ? 'Set by hand for 30 days.' : 'Back to automatic, from the calls.' };
+});
 }
 
 export async function noteAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('noteAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -93,9 +106,11 @@ export async function noteAction(_: SocietyFormState, f: FormData): Promise<Soci
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: 'Note added.' };
+});
 }
 
 export async function wingAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('wingAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -106,9 +121,11 @@ export async function wingAction(_: SocietyFormState, f: FormData): Promise<Soci
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: 'Wing saved.' };
+});
 }
 
 export async function assignLeadsAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('assignLeadsAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -121,19 +138,23 @@ export async function assignLeadsAction(_: SocietyFormState, f: FormData): Promi
   done(id);
   revalidatePath('/studio/clients');
   return { ok: true, message: r.message };
+});
 }
 
 export async function leadWingAction(societyId: string, clientId: string, wingId: string | null): Promise<{ error?: string }> {
+  return guarded('leadWingAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const r = await setLeadWing(access, societyId, clientId, wingId);
   if (!r.ok) return { error: r.error };
   done(societyId);
   return {};
+});
 }
 
 /** Mark a society done, or (undo) back on the list (owner, 17 Nov 2026). */
 export async function doneAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('doneAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -148,10 +169,12 @@ export async function doneAction(_: SocietyFormState, f: FormData): Promise<Soci
   done(id);
   revalidatePath('/studio/clients');
   return { ok: true, message: r.message };
+});
 }
 
 /** One possession month for every wing (owner, 17 Nov 2026). Empty clears it. */
 export async function possessionAction(_: SocietyFormState, f: FormData): Promise<SocietyFormState> {
+  return guarded('possessionAction', { error: SAVE_FAILED }, async () => {
   const access = await mySocietyAccess();
   if (!access) return NO_ACCESS;
   const id = str(f, 'id');
@@ -162,4 +185,5 @@ export async function possessionAction(_: SocietyFormState, f: FormData): Promis
   if (!r.ok) return { error: r.error };
   done(id);
   return { ok: true, message: possession ? 'Possession changed for every wing.' : 'Possession cleared.' };
+});
 }

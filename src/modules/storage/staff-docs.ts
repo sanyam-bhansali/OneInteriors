@@ -30,7 +30,7 @@ export async function storeStaffDoc(studioId: string, memberId: string, kind: St
     return { ok: false, error: 'File storage is not switched on for this deployment yet.' };
   }
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type, 'x-upsert': 'false' },
       body: await file.arrayBuffer(),
@@ -48,7 +48,7 @@ export async function deleteStaffDoc(path: string): Promise<void> {
   const key = secretKey();
   if (!config || !key || path.startsWith('dev-unstored/')) return;
   try {
-    await fetch(`${config.url}/storage/v1/object/${BUCKET}`, {
+    await fetch(`${config.url}/storage/v1/object/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ prefixes: [path] }),
@@ -66,7 +66,7 @@ export async function signedStaffLinks(paths: readonly string[]): Promise<Map<st
   const wanted = [...new Set(paths.filter((p) => p && !p.startsWith('dev-unstored/')))];
   if (!config || !key || wanted.length === 0) return out;
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, {
+    const res = await fetch(`${config.url}/storage/v1/object/sign/${BUCKET}`, { signal: AbortSignal.timeout(20000),
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths: wanted }),

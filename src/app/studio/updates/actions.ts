@@ -1,9 +1,12 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 import { revalidatePath } from 'next/cache';
 import { postStudioUpdate, setStudioStageDone } from '@/modules/portal/tracker-store';
 
 export async function postStudioUpdateAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  return guarded('postStudioUpdateAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await postStudioUpdate(
     String(formData.get('projectId') ?? ''),
     String(formData.get('note') ?? ''),
@@ -12,11 +15,14 @@ export async function postStudioUpdateAction(formData: FormData): Promise<{ ok: 
   );
   revalidatePath('/studio/updates');
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 /** Tick a stage done (or not) on one of this studio's projects. */
 export async function studioStageDoneAction(projectId: string, stage: string, done: boolean): Promise<{ ok: boolean; error?: string }> {
+  return guarded('studioStageDoneAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await setStudioStageDone(String(projectId), String(stage), done === true);
   revalidatePath('/studio/updates');
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }

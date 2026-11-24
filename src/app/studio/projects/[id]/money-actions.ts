@@ -1,5 +1,7 @@
 'use server';
 
+import { guarded, SAVE_FAILED } from '@/lib/action-guard';
+
 /**
  * The Payments tab and the Home locker card (studio workspace Phase 5).
  * Every check is in the module: `payment.record` to record or correct money
@@ -22,6 +24,7 @@ const refresh = (projectId: string) => {
 const id = (v: unknown) => String(v ?? '').slice(0, 64);
 
 export async function recordPaymentAction(form: FormData): Promise<MoneyActionResult> {
+  return guarded('recordPaymentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   const receipt = form.get('receipt');
   const r = await recordPayment(
@@ -31,23 +34,29 @@ export async function recordPaymentAction(form: FormData): Promise<MoneyActionRe
   );
   if (r.ok) refresh(projectId);
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 /** GST on part of the project (owner, 21 Nov 2026): the tick and the % of the value. */
 export async function setProjectGstAction(projectId: string, on: boolean, pct: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+  return guarded('setProjectGstAction', { ok: false, error: SAVE_FAILED }, async () => {
   const p = id(projectId);
   const r = await setProjectGst(p, { on, pct: pct.slice(0, 8) });
   if (r.ok) refresh(p);
   return r.ok ? { ok: true, message: r.message } : { ok: false, error: r.error };
+});
 }
 
 export async function correctPaymentAction(projectId: string, paymentId: string, amount: string): Promise<MoneyActionResult> {
+  return guarded('correctPaymentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await correctPayment(id(paymentId), { amount });
   if (r.ok) refresh(id(projectId));
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 export async function uploadDocumentAction(form: FormData): Promise<MoneyActionResult> {
+  return guarded('uploadDocumentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const projectId = id(form.get('projectId'));
   const file = form.get('file');
   const r = await uploadDocument(
@@ -57,29 +66,38 @@ export async function uploadDocumentAction(form: FormData): Promise<MoneyActionR
   );
   if (r.ok) refresh(projectId);
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 export async function shareDocumentAction(projectId: string, documentId: string): Promise<MoneyActionResult> {
+  return guarded('shareDocumentAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await shareDocument(id(documentId));
   if (r.ok) refresh(id(projectId));
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 export async function removeDraftAction(projectId: string, documentId: string): Promise<MoneyActionResult> {
+  return guarded('removeDraftAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await removeDocument(id(documentId));
   if (r.ok) refresh(id(projectId));
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 export async function materialCodeAction(projectId: string, materialId: string, code: string, ordered: boolean): Promise<MoneyActionResult> {
+  return guarded('materialCodeAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await setMaterialCode(id(materialId), { code, ordered });
   if (r.ok) refresh(id(projectId));
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
 
 /** When a stage is due (accounts, the owner, or the PM on the project). The last one waits for every snag to close (Phase 4's gate, in setPaymentStage). */
 export async function setDueAction(projectId: string, index: number, day: string): Promise<MoneyActionResult> {
+  return guarded('setDueAction', { ok: false, error: SAVE_FAILED }, async () => {
   const r = await setPaymentStage(id(projectId), Number(index), { dueOn: day || null });
   if (r.ok) refresh(id(projectId));
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+});
 }
