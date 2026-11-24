@@ -41,7 +41,7 @@ async function done(r: Promise<TeamResult>): Promise<TeamResult> {
   }
 }
 
-export async function inviteAction(input: { name: string; phone: string; role: string; sites: string[]; salesRoleId?: string; reportsToId?: string; director?: boolean }): Promise<TeamResult> {
+export async function inviteAction(input: { name: string; phone: string; email?: string; role: string; sites: string[]; salesRoleId?: string; reportsToId?: string; director?: boolean }): Promise<TeamResult> {
   return done(inviteMember(input, await baseUrl()));
 }
 
