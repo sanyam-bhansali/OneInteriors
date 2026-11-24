@@ -63,7 +63,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
   const tiles = homeTiles(allApps, prefs);
   /* A director (owner, 24 Nov 2026): projects first; Leads and Quotations under More, read only. */
   const director = member ? isDirector(member) : false;
-  const apps = tiles.filter((a) => !a.more);
+  /* No Team or Product master for a director (owner, 24 Nov 2026: "Remove team and product master option"). */
+  const apps = tiles.filter((a) => !a.more && !(director && (a.key === 'team' || a.key === 'rates')));
   const moreApps = tiles.filter((a) => a.more);
   const role = member?.role ?? 'OWNER';
   /* The lower sections read through the same scoped module functions as the
@@ -204,9 +205,9 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
             ))}
           </div>
           {moreApps.length > 0 ? (
-            <section aria-label="More" data-testid="home-more" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <b style={{ fontSize: 14 }}>More</b>
-              <div className="ph-grid">
+            <details aria-label="More" data-testid="home-more" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>More</summary>
+              <div className="ph-grid" style={{ marginTop: 8 }}>
                 {moreApps.map((a) => (
                   <Link key={a.key} href={a.href} className="ph-app">
                     <span className="tico" style={{ background: a.bg, color: a.fg }}>
@@ -216,7 +217,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
                   </Link>
                 ))}
               </div>
-            </section>
+            </details>
           ) : null}
           {prompt === 'card' ? <SetupCard /> : null}
           {strip.length > 0 ? (
@@ -253,8 +254,6 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
 
         {work ? <MyWork work={work} /> : null}
 
-        {/* A director's dashboard is projects first (owner, 24 Nov 2026): every site, today, above the apps. */}
-        {director ? <EverySite cards={cards} /> : null}
 
         <section aria-labelledby="h-apps" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="hstack" style={{ justifyContent: 'space-between' }}>
@@ -297,25 +296,23 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
         </section>
 
         {moreApps.length > 0 ? (
-          <section aria-labelledby="h-more" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} data-testid="home-more-desk">
-            <div className="hstack" style={{ justifyContent: 'space-between' }}>
-              <h2 id="h-more" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-                More
-              </h2>
-              <span className="muted sm">Read only</span>
-            </div>
-            <div className="lgrid few">
+          /* More opens only when clicked, with no "Read only" words (owner, 24 Nov 2026). */
+          <details className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} data-testid="home-more-desk">
+            <summary id="h-more" style={{ cursor: 'pointer', fontSize: 17, fontWeight: 600, listStyle: 'revert' }}>
+              More
+            </summary>
+            <div className="lgrid few" style={{ marginTop: 14 }}>
               {moreApps.map((a) => (
                 <Link key={a.key} href={a.href} className="tile">
                   <span className="tico" style={{ background: a.bg, color: a.fg }}>
                     <AppIcon name={a.icon} />
                   </span>
                   <b>{a.name}</b>
-                  <span className="tsub">{a.key === 'clients' ? 'Every lead, read only' : 'Every quotation, read only'}</span>
+                  <span className="tsub">{a.key === 'clients' ? 'Every lead' : 'Every quotation'}</span>
                 </Link>
               ))}
             </div>
-          </section>
+          </details>
         ) : null}
 
         {prompt === 'card' ? <SetupCard /> : null}
@@ -350,6 +347,9 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
 
         {role === 'DESIGNER' && board ? <LifecycleTabs board={board} tab={asLifeTab(rawTab)} base="/studio/home" mine /> : null}
         {role === 'DESIGNER' ? <ProjectsToday cards={cards} /> : null}
+
+        {/* A director's sites at the bottom (owner, 24 Nov 2026: "keep the every site today at bottom"). */}
+        {director ? <EverySite cards={cards} /> : null}
 
         <PoweredBy style={{ paddingTop: 24 }} />
       </main>
