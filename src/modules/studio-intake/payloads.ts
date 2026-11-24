@@ -648,7 +648,7 @@ export interface LeadDraft {
   isTest: boolean;
 }
 
-export type Shaped = { ok: true; draft: LeadDraft } | { ok: false; error: string };
+export type Shaped = { ok: true; draft: LeadDraft } | { ok: false; error: string; noPhone?: boolean };
 
 const NOTES_CAP = 4000;
 
@@ -661,8 +661,9 @@ export function shapeLead(lead: IncomingLead): Shaped {
   const phone = lead.phone ? normalisePhone(lead.phone) : null;
   const rawEmail = lead.email?.trim() ?? '';
   const email = rawEmail && rawEmail.length <= CAPS.email && looksLikeEmail(rawEmail) ? rawEmail.toLowerCase() : null;
-  if (!phone && !email) {
-    return { ok: false, error: lead.phone ? `The phone number "${lead.phone.slice(0, 20)}" is not a mobile number, and there is no email.` : 'No phone number or email in the lead.' };
+  /* A mobile number, always (owner, 24 Nov 2026: "a lead cannot be added if it does not have contact number or is already in crm, for meta too"): an email alone is not a lead. */
+  if (!phone) {
+    return { ok: false, noPhone: true, error: lead.phone ? `The phone number "${lead.phone.slice(0, 20)}" is not a mobile number.` : 'No mobile number in the lead.' };
   }
 
   const name = (lead.name?.trim() || (email ? email.split('@')[0]! : '') || 'Name not given').slice(0, CAPS.name);

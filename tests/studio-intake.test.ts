@@ -411,23 +411,16 @@ describe('shaping a lead into a card', () => {
     expect(r.draft.notes).toBeNull();
   });
 
-  it('a wrong number with an email still lands, the number kept in the notes', () => {
-    const r = shapeLead({ ...base, name: 'Asha', phone: '020 2567 8900', email: 'Asha@Example.com' });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.draft.phone).toBeNull();
-    expect(r.draft.email).toBe('asha@example.com');
-    expect(r.draft.notes).toContain('Phone given as: 020 2567 8900');
-  });
-
-  it('nobody to call or write to is refused, with a reason', () => {
-    expect(shapeLead({ ...base, name: 'Asha' })).toEqual({ ok: false, error: 'No phone number or email in the lead.' });
-    const bad = shapeLead({ ...base, name: 'Asha', phone: '12345' });
-    expect(bad.ok).toBe(false);
+  it('no mobile number, no lead: an email alone is not enough (owner, 24 Nov 2026)', () => {
+    expect(shapeLead({ ...base, name: 'Asha' })).toEqual({ ok: false, noPhone: true, error: 'No mobile number in the lead.' });
+    const landline = shapeLead({ ...base, name: 'Asha', phone: '020 2567 8900', email: 'Asha@Example.com' });
+    expect(landline).toMatchObject({ ok: false, noPhone: true });
+    const emailOnly = shapeLead({ ...base, email: 'ravi.k@example.com' });
+    expect(emailOnly).toMatchObject({ ok: false, noPhone: true });
   });
 
   it('a lead with no name is named from the email, or plainly', () => {
-    const a = shapeLead({ ...base, email: 'ravi.k@example.com' });
+    const a = shapeLead({ ...base, phone: '9876543210', email: 'ravi.k@example.com' });
     expect(a.ok && a.draft.name).toBe('ravi.k');
     const b = shapeLead({ ...base, phone: '9876543210' });
     expect(b.ok && b.draft.name).toBe('Name not given');

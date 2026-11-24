@@ -105,6 +105,7 @@ export function Import({
       written,
       alreadyHere: Math.max(0, total - written),
       skippedNoName: plan?.skippedNoName ?? 0,
+      skippedNoPhone: plan?.skippedNoPhone ?? 0,
       duplicatesInFile: plan?.duplicatesInFile ?? 0,
     });
   }
@@ -176,6 +177,11 @@ export function Import({
             <li>
               <span className="mono">{state.skippedNoName}</span> had no name, so there was nobody
               to add. Those rows are still in your file.
+            </li>
+          ) : null}
+          {state.skippedNoPhone > 0 ? (
+            <li>
+              <span className="mono">{state.skippedNoPhone}</span> had no mobile number, so they were left out. Every lead needs one.
             </li>
           ) : null}
         </ul>
@@ -358,6 +364,11 @@ export function Import({
                 out.
               </li>
             ) : null}
+            {plan.skippedNoPhone > 0 ? (
+              <li>
+                <span className="mono">{plan.skippedNoPhone}</span> have no mobile number and will be left out.
+              </li>
+            ) : null}
             {plan.duplicatesInFile > 0 ? (
               <li>
                 <span className="mono">{plan.duplicatesInFile}</span> repeat a phone number already
@@ -410,8 +421,8 @@ export function Import({
                 They look like <span className="mono">9.87E+09</span>
                 . Excel read the column as numbers and kept only the first few digits, so the rest
                 are not in this file to recover. Go back to the original, format the phone column as{' '}
-                <strong>Text</strong> before opening it, and export again. You can import now and
-                those rows will simply have no number.
+                <strong>Text</strong> before opening it, and export again. If you import now, those
+                rows are left out, because every lead needs a mobile number.
               </p>
             </div>
           ) : null}

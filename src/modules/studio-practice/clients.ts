@@ -466,7 +466,9 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
    * a second one — and the answer says which it is.
    */
   const typedPhone = input.phone?.trim() ?? '';
-  if (typedPhone.length > 0 && input.force !== true) {
+  /* A mobile number, always, and never one already in the CRM (owner, 24 Nov 2026: "a lead cannot be added if it does not have contact number or is already in crm, for meta too"). */
+  if (!normalisePhone(typedPhone)) return { ok: false, error: typedPhone ? 'That does not look like a 10-digit mobile number.' : 'Add their mobile number. Every lead needs one.' };
+  {
     const digits = normalisePhone(typedPhone);
     if (digits) {
       const match = await prisma.studioClient.findFirst({

@@ -64,9 +64,6 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
     nextAction: str(form, 'nextAction'),
     nextActionOn: str(form, 'nextActionOn'),
     custom: custom(form),
-    /* Only ever true because the person ticked the box the previous refusal
-       put in front of them. */
-    force: str(form, 'force') === '1',
   });
 
   if (!result.ok) {
@@ -84,10 +81,9 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
 
       return {
         ok: false,
-        error: `${d.name} already has that number and ${where}.${
-          d.deleted ? ' Restoring them keeps everything you recorded before.' : ''
+        error: `This number is already in your CRM: ${d.name} ${where}.${
+          d.deleted ? ' Restore them from the bin instead; that keeps everything recorded before.' : ' Open that lead instead of adding a new one.'
         }`,
-        askAgain: { label: 'Different person — add anyway', field: 'force' },
       };
     }
     return result;
