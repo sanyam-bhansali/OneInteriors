@@ -138,7 +138,12 @@ seconds per call; the screen calls again until done, and a second run skips
 what is already in.
 
 **Meta app setup (One Interiors, once).** Env `META_APP_ID`, `META_APP_SECRET`,
-`META_VERIFY_TOKEN`, and `STUDIO_TOKEN_KEY` (recommended). In the Meta app:
+`META_VERIFY_TOKEN`, `META_LOGIN_CONFIG_ID`, and `STUDIO_TOKEN_KEY`
+(recommended). The app is "OneInteriors Studio" (made 24 Nov 2026, Business
+type, owned by the hauspiredesignstudio portfolio). Its Facebook Login for
+Business configuration "Studio lead ads" (user access token) holds the same
+permissions as `META_SCOPES`; its id goes in `META_LOGIN_CONFIG_ID`, and the
+login then sends `config_id` instead of `scope`. In the Meta app:
 Facebook Login for Business with redirect URI
 `https://studio.oneinteriors.in/api/studio/meta/callback`; Webhooks → Page →
 callback `https://studio.oneinteriors.in/api/studio/intake/meta`, the verify

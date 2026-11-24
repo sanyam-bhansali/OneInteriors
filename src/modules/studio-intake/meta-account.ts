@@ -68,7 +68,7 @@ export async function startLogin(): Promise<{ ok: true; url: string; state: stri
   const app = metaApp();
   if (blocked || !app) return { ok: false, error: blocked ?? 'Not set up.' };
   const state = randomBytes(24).toString('base64url');
-  return { ok: true, url: loginUrl({ appId: app.appId, redirectUri: callbackUrl(), state }), state };
+  return { ok: true, url: loginUrl({ appId: app.appId, redirectUri: callbackUrl(), state, configId: app.configId }), state };
 }
 
 async function graphJson(url: string, init?: RequestInit): Promise<{ ok: true; body: unknown } | Fail> {
