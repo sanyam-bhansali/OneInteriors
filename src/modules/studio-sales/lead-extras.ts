@@ -9,7 +9,7 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { leadInScope, mayOnLead, myLeadScope, actingMember } from '@/modules/studio/lead-scope';
+import { leadInScope, mayOnLead, myLeadScope, actingMember, refusalForMe } from '@/modules/studio/lead-scope';
 import { record } from '@/modules/studio-practice/events';
 import { addTags, removeTag } from './tag-rules';
 import { rawSeenOrPool } from './lead-sql';
@@ -27,7 +27,7 @@ async function workable(leadId: unknown) {
 /** Add tags (cleaned, no duplicates in any case, at most 20). */
 export async function addLeadTags(leadId: unknown, raw: unknown): Promise<Done> {
   const w = await workable(leadId);
-  if (!w) return { ok: false, error: 'That lead is not yours to change.' };
+  if (!w) return { ok: false, error: await refusalForMe('That lead is not yours to change.') };
   const add = (Array.isArray(raw) ? raw : [raw]).filter((t): t is string => typeof t === 'string').slice(0, 20);
   try {
     const row = await prisma.studioClient.findFirst({ where: { id: w.lead.id, studioId: w.scope.studioId }, select: { tags: true } });
@@ -42,7 +42,7 @@ export async function addLeadTags(leadId: unknown, raw: unknown): Promise<Done> 
 
 export async function removeLeadTag(leadId: unknown, tag: unknown): Promise<Done> {
   const w = await workable(leadId);
-  if (!w || typeof tag !== 'string') return { ok: false, error: 'That lead is not yours to change.' };
+  if (!w || typeof tag !== 'string') return { ok: false, error: await refusalForMe('That lead is not yours to change.') };
   try {
     const row = await prisma.studioClient.findFirst({ where: { id: w.lead.id, studioId: w.scope.studioId }, select: { tags: true } });
     await prisma.studioClient.updateMany({ where: { id: w.lead.id, studioId: w.scope.studioId, deletedAt: null }, data: { tags: removeTag(row?.tags ?? [], tag) } });
@@ -83,7 +83,7 @@ async function ownNote(leadId: unknown, noteId: unknown) {
 
 export async function editLeadNote(leadId: unknown, noteId: unknown, text: unknown): Promise<Done> {
   const n = await ownNote(leadId, noteId);
-  if (!n) return { ok: false, error: 'That note is not yours to change.' };
+  if (!n) return { ok: false, error: await refusalForMe('That note is not yours to change.') };
   const words = typeof text === 'string' ? text.trim().slice(0, 2000) : '';
   if (!words) return { ok: false, error: 'Write the note first.' };
   await prisma.studioClientEvent.updateMany({ where: { id: n.note.id, studioId: n.scope.studioId }, data: { summary: words, meta: { edited: new Date().toISOString() } } });
@@ -92,7 +92,7 @@ export async function editLeadNote(leadId: unknown, noteId: unknown, text: unkno
 
 export async function deleteLeadNote(leadId: unknown, noteId: unknown): Promise<Done> {
   const n = await ownNote(leadId, noteId);
-  if (!n) return { ok: false, error: 'That note is not yours to change.' };
+  if (!n) return { ok: false, error: await refusalForMe('That note is not yours to change.') };
   await prisma.studioClientEvent.deleteMany({ where: { id: n.note.id, studioId: n.scope.studioId, kind: 'NOTE' } });
   return { ok: true, message: 'Note deleted.' };
 }
@@ -100,7 +100,7 @@ export async function deleteLeadNote(leadId: unknown, noteId: unknown): Promise<
 /** Tick the next call done (AxLeads' Follow-up checkbox): cleared, with a timeline line. */
 export async function followUpDone(leadId: unknown): Promise<Done> {
   const w = await workable(leadId);
-  if (!w) return { ok: false, error: 'That lead is not yours to change.' };
+  if (!w) return { ok: false, error: await refusalForMe('That lead is not yours to change.') };
   const row = await prisma.studioClient.findFirst({ where: { id: w.lead.id, studioId: w.scope.studioId }, select: { nextAction: true, nextActionOn: true } });
   if (!row?.nextActionOn) return { ok: false, error: 'There is no follow-up to tick.' };
   await prisma.studioClient.updateMany({ where: { id: w.lead.id, studioId: w.scope.studioId, deletedAt: null }, data: { nextAction: null, nextActionOn: null } });

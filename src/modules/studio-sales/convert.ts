@@ -25,7 +25,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { ACCESS_ERRORS } from '@/modules/studio/access';
-import { myLeadScope, mayOnLead, actingMember } from '@/modules/studio/lead-scope';
+import { myLeadScope, mayOnLead, actingMember, refusalForMe } from '@/modules/studio/lead-scope';
 import { startOwnProject, istToday } from '@/modules/project/own-project';
 import { recordEvent } from '@/modules/project/events';
 import { record } from '@/modules/studio-practice/events';
@@ -162,7 +162,7 @@ export async function convertLead(
   now = new Date(),
 ): Promise<ConvertResult> {
   const found = await leadFor(input.clientId);
-  if (!found) return { ok: false, error: ACCESS_ERRORS.notYourRole };
+  if (!found) return { ok: false, error: await refusalForMe(ACCESS_ERRORS.notYourRole) };
   const { scope, lead } = found;
   const member = scope.member;
   const studioId = scope.studioId;

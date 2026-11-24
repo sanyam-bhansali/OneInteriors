@@ -521,6 +521,26 @@ export function quoteReadOnly(member: MemberRole): boolean {
 export const isDirector = (member: MemberRole): boolean => member.role === 'OWNER' && member.director === true;
 
 /**
+ * What a director is told when a lead or quotation write is refused (owner,
+ * 24 Nov 2026: "if someone tries to make some changes there it should
+ * trigger a msg that only the owner of this lead can make changes").
+ */
+export const DIRECTOR_CHANGE_REFUSED = 'Only the owner of this lead can make changes.';
+
+/**
+ * The message for a refused lead or quotation write: `DIRECTOR_CHANGE_REFUSED`
+ * when the person refused is a director (that is why they were refused), else
+ * the site's own message. Takes the member, or anything carrying one (a
+ * `LeadScope`); null or undefined keeps the fallback. Staff viewing as a
+ * director (`viewOnly`) are refused for viewing, so they keep the fallback.
+ */
+export function refusalFor(who: MemberRole | { member: MemberRole } | null | undefined, fallback: string): string {
+  if (!who) return fallback;
+  const member = 'member' in who ? who.member : who;
+  return isDirector(member) && member.viewOnly !== true ? DIRECTOR_CHANGE_REFUSED : fallback;
+}
+
+/**
  * What a director may not do (owner, 24 Nov 2026: "for leads as well as
  * quotation, they only have read only access"): every lead and quotation
  * write, the sales team and lead settings, and the leads list download.
