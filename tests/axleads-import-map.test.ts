@@ -275,11 +275,11 @@ describe('leads', () => {
     expect(plan.report.eventsSkipped.messageDuplicates).toBe(1);
   });
 
-  it('a binned lead goes into the bin with the clock starting today; a landline is kept in the notes', () => {
+  it('a binned lead goes into the bin with the clock starting today; a landline goes in the Phone box with +91', () => {
     const four = created(plan, 4);
-    expect(four.client).toMatchObject({ name: 'lead4', phone: null, stageId: stageId('New'), assignee: null, city: 'Mumbai' });
+    expect(four.client).toMatchObject({ name: 'lead4', phone: '+912040000000', stageId: stageId('New'), assignee: null, city: 'Mumbai' });
     expect(four.client.deletedAt).toEqual(NOW);
-    expect(four.client.notes).toMatch(/Phone as it was on AxLeads: 020 4000 0000/);
+    expect(four.client.notes ?? '').not.toMatch(/Phone as it was on AxLeads/);
     expect(four.client.notes).toMatch(/Stage on AxLeads: Mystery Stage/);
     expect(four.client.notes).toMatch(/Was with Test Agent B on AxLeads/);
     expect(four.client.notes).toMatch(/Carpet area: about 900 \(did not fit the field\)/);
@@ -396,7 +396,7 @@ describe('leads', () => {
   });
 
   it('counts and the report', () => {
-    expect(plan.report).toMatchObject({ leadsInFile: 7, create: 6, mergeFile: 1, mergeExisting: 0, binned: 1, noPhone: 1, phonesNotMobile: 1 });
+    expect(plan.report).toMatchObject({ leadsInFile: 7, create: 6, mergeFile: 1, mergeExisting: 0, binned: 1, noPhone: 0, phonesNotMobile: 0 });
     expect(plan.report.perStage).toEqual({ 'Calling 1': 1, Junk: 1, Lost: 1, New: 2, Converted: 1 });
     expect(plan.report.perAssignee).toEqual({ 'Test Agent A (new, invited)': 1, 'Pool (nobody)': 4, 'Hauspire Owner': 1 });
     expect(plan.report.eventsSkipped.scoreUpdates).toBe(1);

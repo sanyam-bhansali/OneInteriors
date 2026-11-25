@@ -101,6 +101,38 @@ export function normalisePhone(raw: string): string | null {
 }
 
 /**
+ * A lead's phone for the studio's Phone box (owner, 25 Nov 2026: "number
+ * should show on the phone number tab not notes"). An Indian mobile is the
+ * ten digits `normalisePhone` makes, so the duplicate check still matches
+ * however it was typed. Anything else with 8 to 15 digits (a foreign number,
+ * an Indian landline, a mistyped number) is kept as `+`, its country code
+ * (91 when none was typed) and its digits: the
+ * team can see it, call it and fix it on the card. Too short or long → null.
+ *
+ * Studio leads only. Sign-in, OTP and customer accounts stay Indian mobiles.
+ */
+export function leadPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const first = raw.split(/[/,;|]/)[0] ?? '';
+  const indian = normalisePhone(first);
+  if (indian) return indian;
+  const typed = first.trim();
+  const all = typed.replace(/\D/g, '');
+  /* Written with + or 00: the country code is in it. */
+  if (typed.startsWith('+') || all.startsWith('00')) {
+    const d = all.replace(/^0+/, '');
+    return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+  }
+  /* Without one it is Indian: a landline ("020 4000 0000") or a mistyped
+     number, given +91 like the mobiles' calls are. */
+  let d = all;
+  while (d.length > 10 && (d.startsWith('0') || d.startsWith('91'))) d = d.startsWith('0') ? d.slice(1) : d.slice(2);
+  d = d.replace(/^0+/, '');
+  if (d.length === 10) return `+91${d}`;
+  return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+}
+
+/**
  * Good enough to be worth storing.
  *
  * Deliberately not RFC 5322. A regex that accepts every legal address rejects
