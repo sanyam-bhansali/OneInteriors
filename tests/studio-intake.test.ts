@@ -415,13 +415,16 @@ describe('shaping a lead into a card', () => {
     expect(r.draft.notes).toBeNull();
   });
 
-  it('a wrong number with an email still lands, the number kept in the notes', () => {
+  it('a landline lands in the Phone box with +91 (owner, 25 Nov 2026); junk stays in the notes', () => {
     const r = shapeLead({ ...base, name: 'Asha', phone: '020 2567 8900', email: 'Asha@Example.com' });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.draft.phone).toBeNull();
+    expect(r.draft.phone).toBe('+912025678900');
     expect(r.draft.email).toBe('asha@example.com');
-    expect(r.draft.notes).toContain('Phone given as: 020 2567 8900');
+    expect(r.draft.notes).toBeNull();
+    const junk = shapeLead({ ...base, name: 'Asha', phone: '12345', email: 'Asha@Example.com' });
+    expect(junk.ok && junk.draft.phone).toBeNull();
+    expect(junk.ok && junk.draft.notes).toContain('Phone given as: 12345');
   });
 
   it('nobody to call or write to is refused, with a reason', () => {

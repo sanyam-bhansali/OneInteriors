@@ -59,6 +59,7 @@
 
 import { normalisePhone as clientPhone, tidyName } from '@/modules/studio-practice/csv';
 import { normalisePhone as memberPhone } from '@/modules/studio/phone';
+import { leadPhone } from '@/modules/studio-practice/capture-fields';
 import {
   assignedSummary,
   contactSummary,
@@ -1438,9 +1439,9 @@ function buildLead(lead: AxLead, b: BuildCtx): Built {
 
   // Who and how to reach them.
   const rawPhone = (lead.phone ?? lead.contact?.phone ?? '').trim();
-  const phone = rawPhone ? clientPhone(rawPhone) : null;
+  const phone = rawPhone ? (clientPhone(rawPhone) ?? leadPhone(rawPhone)) : null;
   const phoneNotMobile = !!rawPhone && !phone;
-  if (phoneNotMobile) extra.push(`Phone as it was on AxLeads: ${rawPhone} (not a mobile number, so not in the phone box)`);
+  if (phoneNotMobile) extra.push(`Phone as it was on AxLeads: ${rawPhone} (not a number we could read, so not in the phone box)`);
   const email = (lead.email ?? lead.contact?.email ?? '').trim().toLowerCase() || null;
   let name = tidyName(lead.name ?? lead.contact?.name ?? '');
   if (name.length < 2) name = email ? email.split('@')[0]! : phone ? `AxLeads lead …${phone.slice(-4)}` : `AxLeads lead ${lead.id.slice(0, 8)}`;

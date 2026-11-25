@@ -174,7 +174,18 @@ function tenDigits(phone: string | null | undefined): string | null {
   return /^[6-9]\d{9}$/.test(ten) ? ten : null;
 }
 
+/** A number kept with its country code (`leadPhone`): `+` and 8 to 15 digits, not an Indian mobile. */
+function otherDigits(phone: string | null | undefined): string | null {
+  const p = (phone ?? '').trim();
+  if (!p.startsWith('+')) return null;
+  const d = p.replace(/\D/g, '');
+  if (d.length === 12 && d.startsWith('91') && /^[6-9]/.test(d.slice(2))) return null;
+  return d.length >= 8 && d.length <= 15 ? d : null;
+}
+
 export function telLink(phone: string | null | undefined): string | null {
+  const other = otherDigits(phone);
+  if (other) return `tel:+${other}`;
   const ten = tenDigits(phone);
   return ten ? `tel:+91${ten}` : null;
 }
@@ -185,6 +196,8 @@ export function telLink(phone: string | null | undefined): string | null {
  * typed and sent by them.
  */
 export function whatsappLink(phone: string | null | undefined): string | null {
+  const other = otherDigits(phone);
+  if (other) return `https://wa.me/${other}`;
   const ten = tenDigits(phone);
   return ten ? `https://wa.me/91${ten}` : null;
 }

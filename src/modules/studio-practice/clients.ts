@@ -24,7 +24,8 @@ const getCurrentUserId = async (): Promise<string | null> => (await getCurrentUs
 import { myStages, intakeStageId } from './stages';
 import { myFields } from './fields';
 import { cleanValues, problemSentence, readValues, type FieldValues } from './field-values';
-import { IMPORT_SOURCE, IMPORT_NOTE, normalisePhone, type ImportRow } from './csv';
+import { IMPORT_SOURCE, IMPORT_NOTE, type ImportRow } from './csv';
+import { leadPhone } from './capture-fields';
 
 export type { ImportRow, ColumnKey, ImportPlan } from './csv';
 export { parseCsv, guessMapping, planImport, COLUMN_LABELS } from './csv';
@@ -467,7 +468,7 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
    */
   const typedPhone = input.phone?.trim() ?? '';
   if (typedPhone.length > 0 && input.force !== true) {
-    const digits = normalisePhone(typedPhone);
+    const digits = leadPhone(typedPhone);
     if (digits) {
       const match = await prisma.studioClient.findFirst({
         where: { studioId, phone: digits, isDemo: false },
@@ -522,7 +523,7 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
            "+91 98765 43210" is invisible to the duplicate check that looks
            for "9876543210", so the next person to type it gets a second
            card — the exact bug this block was added to prevent. */
-        phone: typedPhone.length > 0 ? (normalisePhone(typedPhone) ?? typedPhone) : null,
+        phone: typedPhone.length > 0 ? (leadPhone(typedPhone) ?? typedPhone) : null,
         society: input.society?.trim() || null,
         config: input.config?.trim() || null,
         // A studio cannot mark its own walk-in as one of ours. That flag is set

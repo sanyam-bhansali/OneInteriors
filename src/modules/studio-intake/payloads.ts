@@ -28,7 +28,7 @@
  * budget, home and area questions are recognised by pattern, not by name.
  */
 
-import { CAPS, CONFIGS, localitySlug, looksLikeEmail, normalisePhone } from '@/modules/studio-practice/capture-fields';
+import { CAPS, CONFIGS, leadPhone, localitySlug, looksLikeEmail } from '@/modules/studio-practice/capture-fields';
 import type { ClientSourceName } from '@/modules/studio-practice/vocabulary';
 
 export type ConnectionKindName = 'WEBSITE' | 'GOOGLE_LEAD_FORM' | 'PORTAL' | 'META_PAGE';
@@ -681,7 +681,7 @@ const NOTES_CAP = 4000;
  * notes ("Phone given as …") so the studio can still try it.
  */
 export function shapeLead(lead: IncomingLead): Shaped {
-  const phone = lead.phone ? normalisePhone(lead.phone) : null;
+  const phone = lead.phone ? leadPhone(lead.phone) : null;
   const rawEmail = lead.email?.trim() ?? '';
   const email = rawEmail && rawEmail.length <= CAPS.email && looksLikeEmail(rawEmail) ? rawEmail.toLowerCase() : null;
   if (!phone && !email) {
