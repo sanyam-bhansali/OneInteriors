@@ -117,7 +117,13 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
   const href = `/studio/projects/${c.id}?tab=${c.phase === 'CLOSURE' ? 'closure' : tab === 'design' ? 'design' : tab === 'snags' ? 'snags' : 'plan'}`;
   const tone = c.phase === 'CLOSURE' ? 'warn' : c.phase === 'WARRANTY' ? 'good' : c.phase === 'SNAGS' ? 'bad' : 'oi';
   return (
-    <Link href={href} className="card lcard" data-testid="life-card" data-phase={c.phase}>
+    <Link href={href} className={`card lcard${c.setup ? ' lnew' : ''}`} data-testid="life-card" data-phase={c.phase}>
+      {/* Flashing until set up (owner, 27 Nov 2026: "should flash that no designer assigned new project"). */}
+      {c.setup ? (
+        <span className="newflash" role="status" data-testid="life-card-new">
+          {c.setup === 'designer' ? 'New project · No designer assigned' : 'New project · Set its priority'}
+        </span>
+      ) : null}
       <div className="lhead">
         <span className="min-w-0">
           <b>{c.client}</b>

@@ -18,6 +18,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember, memberOnProject, projectsVisibleTo } from './access';
 import { siteLabel } from './team-rules';
+import { newOnTop } from './board-view';
 import { readSignedStages } from '@/modules/portal/payments';
 import { GATE_SELECT, gateStagesOf } from '@/modules/studio-design/store';
 import { chainLocks, drawingsOf } from '@/modules/studio-design/rules';
@@ -85,6 +86,16 @@ export interface BoardCard {
   stageOrder: number;
   /** Execution start, handover and the working days between (owner, 22 Nov 2026); null until the execution is planned. */
   execution: ExecutionSpan | null;
+  /** When the project was made (ISO), for newest-converted first. */
+  createdAt: string;
+  /**
+   * A new project still being set up (owner, 27 Nov 2026: "newly converted
+   * projects should show on top until assignment and priority setup and should
+   * flash that no designer assigned new project"): 'designer' while in design
+   * with nobody picked; 'priority' once picked but with no stars set by hand
+   * and no step ticked yet; else null. Pinned on top of the Design board.
+   */
+  setup: 'designer' | 'priority' | null;
 }
 
 export interface LifecycleBoard {
@@ -107,6 +118,7 @@ const SELECT = {
   holds: { where: { status: 'ON' }, take: 1, select: { reason: true } },
   priority: true,
   category: true,
+  createdAt: true,
   onSiteCarcass: true,
   startOn: true,
   executionPlannedAt: true,
@@ -232,6 +244,8 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     designEndsOn: designStage?.plannedEnd ? istDay(designStage.plannedEnd) : null,
     startedOn: p.startOn ? istDay(p.startOn) : null,
     pct: pctOf(phase, p.stages),
+    createdAt: p.createdAt.toISOString(),
+    setup: setupOf(phase, p.designerId ?? null, p.priority ?? null, pctOf(phase, p.stages)),
     ...stageOf(phase, p.stages),
     /* The Execution tab's dates (owner, 22 Nov 2026): start, handover, working days. */
     execution: executionSpan(
@@ -243,6 +257,13 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
 }
 
 /** % complete (owner, 20 Nov 2026): the design's % in design and pre-execution (as on its Design tab; design weighs ~2% of the whole), the project's after. */
+/** See BoardCard `setup`: a project in design with no designer, or with no stars by hand and nothing ticked yet. */
+export function setupOf(phase: Phase, designerId: string | null, priority: number | null, pct: number): BoardCard['setup'] {
+  if (phase !== 'DESIGN') return null;
+  if (designerId === null) return 'designer';
+  return priority === null && pct === 0 ? 'priority' : null;
+}
+
 function pctOf(phase: Phase, stages: Row['stages']): number {
   const progress = progressOf(stages.flatMap((s) => s.items.map((i) => ({ id: i.id, stageId: s.id, weightBp: i.weightBp, inScope: i.inScope, done: i.doneAt !== null }))));
   if (phase === 'DESIGN' || phase === 'PRE_EXECUTION') {
@@ -333,11 +354,12 @@ export async function projectPhaseFor(projectId: string, now = new Date()): Prom
  * the Design tab under its own heading, owner 12 Nov 2026), execution with
  * the closure, snags with the warranty, closed. Stars first, then most late.
  */
-export function boardColumns<C extends Pick<BoardCard, 'phase' | 'priority' | 'lateDays' | 'client' | 'snags'>>(cards: readonly C[]) {
+export function boardColumns<C extends Pick<BoardCard, 'phase' | 'priority' | 'lateDays' | 'client' | 'snags'> & Partial<Pick<BoardCard, 'setup' | 'createdAt'>>>(cards: readonly C[]) {
   /* Stars first (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.4), then the latest. */
   const byLate = (a: C, b: C) => (b.priority ?? 0) - (a.priority ?? 0) || b.lateDays - a.lateDays || a.client.localeCompare(b.client);
   return {
-    design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
+    /* New projects still being set up first, newest first (owner, 27 Nov 2026). */
+    design: newOnTop(cards.filter((c) => c.phase === 'DESIGN').sort(byLate)),
     preExecution: cards.filter((c) => c.phase === 'PRE_EXECUTION').sort(byLate),
     execution: cards.filter((c) => c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
     snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),

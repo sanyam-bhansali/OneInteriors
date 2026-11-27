@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyBoardView, boardViewQuery, keepCard, readBoardView, stageChoices } from '@/modules/studio/board-view';
+import { applyBoardView, boardViewQuery, keepCard, newOnTop, readBoardView, stageChoices } from '@/modules/studio/board-view';
+import { setupOf } from '@/modules/studio/lifecycle-store';
 import type { BoardCard } from '@/modules/studio/lifecycle-store';
 
 const card = (o: Partial<BoardCard>): BoardCard =>
@@ -47,7 +48,7 @@ describe('Design board sort and filter (owner, 20 Nov 2026)', () => {
   });
 
   it('leaves the board as built on the default view', () => {
-    expect(applyBoardView(board, readBoardView({}))).toBe(board);
+    expect(applyBoardView(board, readBoardView({}))).toEqual(board);
   });
 
   it('sorts by late, design end (undated last), newest and client name', () => {
@@ -75,5 +76,30 @@ describe('Design board sort and filter (owner, 20 Nov 2026)', () => {
   it('filters by the stage, listing every stage in plan order with its count', () => {
     expect(stageChoices(board.design)).toEqual([{ stage: '2D layout', count: 1 }, { stage: 'First draft (3D)', count: 2 }]);
     expect(names(applyBoardView(board, readBoardView({ stage: 'First draft (3D)' })).design)).toEqual(['Asha', 'Chetan']);
+  });
+});
+
+describe('new projects on top (owner, 27 Nov 2026)', () => {
+  const N1 = card({ client: 'New one', setup: 'designer', createdAt: '2026-11-20T10:00:00.000Z' });
+  const N2 = card({ client: 'Newer', setup: 'priority', createdAt: '2026-11-26T10:00:00.000Z' });
+  const b2 = { design: [A, N1, B, N2, C], preExecution: [], execution: [], snags: [], closed: [], closures: [] };
+
+  it('stays first, newest converted first, whatever the sort', () => {
+    for (const sort of ['stars', 'late', 'client', 'pct-asc'] as const) {
+      const out = applyBoardView(b2, { sort, cat: null, show: null, stage: null });
+      expect(names(out.design).slice(0, 2)).toEqual(['Newer', 'New one']);
+    }
+  });
+
+  it('drops into the list once set up', () => {
+    expect(names(newOnTop([A, { ...N1, setup: null }, B]))).toEqual(['Asha', 'New one', 'bhushan']);
+  });
+
+  it('is a new project while no designer, or no stars by hand and nothing ticked', () => {
+    expect(setupOf('DESIGN', null, 4, 30)).toBe('designer');
+    expect(setupOf('DESIGN', 'm1', null, 0)).toBe('priority');
+    expect(setupOf('DESIGN', 'm1', null, 25)).toBeNull();
+    expect(setupOf('DESIGN', 'm1', 3, 0)).toBeNull();
+    expect(setupOf('EXECUTION', null, null, 0)).toBeNull();
   });
 });

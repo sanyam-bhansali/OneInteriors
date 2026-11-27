@@ -97,6 +97,17 @@ export function keepCard(c: Card, v: BoardView): boolean {
   }
 }
 
+/**
+ * New projects still being set up on top, newest converted first (owner, 27
+ * Nov 2026: "newly converted projects should show on top until assignment and
+ * priority setup"). The rest keep their order. Whatever the sort, these stay
+ * first; once a designer and the stars are set they drop into the list.
+ */
+export function newOnTop<C extends Partial<Pick<BoardCard, 'setup' | 'createdAt'>>>(cards: readonly C[]): C[] {
+  const fresh = cards.filter((c) => c.setup).sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  return fresh.length ? [...fresh, ...cards.filter((c) => !c.setup)] : [...cards];
+}
+
 const stars = (a: Card, b: Card) => (b.priority ?? 0) - (a.priority ?? 0) || b.lateDays - a.lateDays || a.client.localeCompare(b.client);
 
 export function compareCards(sort: BoardSort): (a: Card, b: Card) => number {
@@ -121,12 +132,12 @@ export function compareCards(sort: BoardSort): (a: Card, b: Card) => number {
 
 /** The board with the view applied to every column. The default view leaves the board exactly as built. */
 export function applyBoardView<B extends Pick<LifecycleBoard, 'design' | 'preExecution' | 'execution' | 'snags' | 'closed' | 'closures'>>(b: B, v: BoardView): B {
-  if (isDefaultView(v)) return b;
+  if (isDefaultView(v)) return { ...b, design: newOnTop(b.design) };
   const by = compareCards(v.sort);
   const pick = (l: BoardCard[], resort = true) => {
     const kept = l.filter((c) => keepCard(c, v));
     return resort && v.sort !== 'stars' ? [...kept].sort(by) : kept;
   };
   // Execution keeps closures on top unless a sort is picked; snags keep most-snags first unless a sort is picked.
-  return { ...b, design: pick(b.design), preExecution: pick(b.preExecution), execution: pick(b.execution), snags: pick(b.snags), closed: pick(b.closed), closures: pick(b.closures, false) };
+  return { ...b, design: newOnTop(pick(b.design)), preExecution: pick(b.preExecution), execution: pick(b.execution), snags: pick(b.snags), closed: pick(b.closed), closures: pick(b.closures, false) };
 }

@@ -108,3 +108,28 @@
     padding: 0 12px;
   }
 }
+
+/* A new project still being set up (owner, 27 Nov 2026): on top, flashing until a designer and the priority are set. */
+.oi-studio .oi-life .lcard.lnew {
+  border-color: var(--warn);
+}
+.oi-studio .newflash {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 700;
+  animation: oi-newflash 1.2s ease-in-out infinite;
+}
+@keyframes oi-newflash {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oi-studio .newflash {
+    animation: none;
+  }
+}
