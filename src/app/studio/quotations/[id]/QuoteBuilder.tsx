@@ -799,7 +799,7 @@ export function QuoteBuilder({
           </p>
         ) : null}
         <p className="hhelp">
-          Two quotations per project — the <b>Sales Final</b>, and the design revision of it. Save the design revision as often as you like; it becomes the <b>Design Final</b> when you press <b>Generate PDF</b> (the project's payment stages then move to its total), and each copy the client gets is kept (R1, R2…). It is always compared with the Sales Final.
+          Two quotations per project — the <b>Sales Final</b>, and the design revision of it. Save the design revision as often as you like; it becomes the <b>Design Final</b> when you press <b>Generate PDF</b> (the project’s payment stages then move to its total), and each copy the client gets is kept (R1, R2…). It is always compared with the Sales Final.
         </p>
 
         <details className="hmore">
