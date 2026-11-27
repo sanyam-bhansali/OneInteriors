@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { myBranding, myTier } from '@/modules/studio-quote/store';
+import { myBranding, myPlan, myTier } from '@/modules/studio-quote/store';
 import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
 import { LogoAndMark } from './LogoAndMark';
@@ -43,9 +43,10 @@ export default async function SettingsPage() {
 
   /* In parallel: neither depends on the other, and the signed URL is a round
      trip to storage that should not sit behind a subscription lookup. */
-  const [logoUrl, tier, warranty, brandPageUrls, member, service] = await Promise.all([
+  const [logoUrl, tier, plan, warranty, brandPageUrls, member, service] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     myTier(),
+    myPlan(),
     myWarranty().catch(() => null),
     Promise.all((branding?.brandPages ?? []).map((p) => signedLogoUrl(p))),
     currentMember(),
@@ -81,6 +82,7 @@ export default async function SettingsPage() {
             hasBranding={branding !== null}
             uploadEnabled={logoUploadEnabled()}
             tier={tier}
+            plan={plan}
             hideRequested={branding?.hideOurMark ?? false}
           />
         </div>

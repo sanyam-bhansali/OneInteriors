@@ -114,7 +114,7 @@ const STEPS: Step[] = [
       <Options
         value={a.pipeline ?? suggestedPipeline(a.leadsPerMonth)}
         options={[
-          { v: 'HAUSPIRE', label: 'Detailed, like Hauspire', note: 'New, four calling rounds, effective lead, floor plan and quotation stages, visits, finalisation, converted.' },
+          { v: 'HAUSPIRE', label: 'Detailed', note: 'New, four calling rounds, effective lead, floor plan and quotation stages, visits, finalisation, converted.' },
           { v: 'SIMPLE', label: 'Simple', note: 'Keep the columns you have now.' },
         ]}
         onPick={(v) => set({ pipeline: v })}

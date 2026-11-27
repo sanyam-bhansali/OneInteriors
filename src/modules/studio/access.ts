@@ -1,5 +1,5 @@
 import 'server-only';
-import { opensFullSoftware, planOf } from './software-plan';
+import { opensFullSoftware, planOf, worksAlone } from './software-plan';
 
 /**
  * The studio workspace's permission check against the database: who this
@@ -95,7 +95,7 @@ async function refFor(row: MemberRow | null): Promise<StudioMemberRef | null> {
       : null;
   const base = sales ? { ...member, sales } : member;
   /* The relation is required; a test double without it narrows nothing. */
-  return studio ? { ...base, fullSoftware: opensFullSoftware(planOf(studio)), solo: planOf(studio) === 'SOLO' } : base;
+  return studio ? { ...base, fullSoftware: opensFullSoftware(planOf(studio)), solo: worksAlone(planOf(studio)) } : base;
 }
 
 /**

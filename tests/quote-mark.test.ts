@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { showsOurMark, tierMayRemoveMark, markToggleState } from '@/modules/studio-quote/mark';
+import { mayRemoveMark, showsOurMark, tierMayRemoveMark, markToggleState } from '@/modules/studio-quote/mark';
 
 /**
  * Who sees our mark on a studio's quotation.
@@ -59,7 +59,7 @@ describe('markToggleState', () => {
   it('tells an unentitled studio what it costs rather than hiding the control', () => {
     const state = markToggleState({ tier: 'ESSENTIAL', hideRequested: false });
     expect(state.entitled).toBe(false);
-    expect(state.note).toContain('Premium');
+    expect(state.note).toContain('Pro and Max');
   });
 
   it('keeps showing an unentitled studio their own stored preference', () => {
@@ -72,5 +72,32 @@ describe('markToggleState', () => {
     const state = markToggleState({ tier: 'PREMIUM', hideRequested: false });
     expect(state.entitled).toBe(true);
     expect(state.note).toContain('footer');
+  });
+});
+
+describe('the CRM plans and our mark (owner, 24 Nov 2026)', () => {
+  it('Pro and Max may take the line off; Free keeps it', () => {
+    expect(mayRemoveMark({ tier: null, plan: 'PRO' })).toBe(true);
+    expect(mayRemoveMark({ tier: null, plan: 'MAX' })).toBe(true);
+    expect(mayRemoveMark({ tier: null, plan: 'FREE' })).toBe(false);
+    expect(mayRemoveMark({ tier: null, plan: null })).toBe(false);
+  });
+
+  it('a marketplace tier that includes it still counts on Free', () => {
+    expect(mayRemoveMark({ tier: 'PREMIUM', plan: 'FREE' })).toBe(true);
+  });
+
+  it('the wish is honoured only while entitled, so a downgrade to Free brings the line back', () => {
+    const wish = { tier: null, hideRequested: true };
+    expect(showsOurMark({ ...wish, plan: 'PRO' })).toBe(false);
+    expect(showsOurMark({ ...wish, plan: 'FREE' })).toBe(true);
+    expect(showsOurMark({ tier: null, plan: 'MAX', hideRequested: false })).toBe(true);
+  });
+
+  it('the toggle on Free says which plans include it', () => {
+    const s = markToggleState({ tier: null, plan: 'FREE', hideRequested: false });
+    expect(s.entitled).toBe(false);
+    expect(s.note).toMatch(/Pro and Max/);
+    expect(markToggleState({ tier: null, plan: 'PRO', hideRequested: false }).entitled).toBe(true);
   });
 });

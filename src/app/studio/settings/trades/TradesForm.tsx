@@ -87,12 +87,12 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
       <section className={section}>
         <h2 className="m-0 text-[16px] font-semibold">Routing quotation lines to trades</h2>
         <p className={`m-0 ${muted}`}>
-          Your rows come first: an exact product name, or a word the name contains. Then Hauspire&apos;s table ({Object.keys(HAUSPIRE_PRODUCTS).length} product names and its keyword rules). A
+          Your rows come first: an exact product name, or a word the name contains. Then the standard table ({Object.keys(HAUSPIRE_PRODUCTS).length} product names and its keyword rules). A
           line nothing matches goes to carpentry, marked &ldquo;trade guessed&rdquo;.
         </p>
         <label className="flex items-center gap-2 text-[13.5px]">
           <input type="checkbox" checked={useHauspire} onChange={(e) => setUseHauspire(e.target.checked)} />
-          Use Hauspire&apos;s routing under my rows
+          Use the standard routing under my rows
         </label>
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {routes.map((x, i) => (
@@ -125,7 +125,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
 
       <section className={section}>
         <h2 className="m-0 text-[16px] font-semibold">Rate templates</h2>
-        <p className={`m-0 ${muted}`}>Copied onto a new crew&apos;s card for their trades, once. Changing a template never changes a crew&apos;s card. Only ₹150 per sq ft installation is Hauspire&apos;s real rate; fill in yours.</p>
+        <p className={`m-0 ${muted}`}>Copied onto a new crew&apos;s card for their trades, once. Changing a template never changes a crew&apos;s card. Only the ₹150 per sq ft installation is a real rate; fill in yours.</p>
         <div className="flex flex-wrap gap-1.5">
           {keyed.map((t) => (
             <button key={t.key} type="button" className={tplOpen === t.key ? 'btn pri sm' : 'btn ghost sm'} onClick={() => setTplOpen(tplOpen === t.key ? null : t.key)}>
@@ -169,7 +169,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
           <label className="flex flex-col gap-1">
             <span className="lbl">Pay crews within (days)</span>
             <input className="fld w-[120px] fit" inputMode="numeric" value={dueDays} onChange={(e) => setDueDays(e.target.value)} />
-            <span className={muted}>A new work order&apos;s &ldquo;pay by&rdquo; date. Hauspire: 45.</span>
+            <span className={muted}>A new work order&apos;s &ldquo;pay by&rdquo; date. Usual: 45.</span>
           </label>
           <label className="flex flex-col gap-1">
             <span className="lbl">Labour margin target (%)</span>
@@ -179,7 +179,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
           <label className="flex flex-col gap-1">
             <span className="lbl">Installation-only rate (₹ per sq ft)</span>
             <input className="fld w-[120px] fit" inputMode="decimal" value={install} onChange={(e) => setInstall(e.target.value)} />
-            <span className={muted}>For a carpentry line marked installation only, when the crew&apos;s card has no rate. Hauspire: ₹150.</span>
+            <span className={muted}>For a carpentry line marked installation only, when the crew&apos;s card has no rate. Usual: ₹150.</span>
           </label>
           <label className="flex flex-col gap-1">
             <span className="lbl">Advance limit (₹)</span>

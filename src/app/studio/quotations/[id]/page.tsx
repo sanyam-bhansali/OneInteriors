@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getQuote, projectIdOfQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
-import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
+import { myProducts, myBranding, myPlan, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
 import { signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
@@ -50,11 +50,12 @@ export const dynamic = 'force-dynamic';
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [quote, products, branding, tier] = await Promise.all([
+  const [quote, products, branding, tier, plan] = await Promise.all([
     getQuote(id),
     myProducts(),
     myBranding(),
     myTier().catch(() => null),
+    myPlan().catch(() => null),
   ]);
 
   if (!quote) notFound();
@@ -229,7 +230,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           /* Their wish and their entitlement, resolved on the server. The
              browser is told whether the line prints, never what tier they are
              on — see modules/studio-quote/mark.ts. */
-          showMark={showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false })}
+          showMark={showsOurMark({ tier, plan, hideRequested: branding?.hideOurMark ?? false })}
           markText={MARK_TEXT}
           logoUrl={logoUrl}
           planReader={planReader}

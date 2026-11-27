@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
 import { signedBrandPageUrls, signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
 import { readStages, templateOrDefault, type PaymentStage } from '@/modules/studio-sales/payment-template';
-import { myBranding, myStudioProfile, myTier, type BrandingRow } from './store';
+import { myBranding, myPlan, myStudioProfile, myTier, type BrandingRow } from './store';
 import { showsOurMark, MARK_TEXT } from './mark';
 import { coverFacts, type DocSpecRow, type DocStudio } from './document';
 import { salesFinalTotalInStudio, type QuoteRow } from './quotes';
@@ -36,7 +36,7 @@ export interface DocContext {
 }
 
 export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 'terms' | 'status'>): Promise<DocContext> {
-  const [branding, tier, profile, studioId] = await Promise.all([myBranding(), myTier(), myStudioProfile(), quotingStudioId()]);
+  const [branding, tier, plan, profile, studioId] = await Promise.all([myBranding(), myTier(), myPlan(), myStudioProfile(), quotingStudioId()]);
 
   const [row, logoUrl, brandPages] = await Promise.all([
     studioId
@@ -98,7 +98,7 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
        terms, so every PDF ends with a Terms & Conditions page (owner, 13 Oct 2026). */
     terms: quote.terms?.trim() ? quote.terms : (branding?.terms ?? null),
     validDays: branding?.validityDays ?? 30,
-    showMark: showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false }),
+    showMark: showsOurMark({ tier, plan, hideRequested: branding?.hideOurMark ?? false }),
     markText: MARK_TEXT,
     branding,
   };

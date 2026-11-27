@@ -53,6 +53,18 @@ export function tierMayRemoveMark(tier: string | null | undefined): boolean {
 }
 
 /**
+ * The studio CRM plans (owner, 24 Nov 2026; studio/software-plan.ts
+ * `mayRemoveMark`): Pro and Max may take the line off, Free keeps it. Listed
+ * here, not imported, for the same reason as the tiers above.
+ */
+const ENTITLED_PLANS = ['PRO', 'MAX'] as const;
+
+/** Either way of being entitled: a marketplace tier that includes it, or a CRM plan that does. */
+export function mayRemoveMark(input: { tier: string | null | undefined; plan?: string | null }): boolean {
+  return tierMayRemoveMark(input.tier) || (ENTITLED_PLANS as readonly string[]).includes(input.plan ?? '');
+}
+
+/**
  * Does our mark go on this document?
  *
  * Both halves are required, and the order matters. A studio can ask for it to
@@ -68,18 +80,21 @@ export function tierMayRemoveMark(tier: string | null | undefined): boolean {
  */
 export function showsOurMark(input: {
   tier: string | null | undefined;
+  /** The studio CRM plan (FREE | PRO | MAX). */
+  plan?: string | null;
   hideRequested: boolean;
 }): boolean {
   if (!input.hideRequested) return true;
-  return !tierMayRemoveMark(input.tier);
+  return !mayRemoveMark(input);
 }
 
 /** What the settings screen says about the toggle, given where they stand. */
 export function markToggleState(input: {
   tier: string | null | undefined;
+  plan?: string | null;
   hideRequested: boolean;
 }): { entitled: boolean; on: boolean; note: string } {
-  const entitled = tierMayRemoveMark(input.tier);
+  const entitled = mayRemoveMark(input);
 
   if (!entitled) {
     return {
@@ -87,7 +102,7 @@ export function markToggleState(input: {
       on: input.hideRequested,
       /* Says what it costs rather than hiding the control. A feature a studio
          cannot see is one they cannot decide they want. */
-      note: 'Available on Premium. Your preference is kept either way, so it takes effect the day you upgrade.',
+      note: 'Available on Pro and Max. Your preference is kept either way, so it takes effect the day you upgrade.',
     };
   }
 

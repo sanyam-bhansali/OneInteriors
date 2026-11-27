@@ -1,5 +1,5 @@
 import 'server-only';
-import { SOFTWARE_PLANS, isSoftwarePlan, planOf, seatLimit, type SoftwarePlan } from '@/modules/studio/software-plan';
+import { SOFTWARE_PLANS, isSoftwarePlan, opensFullSoftware, planOf, seatLimit, type SoftwarePlan } from '@/modules/studio/software-plan';
 
 /**
  * The ops write path.
@@ -353,7 +353,9 @@ export async function setHiddenAsTest(
 // ── The studio software plan ───────────────────────────────────
 
 /**
- * Put a studio on Pro or Max (owner, 19 Oct 2026; studio/software-plan.ts).
+ * Put a studio on Free, Pro or Max (owner, 19 Oct 2026; plans 24 Nov 2026;
+ * studio/software-plan.ts). A studio still on the old Pro Solo (SOLO) moved
+ * to Free is written as FREE, which turns the Free limits on.
  * Ops only, audited like every other change ops makes to a studio. Writes
  * the older `fullSoftware` switch to match, so both read the same until it
  * is retired. Moving to Pro keeps every record: projects, crews and the team
@@ -361,18 +363,18 @@ export async function setHiddenAsTest(
  */
 export async function setSoftwarePlan(studioId: string, plan: SoftwarePlan): Promise<RecordResult> {
   const actor = await requireRole('OPS');
-  if (!isSoftwarePlan(plan)) return { ok: false, error: 'Choose Pro Solo, Pro or Max.' };
+  if (!isSoftwarePlan(plan)) return { ok: false, error: 'Choose Free, Pro or Max.' };
   try {
     await prisma.$transaction(async (tx) => {
       const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true, tradeName: true } });
       const was = planOf(before);
-      if (was === plan && before.softwarePlan === plan && before.fullSoftware === (plan === 'MAX')) return;
+      if (was === plan && before.softwarePlan === plan && before.fullSoftware === opensFullSoftware(plan)) return;
       const limit = seatLimit(plan);
       if (limit !== null) {
         const people = await tx.studioMember.count({ where: { studioId } });
         if (people > limit) throw new Error(`${SOFTWARE_PLANS[plan].name} is for one person. This studio has ${people} people on its team; remove them first, or keep it on Pro.`);
       }
-      await tx.studio.update({ where: { id: studioId }, data: { softwarePlan: plan, fullSoftware: plan === 'MAX' } });
+      await tx.studio.update({ where: { id: studioId }, data: { softwarePlan: plan, fullSoftware: opensFullSoftware(plan) } });
       await writeAudit(tx, actor, 'studio.plan_changed', 'Studio', studioId, { plan: was }, { plan, tradeName: before.tradeName });
     });
     return { ok: true };
@@ -381,11 +383,11 @@ export async function setSoftwarePlan(studioId: string, plan: SoftwarePlan): Pro
   }
 }
 
-/** The studio's plan (the ops page reads it). */
-export async function softwarePlanOf(studioId: string): Promise<SoftwarePlan> {
+/** The studio's plan (the ops page reads it), and whether it is still the old Pro Solo (Free, limits waived). */
+export async function softwarePlanOf(studioId: string): Promise<{ plan: SoftwarePlan; legacySolo: boolean }> {
   await requireRole('OPS');
   const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true } });
-  return planOf(row);
+  return { plan: planOf(row), legacySolo: row?.softwarePlan === 'SOLO' && planOf(row) === 'FREE' };
 }
 
 // ── GSTIN ──────────────────────────────────────────────────────

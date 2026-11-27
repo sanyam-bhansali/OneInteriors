@@ -181,3 +181,27 @@ describe('what each answer changes', () => {
     expect(plan.kept.length).toBe(1);
   });
 });
+
+describe('the quiz never names another studio (owner, 24 Nov 2026: the CRM is sold to every studio)', () => {
+  it('no change it proposes says Hauspire', () => {
+    const all = ans({
+      pipeline: 'HAUSPIRE',
+      production: 'FACTORY',
+      designInHouse: true,
+      sources: ['GOOGLE', 'OTHER'],
+      otherSource: 'Hoardings',
+      discountPct: 10,
+      feeOn: false,
+      gstOn: true,
+      validityDays: 15,
+      team: { sales: 2, designers: 1, pms: 1, supervisors: 1, accounts: 1 },
+    });
+    const own = [{ label: 'Advance', note: '', kind: 'PCT', pct: 50 }, { label: 'Rest', note: '', kind: 'PCT', pct: 50 }];
+    for (const now of [fresh(), fresh({ paymentTemplate: own, designTemplate: SHORT_DESIGN })]) {
+      const plan = planSetup(all, now);
+      expect(plan.changes.length).toBeGreaterThan(0);
+      for (const c of plan.changes) expect(`${c.title} ${c.detail}`).not.toMatch(/hauspire/i);
+      for (const k of plan.kept) expect(k).not.toMatch(/hauspire/i);
+    }
+  });
+});
