@@ -1042,7 +1042,7 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
               <Link href={`/studio/quotations/${f.designFinal.id}`} className="acc-t">
                 {f.designFinal.number}
               </Link>{' '}
-              <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'not final yet: mark it in the quotation' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
+              <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'not final yet: open it and press Generate PDF' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
               <Link href={`/studio/quotations/${f.designFinal.id}/compare`} className="acc-t">
                 Compare with the sales final
               </Link>
@@ -1086,10 +1086,10 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
           <span className={muted}>
             {!f.designFinal
               ? tab.canAssign
-                ? 'A working copy of the sales final for the design’s changes. Revise it as often as needed; it is the design final only once you mark it in the quotation.'
+                ? 'A working copy of the sales final for the design’s changes. Revise it as often as needed; it is the design final only once you press Generate PDF on it; the payment stages then move to its total.'
                 : 'The owner, the project manager or the designer revises the sales final into the design final.'
               : f.designFinal.status === 'DRAFT'
-                ? 'Revise it in the quotation, then mark it as the design final there. Sign-off comes after.'
+                ? 'Revise it in the quotation, then press Generate PDF there: that makes it the design final and moves the payment stages to its total. Sign-off comes after.'
                 : 'Sign off when the design is done. The project then moves to execution.'}
           </span>
         </div>
